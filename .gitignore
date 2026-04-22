@@ -1,0 +1,49 @@
+# 🔹 Node modules
+node_modules/
+
+# 🔹 Environment variables (VERY IMPORTANT)
+.env
+.env.*
+
+# 🔹 Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 🔹 Build output
+dist/
+build/
+
+# 🔹 OS files
+.DS_Store
+Thumbs.db
+
+# 🔹 Editor
+.vscode/
+.idea/
+
+# 🔹 Cache
+.cache/
+.eslintcache
+
+# 🔹 Prisma
+prisma/*.db
+prisma/*.db-journal
+
+# ❗ Keep migrations (recommended for backend)
+# prisma/migrations/   <-- DO NOT ignore (important)
+
+# 🔹 Temporary files
+tmp/
+temp/
+
+# 🔹 Coverage
+coverage/
+
+# my files setup
+.editorconfig
+.prettierrc
+.prettierignore
+.eslintrc.js
