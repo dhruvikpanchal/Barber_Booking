@@ -1,22 +1,43 @@
 import express from 'express';
-import dotenv from 'dotenv';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 
-dotenv.config();
+// Middleware
+import { authMiddleware } from './middleware/auth.middleware.js';
+import { roleMiddleware } from './middleware/role.middleware.js';
+import { errorHandler } from './middleware/errorHandler.middleware.js';
+
+// Routes
+import authRouter from './router/auth.route.js';
+import userRouter from './router/user.route.js';
+import publicRouter from './router/public.route.js';
 
 const app = express();
 
-// middleware
+// Middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static('temp'));
+app.use(cookieParser());
 app.use(
   cors({
-    origin: '*',
+    origin: process.env.CORS_ORIGIN,
     credentials: true,
   }),
 );
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static('temp'));
 
-// routes
+// Routes
+app.use('/api/v1/auth', authRouter);
+app.use('/api/v1/user', userRouter);
+app.use('/api/v1/public', publicRouter);
+// app.use('/api/v1/barber', authMiddleware, roleMiddleware(['BARBER']), barberRouter);
+
+// Health check
+app.get('/', (_, res) => {
+  res.send('Website is Running...');
+});
+
+// Global error Handler
+app.use(errorHandler);
 
 export default app;
