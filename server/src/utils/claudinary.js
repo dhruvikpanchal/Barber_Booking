@@ -24,12 +24,14 @@ const uploadOnCloudinary = async (localFilePath) => {
     };
   } catch (error) {
     console.error('Cloudinary upload error:', error.message);
-
+    return null;
+  } finally {
     try {
       await fs.unlink(localFilePath);
-    } catch {}
-
-    return null;
+      console.log('Temp file deleted:', localFilePath);
+    } catch (err) {
+      console.error('File delete failed:', err.message);
+    }
   }
 };
 

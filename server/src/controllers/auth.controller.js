@@ -45,6 +45,7 @@ export const RegisterUser = asyncHandler(async (req, res) => {
     await prisma.barber.create({
       data: {
         userId: user.id,
+        status: 'PENDING',
       },
     });
   }

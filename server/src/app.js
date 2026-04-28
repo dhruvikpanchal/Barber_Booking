@@ -3,14 +3,13 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 
 // Middleware
-import { authMiddleware } from './middleware/auth.middleware.js';
-import { roleMiddleware } from './middleware/role.middleware.js';
 import { errorHandler } from './middleware/errorHandler.middleware.js';
 
 // Routes
+import publicRouter from './router/public.route.js';
 import authRouter from './router/auth.route.js';
 import userRouter from './router/user.route.js';
-import publicRouter from './router/public.route.js';
+import barberRouter from './router/barber.route.js';
 
 const app = express();
 
@@ -27,10 +26,10 @@ app.use(
 );
 
 // Routes
+app.use('/api/v1/public', publicRouter);
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/user', userRouter);
-app.use('/api/v1/public', publicRouter);
-// app.use('/api/v1/barber', authMiddleware, roleMiddleware(['BARBER']), barberRouter);
+app.use('/api/v1/barber', barberRouter);
 
 // Health check
 app.get('/', (_, res) => {
