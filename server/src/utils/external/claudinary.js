@@ -7,7 +7,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const uploadOnCloudinary = async (localFilePath) => {
+const uploadOnCloudinary = async ({ localFilePath }) => {
   try {
     if (!localFilePath) return null;
 
@@ -15,8 +15,6 @@ const uploadOnCloudinary = async (localFilePath) => {
       resource_type: 'auto',
       folder: 'User_Images',
     });
-
-    await fs.unlink(localFilePath);
 
     return {
       url: response.secure_url,
@@ -27,15 +25,17 @@ const uploadOnCloudinary = async (localFilePath) => {
     return null;
   } finally {
     try {
-      await fs.unlink(localFilePath);
-      console.log('Temp file deleted:', localFilePath);
+      if (localFilePath) {
+        await fs.unlink(localFilePath);
+        console.log('Temp file deleted:', localFilePath);
+      }
     } catch (err) {
       console.error('File delete failed:', err.message);
     }
   }
 };
 
-const deleteFromCloudinary = async (publicId) => {
+const deleteFromCloudinary = async ({ publicId }) => {
   try {
     if (!publicId) return;
 

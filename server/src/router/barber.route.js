@@ -6,6 +6,7 @@ import {
   getBarberProfile,
   updateBarberProfile,
   uploadBarberProfileImage,
+  changePassword,
   createService,
   updateService,
   toggleServiceStatus,
@@ -23,7 +24,7 @@ import {
   getBookings,
   updateBookingStatus,
   getBookingById,
-  deleteeBooking,
+  deleteBooking,
   toggleAvailability,
   getDashboardStats,
   getAllReviews,
@@ -37,6 +38,7 @@ barberRouter.use(roleMiddleware(['BARBER']));
 barberRouter.get('/profile', getBarberProfile);
 barberRouter.put('/profile', updateBarberProfile);
 barberRouter.post('/profile/image', upload.single('image'), uploadBarberProfileImage);
+barberRouter.post('/change-password', changePassword);
 barberRouter.post('/services', createService);
 barberRouter.put('/services/:id', updateService);
 barberRouter.put('/services/:id/status', toggleServiceStatus);
@@ -46,8 +48,6 @@ barberRouter.post('/schedules', createSchedule);
 barberRouter.put('/schedules/:id', updateSchedule);
 barberRouter.delete('/schedules/:id', deleteSchedule);
 barberRouter.get('/schedules', getSchedules);
-
-// I stoped Here
 barberRouter.post('/slots', createTimeSlot);
 barberRouter.post('/slots/bulk', createBulkTimeSlots);
 barberRouter.get('/slots', getTimeSlots);
@@ -55,8 +55,10 @@ barberRouter.put('/slots/:id', updateTimeSlot);
 barberRouter.delete('/slots/:id', deleteTimeSlot);
 barberRouter.get('/bookings', getBookings);
 barberRouter.put('/bookings/:id/status', updateBookingStatus);
+
+// I stoped Here
 barberRouter.get('/bookings/:id', getBookingById);
-barberRouter.delete('/bookings/:id', deleteeBooking);
+barberRouter.delete('/bookings/:id', deleteBooking);
 barberRouter.put('/availability', toggleAvailability);
 barberRouter.get('/dashboard', getDashboardStats);
 barberRouter.get('/reviews', getAllReviews);

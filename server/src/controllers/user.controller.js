@@ -1,82 +1,80 @@
-import { PrismaClient } from '@prisma/client';
-import { asyncHandler } from '../utils/asyncHandler.js';
-import { ApiError } from '../utils/ApiError.js';
-import { ApiResponse } from '../utils/ApiResponse.js';
-import { paginationFn } from '../utils/Pagination.js';
-import { uploadOnCloudinary, deleteFromCloudinary } from '../utils/claudinary.js';
+import { prisma } from '../config/prismaClient.js';
 
-const prisma = new PrismaClient();
+// Utils
+import {
+  asyncHandler,
+  ApiError,
+  ApiResponse,
+  getPaginationParams,
+  paginationFn,
+  parseDateUTC,
+  formatSlot,
+  combineDateAndTimeUTC,
+} from '../utils/index.js';
+
+// Helpers
+import { recalculateBarberRating } from '../helpers/ratingHelper.js';
+import { VerifyAndUpdatePassword } from '../helpers/ChangePasswordHelper.js';
+import { uploadProfileImage } from '../helpers/updateImageHelper.js';
+import {
+  checkUserAndRole,
+  userVerifyAndStatusCheck,
+  barberVerifyAndStatusCheck,
+} from '../helpers/OnlyUserHelper.js';
+
+/*===========================================================================
+                            Main Functions
+=============================================================================*/
 
 // [1] User Profile Fetch
 export const getProfile = asyncHandler(async (req, res) => {
-  const id = req.user.id;
+  const userId = req.user.id;
 
-  if (!id) {
-    throw new ApiError(400, 'Id is required');
-  }
+  checkUserAndRole({ userId: userId, userRole: req.user?.role });
 
-  const user = await prisma.user.findUnique({ where: { id: id } });
+  const existingUser = await userVerifyAndStatusCheck({ userId: userId });
 
-  if (!user) {
-    throw new ApiError(404, 'User not found');
-  }
+  const user = await prisma.user.findUnique({
+    where: { id: existingUser.id },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      imageUrl: true,
+      role: true,
+      isActive: true,
+      isEmailVerified: true,
+      createdAt: true,
+    },
+  });
 
-  const { passwordHash, ...safeUserData } = user;
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, safeUserData, 'User Profile fetched successfully'));
+  return res.status(200).json(new ApiResponse(200, user, 'User Profile fetched successfully'));
 });
 
 // [2] Update Profile
 export const updateProfile = asyncHandler(async (req, res) => {
-  const id = req.user.id;
-  const { name, phone, image } = req.body;
+  const userId = req.user.id;
+  const { name, phone } = req.body;
 
-  if (!id) {
-    throw new ApiError(400, 'Id is required');
-  }
+  checkUserAndRole({ userId: userId, userRole: req.user?.role });
 
-  if (!name && !phone) {
-    throw new ApiError(400, 'At least one field is required to update');
-  }
+  if (!name && !phone) throw new ApiError(400, 'At least one field is required to update');
 
-  const existingUser = await prisma.user.findUnique({ where: { id: id } });
-
-  if (!existingUser) {
-    throw new ApiError(404, 'User not found');
-  }
-
-  let uploadedImage = null;
-
-  if (req.file?.path) {
-    uploadedImage = await uploadOnCloudinary(req.file.path);
-
-    if (!uploadedImage) {
-      throw new ApiError(500, 'Image upload failed');
-    }
-
-    if (existingUser?.imagePublicId) {
-      await deleteFromCloudinary(existingUser.imagePublicId);
-    }
-  }
+  const existingUser = await userVerifyAndStatusCheck({ userId: userId });
 
   const updatedUser = await prisma.user.update({
     where: {
-      id: id,
+      id: existingUser.id,
     },
     data: {
       ...(name && { name }),
       ...(phone && { phone }),
-      ...(image && { image }),
-      imageUrl: uploadedImage.url,
-      imagePublicId: uploadedImage.public_id,
     },
     select: {
       id: true,
       name: true,
       phone: true,
-      imageUrl: true,
     },
   });
 
@@ -85,139 +83,71 @@ export const updateProfile = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, updatedUser, 'User Profile Updated successfully'));
 });
 
-// [3] Get Barber List
-export const getBarberList = asyncHandler(async (req, res) => {
-  const { search, location } = req.query;
-  const page = Number(req.query.page) || 1;
-  const limit = Math.min(Number(req.query.limit) || 10, 50);
+// [3] Change Password
+export const changePassword = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { oldPassword, newPassword } = req.body;
 
-  const skip = (page - 1) * limit;
+  checkUserAndRole({ userId: userId, userRole: req.user?.role });
 
-  const whereCause = {
-    status: 'APPROVED',
-    isAvailable: true,
-    ...(location && { location: { contains: location, mode: 'insensitive' } }),
-    ...(search && {
-      user: {
-        name: { contains: search, mode: 'insensitive' },
-      },
-    }),
-  };
+  const existingUser = await userVerifyAndStatusCheck({ userId: userId });
 
-  const barbers = await prisma.barber.findMany({
-    where: whereCause,
-    select: {
-      id: true,
-      bio: true,
-      averageRating: true,
-      location: true,
-      user: {
-        select: { name: true },
-      },
-    },
-    orderBy: { averageRating: 'desc' },
-    skip: skip,
-    take: limit,
+  const user = await VerifyAndUpdatePassword({
+    userId: existingUser.id,
+    oldPassword: oldPassword,
+    newPassword: newPassword,
+    existingPasswordHash: existingUser.passwordHash,
   });
 
-  const total = await prisma.barber.count({ where: whereCause });
+  return res.status(200).json(new ApiResponse(200, user, 'Password changed successfully'));
+});
 
-  const pagination = paginationFn(total, page, limit);
+// [4]  Upload User Profile Image
+export const uploadUserProfileImage = asyncHandler(async (req, res) => {
+  const userId = req.user?.id;
+
+  checkUserAndRole({ userId: userId, userRole: req.user?.role });
+
+  const existingUser = await userVerifyAndStatusCheck({ userId: userId });
+
+  const user = await uploadProfileImage({
+    userId: existingUser.id,
+    filePath: req?.file?.path,
+    oldImageId: existingUser?.imagePublicId,
+  });
 
   return res
     .status(200)
-    .json(new ApiResponse(200, { barbers, pagination }, 'Barber List fetched successfully'));
-});
-
-// [4] Get Barber Details
-export const getBarberDetails = asyncHandler(async (req, res) => {
-  const id = Number(req.params.id);
-
-  if (!id) {
-    throw new ApiError(400, 'Id is required');
-  }
-
-  const barber = await prisma.user.findUnique({
-    where: { id: Number(id) },
-    select: {
-      name: true,
-      imageUrl: true,
-      phone: true,
-      email: true,
-
-      barber: {
-        select: {
-          id: true,
-          bio: true,
-          averageRating: true,
-
-          // ✅ Reviews
-          reviews: {
-            take: 10,
-            orderBy: { createdAt: 'desc' },
-            select: {
-              id: true,
-              rating: true,
-              comment: true,
-              createdAt: true,
-              user: {
-                select: {
-                  name: true,
-                  imageUrl: true,
-                },
-              },
-            },
-          },
-
-          // ✅ Services (junction table)
-          services: {
-            select: {
-              id: true,
-              name: true,
-              description: true,
-              durationMinutes: true,
-              price: true,
-            },
-          },
-        },
-      },
-    },
-  });
-
-  if (!barber) {
-    throw new ApiError(404, 'Barber not found');
-  }
-
-  return res.status(200).json(new ApiResponse(200, barber, 'Barber Details fetched successfully'));
+    .json(new ApiResponse(200, user, 'User profile image updated successfully'));
 });
 
 // [5] Get Available Time Slots
 export const getAvailableTimeSlots = asyncHandler(async (req, res) => {
-  const barberId = req.params.id;
+  const barberId = Number(req?.params?.id);
+  const userId = req?.user?.id;
+  const { page, limit, skip } = getPaginationParams({
+    page: req?.query?.page,
+    limit: req?.query?.limit,
+  });
 
-  if (!barberId) {
-    throw new ApiError(400, 'Barber ID is required');
-  }
+  checkUserAndRole({ userId: userId, userRole: req.user?.role });
 
-  const date = req.query.date;
+  if (!barberId) throw new ApiError(400, 'Barber ID is required');
 
-  if (!date) {
-    throw new ApiError(400, 'Date is required');
-  }
+  const date = req?.query?.date;
 
-  const parsedDate = new Date(date);
+  if (!date) throw new ApiError(400, 'Date is required');
 
-  if (isNaN(parsedDate)) {
-    throw new ApiError(400, 'Invalid date format');
-  }
+  await userVerifyAndStatusCheck({ userId: id });
 
-  const startOfDay = new Date(parsedDate.setHours(0, 0, 0, 0));
-  const endOfDay = new Date(parsedDate.setHours(23, 59, 59, 999));
+  const existingBarber = await barberVerifyAndStatusCheck({ barberId: barberId });
+
+  const parsedDate = parseDateUTC({ dateStr: date });
 
   const timeSlots = await prisma.timeSlot.findMany({
     where: {
-      barberId: Number(barberId),
-      slotDate: { gte: startOfDay, lte: endOfDay },
+      barberId: existingBarber.id,
+      slotDate: parsedDate,
       status: 'AVAILABLE',
     },
     select: {
@@ -227,15 +157,29 @@ export const getAvailableTimeSlots = asyncHandler(async (req, res) => {
       status: true,
     },
     orderBy: { startTime: 'asc' },
+    skip,
+    take: limit,
   });
+
+  const total = await prisma.timeSlot.count({
+    where: {
+      barberId: Number(barberId),
+      slotDate: parsedDate,
+      status: 'AVAILABLE',
+    },
+  });
+
+  const pagination = paginationFn({ total: total, limit: limit, page: page });
+
+  const formattedSlots = timeSlots.map((slot) => formatSlot({ slot }));
 
   return res
     .status(200)
     .json(
       new ApiResponse(
         200,
-        timeSlots,
-        timeSlots.length
+        { formattedSlots, pagination },
+        formattedSlots.length
           ? 'Available time slots fetched successfully'
           : 'No time slots available for this date',
       ),
@@ -244,63 +188,69 @@ export const getAvailableTimeSlots = asyncHandler(async (req, res) => {
 
 // [6] Create Booking
 export const createBooking = asyncHandler(async (req, res) => {
+  const userId = req.user?.id;
   const { barberId, serviceId, slotId } = req.body;
-  const userId = req.user.id;
 
-  if (!barberId || !serviceId || !slotId) {
-    throw new ApiError(400, 'All fields are required');
-  }
+  checkUserAndRole({ userId: userId, userRole: req.user?.role });
 
-  if (!userId) {
-    throw new ApiError(401, 'User not authenticated');
-  }
+  if (!barberId || !serviceId || !slotId)
+    throw new ApiError(400, 'barberId, serviceId and slotId are required');
+
+  const existingUser = await userVerifyAndStatusCheck({ userId: userId });
+  const existingBarber = await barberVerifyAndStatusCheck({ barberId: barberId });
 
   const booking = await prisma.$transaction(async (tx) => {
     const slot = await tx.timeSlot.findUnique({
-      where: {
-        id: Number(slotId),
-      },
-    });
-
-    if (!slot || slot.status !== 'AVAILABLE')
-      throw new ApiError(400, 'Slot is not available or invalid');
-
-    const service = await tx.barberService.findFirst({
-      where: {
-        barberId: Number(barberId),
-        serviceId: Number(serviceId),
-      },
-    });
-
-    if (!service) throw new ApiError(400, 'Service not found or not offered by this barber');
-
-    const newBooking = await tx.booking.create({
-      data: {
-        userId,
-        barberId,
-        serviceId,
-        slotId,
-        bookingType: 'ONLINE',
-        bookedAt: new Date(),
-        status: 'CONFIRMED',
-      },
+      where: { id: Number(slotId) },
       select: {
         id: true,
         status: true,
         barberId: true,
-        serviceId: true,
-        slotId: true,
-        bookedAt: true,
-        bookingType: true,
+        slotDate: true,
+        startTime: true,
       },
     });
 
-    await tx.timeSlot.update({
+    if (!slot || slot.status !== 'AVAILABLE') throw new ApiError(400, 'Slot not available');
+
+    if (slot.barberId !== Number(existingBarber.id))
+      throw new ApiError(400, 'Slot does not belong to this barber');
+
+    const slotDateTime = combineDateAndTimeUTC({
+      date: slot.slotDate,
+      time: slot.startTime,
+    });
+
+    if (slotDateTime <= new Date()) throw new ApiError(400, 'Cannot book past slot');
+
+    const service = await tx.service.findFirst({
       where: {
-        id: Number(slotId),
+        id: Number(serviceId),
+        barberId: existingBarber.id,
+        isActive: true,
       },
+    });
+
+    if (!service) throw new ApiError(400, 'Invalid service');
+
+    await tx.timeSlot.update({
+      where: { id: Number(slotId) },
+      data: { status: 'ONLINE_BOOKED' },
+    });
+
+    const newBooking = await tx.booking.create({
       data: {
-        status: 'BOOKED',
+        userId: existingUser.id,
+        barberId: existingBarber.id,
+        serviceId: Number(serviceId),
+        slotId: Number(slotId),
+        bookingType: 'ONLINE',
+        bookedAt: new Date(),
+        status: 'PENDING',
+      },
+      include: {
+        service: true,
+        slot: true,
       },
     });
 
@@ -312,70 +262,92 @@ export const createBooking = asyncHandler(async (req, res) => {
 
 // [7] Cancel Booking
 export const cancelBooking = asyncHandler(async (req, res) => {
-  const userId = req.user.id;
-  const bookingId = req.params.bookingId;
+  const userId = req.user?.id;
+  const bookingId = Number(req.params?.id);
 
-  if (!bookingId) {
-    throw new ApiError(400, 'Booking ID is required');
-  }
+  checkUserAndRole({ userId: userId, userRole: req.user?.role });
+
+  if (!bookingId) throw new ApiError(400, 'Valid Booking ID is required');
+
+  const existingUser = await userVerifyAndStatusCheck({ userId: userId });
 
   const result = await prisma.$transaction(async (tx) => {
-    // 1. Get booking
     const booking = await tx.booking.findUnique({
       where: { id: bookingId },
+      select: {
+        id: true,
+        userId: true,
+        slotId: true,
+        status: true,
+      },
     });
 
-    if (!booking) {
-      throw new ApiError(404, 'Booking not found');
-    }
+    if (!booking) throw new ApiError(404, 'Booking not found');
 
-    // 2. Ownership check
-    if (booking.userId !== userId) {
-      throw new ApiError(403, 'Unauthorized to cancel this booking');
-    }
+    if (booking.userId !== existingUser.id)
+      throw new ApiError(403, 'You are not allowed to cancel this booking');
 
-    // 3. Status validation
-    if (booking.status === 'CANCELLED') {
-      throw new ApiError(400, 'Booking already cancelled');
-    }
+    if (booking.status === 'CANCELLED') return { booking, alreadyCancel: true };
 
-    if (booking.status === 'COMPLETED') {
+    if (booking.status === 'COMPLETED')
       throw new ApiError(400, 'Completed booking cannot be cancelled');
+
+    const slot = await tx.timeSlot.findUnique({
+      where: { id: booking.slotId },
+      select: { startTime: true },
+    });
+
+    if (slot) {
+      const now = new Date();
+
+      const slotTime = new Date(slot.startTime);
+
+      if (slotTime.getTime() <= now.getTime())
+        throw new ApiError(400, 'Cannot cancel past bookings');
     }
 
-    // 4. Cancel booking
     const updatedBooking = await tx.booking.update({
       where: { id: bookingId },
-      data: { status: 'CANCELLED' },
+      data: {
+        status: 'CANCELLED',
+        cancelReason: 'USER_CANCELLED',
+      },
     });
 
-    // 5. Release slot
     await tx.timeSlot.update({
       where: { id: booking.slotId },
       data: { status: 'AVAILABLE' },
     });
 
-    return updatedBooking;
+    return { booking: updatedBooking, alreadyCancel: false };
   });
 
-  return res.status(200).json(new ApiResponse(200, result, 'Booking cancelled successfully'));
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        result.booking,
+        result.alreadyCancel ? 'Booking already cancelled' : 'Booking cancelled successfully',
+      ),
+    );
 });
 
 // [8] Get User's Bookings
 export const getMyBookings = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  const page = Number(req.query.page) || 1;
-  const limit = Math.min(Number(req.query.limit) || 10, 50);
+  const { page, limit, skip } = getPaginationParams({
+    page: req?.query?.page,
+    limit: req?.query?.limit,
+  });
 
-  const skip = (page - 1) * limit;
+  checkUserAndRole({ userId: userId, userRole: req.user?.role });
 
-  if (!userId) {
-    throw new ApiError(400, 'User is required');
-  }
+  const existingUser = await userVerifyAndStatusCheck({ userId: userId });
 
   const bookings = await prisma.booking.findMany({
     where: {
-      userId: userId,
+      userId: existingUser.id,
     },
     select: {
       id: true,
@@ -398,7 +370,7 @@ export const getMyBookings = asyncHandler(async (req, res) => {
           user: {
             select: {
               name: true,
-              image: true,
+              imageUrl: true,
               phone: true,
               email: true,
             },
@@ -421,14 +393,20 @@ export const getMyBookings = asyncHandler(async (req, res) => {
   });
 
   const total = await prisma.booking.count({
-    where: { userId },
+    where: { userId: existingUser.id },
   });
 
-  const pagination = paginationFn(total, page, limit);
+  const pagination = paginationFn({ total: total, page: page, limit: limit });
 
   return res
     .status(200)
-    .json(new ApiResponse(200, { bookings, pagination }, 'User bookings fetched successfully'));
+    .json(
+      new ApiResponse(
+        200,
+        { bookings, pagination },
+        bookings.length ? 'User bookings fetched successfully' : 'No bookings found',
+      ),
+    );
 });
 
 // [9] Add Review
@@ -436,73 +414,130 @@ export const addReview = asyncHandler(async (req, res) => {
   const { bookingId, rating, comment } = req.body;
   const userId = req.user.id;
 
-  if (!bookingId || !rating || !comment) {
-    throw new ApiError(400, 'All fields are required');
-  }
+  if (!bookingId || !rating || !comment) throw new ApiError(400, 'All fields are required');
 
-  if (!userId) {
-    throw new ApiError(400, 'User is required');
-  }
+  checkUserAndRole({ userId: userId, userRole: req.user?.role });
 
-  const booking = await prisma.booking.findUnique({
-    where: {
-      id: bookingId,
-    },
-  });
-
-  if (!booking) {
-    throw new ApiError(404, 'Booking not found');
-  }
+  const existingUser = await userVerifyAndStatusCheck({ userId: userId });
 
   const result = await prisma.$transaction(async (tx) => {
     const booking = await tx.booking.findUnique({
       where: { id: bookingId },
     });
 
-    if (!booking) {
-      throw new ApiError(404, 'Booking not found');
-    }
+    if (!booking) throw new ApiError(404, 'Booking not found');
 
-    if (booking.userId !== userId) {
+    if (booking.userId !== existingUser.id)
       throw new ApiError(403, 'Not authorized to review this booking');
-    }
 
-    if (booking.status !== 'COMPLETED') {
+    if (booking.status !== 'COMPLETED')
       throw new ApiError(400, 'You can only review completed bookings');
-    }
 
     const existingReview = await tx.review.findUnique({
       where: { bookingId },
     });
 
-    if (existingReview) {
-      throw new ApiError(400, 'Review already exists for this booking');
-    }
+    if (existingReview) throw new ApiError(400, 'Review already exists for this booking');
 
     const review = await tx.review.create({
       data: {
         bookingId,
-        userId,
+        userId: existingUser.id,
         barberId: booking.barberId,
         rating,
         comment,
       },
     });
 
-    const stats = await tx.review.aggregate({
-      where: { barberId: booking.barberId },
-      _avg: { rating: true },
-    });
-
-    await tx.barber.update({
-      where: { id: booking.barberId },
-      data: {
-        averageRating: stats._avg.rating || 0,
-      },
-    });
+    await recalculateBarberRating({ barberId: booking?.barberId, tx: tx });
 
     return review;
   });
 
   return res.status(201).json(new ApiResponse(201, result, 'Review added successfully'));
+});
+
+// [10] Update Review
+export const updateReview = asyncHandler(async (req, res) => {
+  const { bookingId, rating, comment } = req.body;
+  const userId = req.user.id;
+
+  if (!bookingId || !rating || !comment) throw new ApiError(400, 'All fields are required');
+
+  checkUserAndRole({ userId: userId, userRole: req.user?.role });
+
+  const existingUser = await userVerifyAndStatusCheck({ userId: userId });
+
+  const result = await prisma.$transaction(async (tx) => {
+    const booking = await tx.booking.findUnique({
+      where: { id: bookingId },
+    });
+
+    if (!booking) throw new ApiError(404, 'Booking not found');
+
+    if (booking.userId !== existingUser.id)
+      throw new ApiError(403, 'Not authorized to review this booking');
+
+    if (booking.status !== 'COMPLETED')
+      throw new ApiError(400, 'You can only update review for completed bookings');
+
+    const existingReview = await tx.review.findUnique({
+      where: { bookingId },
+    });
+
+    if (!existingReview) throw new ApiError(400, 'Review does not exist for this booking');
+
+    const review = await tx.review.update({
+      where: { bookingId },
+      data: {
+        rating,
+        comment,
+      },
+    });
+
+    await recalculateBarberRating({ barberId: booking?.barberId, tx: tx });
+
+    return review;
+  });
+
+  return res.status(200).json(new ApiResponse(200, result, 'Review updated successfully'));
+});
+
+// [11] Delete Review
+export const deleteReview = asyncHandler(async (req, res) => {
+  const bookingId = Number(req.params.bookingId);
+  const userId = req.user.id;
+
+  checkUserAndRole({ userId: userId, userRole: req.user?.role });
+
+  if (!bookingId || isNaN(bookingId)) throw new ApiError(400, 'Invalid booking ID');
+
+  const existingUser = await userVerifyAndStatusCheck({ userId: userId });
+
+  const result = await prisma.$transaction(async (tx) => {
+    const booking = await tx.booking.findUnique({
+      where: { id: bookingId },
+    });
+
+    if (!booking) throw new ApiError(404, 'Booking not found');
+
+    if (booking.userId !== existingUser.id)
+      throw new ApiError(403, 'Not authorized to review this booking');
+
+    const existingReview = await tx.review.findUnique({
+      where: { bookingId },
+    });
+
+    if (!existingReview) throw new ApiError(400, 'Review does not exist for this booking');
+
+    const review = await tx.review.delete({
+      where: { bookingId },
+    });
+
+    await recalculateBarberRating({ barberId: booking?.barberId, tx: tx });
+
+    return review;
+  });
+
+  return res.status(200).json(new ApiResponse(200, result, 'Review delete successfully'));
 });

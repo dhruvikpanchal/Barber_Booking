@@ -1,7 +1,7 @@
 import Mailgen from 'mailgen';
 import nodemailer from 'nodemailer';
 
-const sendEmail = async (options) => {
+const sendEmail = async ({ email, subject, mailgenContent }) => {
   const mailGenerator = new Mailgen({
     theme: 'default',
     product: {
@@ -10,9 +10,9 @@ const sendEmail = async (options) => {
     },
   });
 
-  const emailTextual = mailGenerator.generatePlaintext(options.mailgenContent);
+  const emailTextual = mailGenerator.generatePlaintext(mailgenContent);
 
-  const emailHtml = mailGenerator.generate(options.mailgenContent);
+  const emailHtml = mailGenerator.generate(mailgenContent);
 
   const transporter = nodemailer.createTransport({
     host: process.env.MAILTRAP_SMTP_HOST,
@@ -25,8 +25,8 @@ const sendEmail = async (options) => {
 
   const mail = {
     from: 'mail.taskmanager@example.com',
-    to: options.email,
-    subject: options.subject,
+    to: email,
+    subject: subject,
     text: emailTextual,
     html: emailHtml,
   };
@@ -41,7 +41,7 @@ const sendEmail = async (options) => {
   }
 };
 
-const emailVerificationMailgenContent = (username, verficationUrl) => {
+const emailVerificationMailgenContent = ({ username, verficationUrl }) => {
   return {
     body: {
       name: username,
@@ -59,7 +59,7 @@ const emailVerificationMailgenContent = (username, verficationUrl) => {
   };
 };
 
-const forgotPasswordMailgenContent = (username, passwordResetUrl) => {
+const forgotPasswordMailgenContent = ({ username, passwordResetUrl }) => {
   return {
     body: {
       name: username,
@@ -77,7 +77,7 @@ const forgotPasswordMailgenContent = (username, passwordResetUrl) => {
   };
 };
 
-const forgotPasswordOTPContent = (username, otp) => {
+const forgotPasswordOTPContent = ({ username, otp }) => {
   return {
     body: {
       name: username,

@@ -164,7 +164,8 @@ model TimeSlot {
   createdAt  DateTime @default(now()) @map("created_at")
 
   barber     Barber   @relation(fields: [barberId], references: [id], onDelete: Cascade)
-  bookingSlots BookingSlot[]
+
+  booking    Booking? @relation("SlotBooking")
 
   @@unique([barberId, slotDate, startTime])
   @@index([barberId, slotDate, status])
@@ -180,43 +181,28 @@ model Booking {
   barberId      Int      @map("barber_id")
   serviceId     Int      @map("service_id")
 
-  bookingType   BookingType @map("booking_type")
-  walkInName    String?  @map("walk_in_name")
+  slotId        Int      @unique @map("slot_id")
 
-  bookedAt      DateTime @map("booked_at")
+  bookingType   BookingType @map("booking_type")
+  walkInName    String?
+
+  bookedAt      DateTime
 
   status        BookingStatus @default(PENDING)
 
-  cancelReason  String?  @map("cancel_reason")
+  cancelReason  String?
   notes         String?
 
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  barber        Barber   @relation(fields: [barberId], references: [id], onDelete: Cascade)
-  service       Service  @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  user          User?    @relation(fields: [userId], references: [id])
+  barber        Barber   @relation(fields: [barberId], references: [id])
+  service       Service  @relation(fields: [serviceId], references: [id])
 
-  bookingSlots  BookingSlot[]
+  slot          TimeSlot @relation("SlotBooking", fields: [slotId], references: [id])
+
   review        Review?
-
-  @@index([barberId, bookedAt])
-  @@index([userId])
-  @@map("bookings")
-}
-
-/* ================= BOOKING SLOT ================= */
-
-model BookingSlot {
-  id         Int      @id @default(autoincrement())
-
-  bookingId  Int      @map("booking_id")
-  slotId     Int      @unique @map("slot_id")
-
-  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  slot       TimeSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
-
-  @@map("booking_slots")
 }
 
 /* ================= REVIEW ================= */
