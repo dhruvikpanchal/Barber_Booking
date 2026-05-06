@@ -1,5 +1,4 @@
-import jwt from 'jsonwebtoken';
-import { ApiError } from '../utils/ApiError.js';
+import { ApiError, verifyToken } from '../utils/index.js';
 
 export const authMiddleware = (req, res, next) => {
   try {
@@ -15,9 +14,8 @@ export const authMiddleware = (req, res, next) => {
       throw new ApiError(401, 'Unauthorized: Token missing');
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = verifyToken({ token: token });
 
-    // Optional: attach only needed data
     req.user = {
       id: decoded.id,
       role: decoded.role,

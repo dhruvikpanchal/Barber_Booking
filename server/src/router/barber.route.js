@@ -28,6 +28,8 @@ import {
   toggleAvailability,
   getDashboardStats,
   getAllReviews,
+  createWalkInBooking,
+  getEarningsSummary,
 } from '../controllers/barber.controller.js';
 
 const barberRouter = Router();
@@ -55,12 +57,12 @@ barberRouter.put('/slots/:id', updateTimeSlot);
 barberRouter.delete('/slots/:id', deleteTimeSlot);
 barberRouter.get('/bookings', getBookings);
 barberRouter.put('/bookings/:id/status', updateBookingStatus);
-
-// I stoped Here
 barberRouter.get('/bookings/:id', getBookingById);
 barberRouter.delete('/bookings/:id', deleteBooking);
 barberRouter.put('/availability', toggleAvailability);
 barberRouter.get('/dashboard', getDashboardStats);
 barberRouter.get('/reviews', getAllReviews);
+barberRouter.post('/bookings/walk-in', createWalkInBooking);
+barberRouter.get('/earnings/summary', getEarningsSummary);
 
 export default barberRouter;

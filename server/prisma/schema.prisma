@@ -214,7 +214,7 @@ model Review {
   userId     Int      @map("user_id")
   barberId   Int      @map("barber_id")
 
-  rating     Int
+  rating     Float
   comment    String?
 
   createdAt  DateTime @default(now()) @map("created_at")

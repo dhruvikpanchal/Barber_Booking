@@ -12,6 +12,9 @@ import {
   getEndOfDayUTC,
 } from '../utils/index.js';
 
+// helper function
+import { buildBarberListWhere } from '../helpers/barberListHelper.js';
+
 /*===========================================================================
                             Main Functions
 =============================================================================*/
@@ -47,16 +50,12 @@ export const getBarberList = asyncHandler(async (req, res) => {
     limit: req?.query?.limit,
   });
 
-  const whereCause = {
+  const whereCause = buildBarberListWhere({
+    search,
+    location,
     status: 'APPROVED',
     isAvailable: true,
-    ...(location && { location: { contains: location, mode: 'insensitive' } }),
-    ...(search && {
-      user: {
-        name: { contains: search, mode: 'insensitive' },
-      },
-    }),
-  };
+  });
 
   const barbers = await prisma.barber.findMany({
     where: whereCause,
@@ -95,65 +94,69 @@ export const getBarberDetails = asyncHandler(async (req, res) => {
 
   if (!barberId) throw new ApiError(400, 'Id is required');
 
-  const existingBarber = await prisma.barber.findUnique({
-    where: { id: Number(barberId) },
+  const row = await prisma.barber.findUnique({
+    where: { id: barberId },
     select: {
       id: true,
       status: true,
-      userId: true,
-    },
-  });
-
-  if (!existingBarber) throw new ApiError(404, 'Barber not found');
-
-  if (existingBarber.status !== 'APPROVED') throw new ApiError(403, 'Barber is not approved');
-
-  const barber = await prisma.user.findUnique({
-    where: { id: Number(existingBarber.userId) },
-    select: {
-      name: true,
-      imageUrl: true,
-      phone: true,
-      email: true,
-
-      barber: {
+      bio: true,
+      averageRating: true,
+      user: {
+        select: {
+          name: true,
+          imageUrl: true,
+          phone: true,
+          email: true,
+        },
+      },
+      reviews: {
+        take: 10,
+        orderBy: { createdAt: 'desc' },
         select: {
           id: true,
-          bio: true,
-          averageRating: true,
-
-          reviews: {
-            take: 10,
-            orderBy: { createdAt: 'desc' },
+          rating: true,
+          comment: true,
+          createdAt: true,
+          user: {
             select: {
-              id: true,
-              rating: true,
-              comment: true,
-              createdAt: true,
-              user: {
-                select: {
-                  name: true,
-                  imageUrl: true,
-                },
-              },
-            },
-          },
-
-          services: {
-            select: {
-              id: true,
               name: true,
-              description: true,
-              durationMinutes: true,
-              price: true,
+              imageUrl: true,
             },
           },
+        },
+      },
+      services: {
+        where: { isActive: true },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          durationMinutes: true,
+          price: true,
         },
       },
     },
   });
 
-  if (!barber) throw new ApiError(404, 'Barber not found');
+  if (!row) throw new ApiError(404, 'Barber not found');
+
+  if (row.status !== 'APPROVED') throw new ApiError(403, 'Barber is not approved');
+
+  if (!row.user) throw new ApiError(404, 'Barber not found');
+
+  const barber = {
+    name: row.user.name,
+    imageUrl: row.user.imageUrl,
+    phone: row.user.phone,
+    email: row.user.email,
+    barber: {
+      id: row.id,
+      bio: row.bio,
+      averageRating: row.averageRating,
+      reviews: row.reviews,
+      services: row.services,
+    },
+  };
 
   return res.status(200).json(new ApiResponse(200, barber, 'Barber Details fetched successfully'));
 });

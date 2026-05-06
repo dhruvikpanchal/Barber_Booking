@@ -10,7 +10,7 @@ const publicRouter = Router();
 
 publicRouter.post('/contact', ContactUs);
 publicRouter.get('/barber', getBarberList);
-publicRouter.get('/barber/:id', getBarberDetails);
 publicRouter.get('/barber/available-slots', getPublicAvailableSlots);
+publicRouter.get('/barber/:id', getBarberDetails);
 
 export default publicRouter;

@@ -5,8 +5,8 @@ const sendEmail = async ({ email, subject, mailgenContent }) => {
   const mailGenerator = new Mailgen({
     theme: 'default',
     product: {
-      name: 'Barber Booking',
-      link: 'https://taskmanagelink.com',
+      name: process.env.APP_NAME || 'Barber Booking',
+      link: process.env.APP_URL || 'http://localhost:5173',
     },
   });
 
@@ -24,7 +24,7 @@ const sendEmail = async ({ email, subject, mailgenContent }) => {
   });
 
   const mail = {
-    from: 'mail.taskmanager@example.com',
+    from: process.env.MAIL_FROM || 'noreply@barberbooking.local',
     to: email,
     subject: subject,
     text: emailTextual,
@@ -35,23 +35,23 @@ const sendEmail = async ({ email, subject, mailgenContent }) => {
     await transporter.sendMail(mail);
   } catch (error) {
     console.error(
-      'Email service failed siliently. Make sure that you have provided your MAILTRAP credentials in the .env file',
+      'Email service failed silently. Make sure that you have provided your MAILTRAP credentials in the .env file',
     );
     console.error('Error: ', error);
   }
 };
 
-const emailVerificationMailgenContent = ({ username, verficationUrl }) => {
+const emailVerificationMailgenContent = ({ username, verificationUrl }) => {
   return {
     body: {
       name: username,
-      intro: "Welcome to our App! we'are excited to have you on board.",
+      intro: "Welcome to our App! We're excited to have you on board.",
       action: {
         instructions: 'To verify your email please click on the following button',
         button: {
           color: '#22BC66',
           text: 'Verify your email',
-          link: verficationUrl,
+          link: verificationUrl,
         },
       },
       outro: "Need help, or have questions? Just reply to this email, we'd love to help.",

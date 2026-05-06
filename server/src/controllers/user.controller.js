@@ -20,6 +20,7 @@ import {
   checkUserAndRole,
   userVerifyAndStatusCheck,
   barberVerifyAndStatusCheck,
+  validateRating,
 } from '../helpers/OnlyUserHelper.js';
 
 /*===========================================================================
@@ -138,7 +139,7 @@ export const getAvailableTimeSlots = asyncHandler(async (req, res) => {
 
   if (!date) throw new ApiError(400, 'Date is required');
 
-  await userVerifyAndStatusCheck({ userId: id });
+  await userVerifyAndStatusCheck({ userId: userId });
 
   const existingBarber = await barberVerifyAndStatusCheck({ barberId: barberId });
 
@@ -233,10 +234,18 @@ export const createBooking = asyncHandler(async (req, res) => {
 
     if (!service) throw new ApiError(400, 'Invalid service');
 
-    await tx.timeSlot.update({
-      where: { id: Number(slotId) },
+    await tx.timeSlot.updateMany({
+      where: { id: Number(slotId), status: 'AVAILABLE' },
       data: { status: 'ONLINE_BOOKED' },
     });
+
+    const existingBooking = await tx.booking.findUnique({
+      where: { slotId: Number(slotId) },
+    });
+
+    if (existingBooking) {
+      throw new ApiError(400, 'Slot already booked');
+    }
 
     const newBooking = await tx.booking.create({
       data: {
@@ -294,16 +303,18 @@ export const cancelBooking = asyncHandler(async (req, res) => {
 
     const slot = await tx.timeSlot.findUnique({
       where: { id: booking.slotId },
-      select: { startTime: true },
+      select: { slotDate: true, startTime: true },
     });
 
     if (slot) {
-      const now = new Date();
+      const slotDateTime = combineDateAndTimeUTC({
+        date: slot.slotDate,
+        time: slot.startTime,
+      });
 
-      const slotTime = new Date(slot.startTime);
+      if (!slotDateTime) throw new ApiError(400, 'Cannot validate booking slot');
 
-      if (slotTime.getTime() <= now.getTime())
-        throw new ApiError(400, 'Cannot cancel past bookings');
+      if (slotDateTime <= new Date()) throw new ApiError(400, 'Cannot cancel past bookings');
     }
 
     const updatedBooking = await tx.booking.update({
@@ -411,10 +422,13 @@ export const getMyBookings = asyncHandler(async (req, res) => {
 
 // [9] Add Review
 export const addReview = asyncHandler(async (req, res) => {
-  const { bookingId, rating, comment } = req.body;
+  const { rating, comment } = req.body;
+  const bookingId = Number(req.params?.id);
   const userId = req.user.id;
 
   if (!bookingId || !rating || !comment) throw new ApiError(400, 'All fields are required');
+
+  const finalRating = validateRating({ rating: rating });
 
   checkUserAndRole({ userId: userId, userRole: req.user?.role });
 
@@ -444,7 +458,7 @@ export const addReview = asyncHandler(async (req, res) => {
         bookingId,
         userId: existingUser.id,
         barberId: booking.barberId,
-        rating,
+        rating: finalRating,
         comment,
       },
     });
@@ -459,10 +473,13 @@ export const addReview = asyncHandler(async (req, res) => {
 
 // [10] Update Review
 export const updateReview = asyncHandler(async (req, res) => {
-  const { bookingId, rating, comment } = req.body;
+  const { rating, comment } = req.body;
+  const bookingId = Number(req.params?.id);
   const userId = req.user.id;
 
   if (!bookingId || !rating || !comment) throw new ApiError(400, 'All fields are required');
+
+  const finalRating = validateRating({ rating: rating });
 
   checkUserAndRole({ userId: userId, userRole: req.user?.role });
 
@@ -490,7 +507,7 @@ export const updateReview = asyncHandler(async (req, res) => {
     const review = await tx.review.update({
       where: { bookingId },
       data: {
-        rating,
+        rating: finalRating,
         comment,
       },
     });
@@ -505,7 +522,7 @@ export const updateReview = asyncHandler(async (req, res) => {
 
 // [11] Delete Review
 export const deleteReview = asyncHandler(async (req, res) => {
-  const bookingId = Number(req.params.bookingId);
+  const bookingId = Number(req.params?.id);
   const userId = req.user.id;
 
   checkUserAndRole({ userId: userId, userRole: req.user?.role });

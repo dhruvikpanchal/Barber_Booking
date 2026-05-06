@@ -10,13 +10,14 @@ import publicRouter from './router/public.route.js';
 import authRouter from './router/auth.route.js';
 import userRouter from './router/user.route.js';
 import barberRouter from './router/barber.route.js';
+import adminRouter from './router/admin.route.js';
 
 const app = express();
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static('temp'));
+app.use(express.static('public/temp'));
 app.use(cookieParser());
 app.use(
   cors({
@@ -30,6 +31,7 @@ app.use('/api/v1/public', publicRouter);
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/user', userRouter);
 app.use('/api/v1/barber', barberRouter);
+app.use('/api/v1/admin', adminRouter);
 
 // Health check
 app.get('/', (_, res) => {

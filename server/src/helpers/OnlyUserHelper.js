@@ -56,3 +56,11 @@ export const barberVerifyAndStatusCheck = async ({ barberId }) => {
 
   return barber;
 };
+
+// helper function for api [9] & [10]
+export const validateRating = ({ rating }) => {
+  const r = Number(rating);
+  if (!(r >= 1 && r <= 5)) throw new ApiError(400, 'Rating must be an integer between 1 and 5');
+
+  return Number(r.toFixed(1));
+};

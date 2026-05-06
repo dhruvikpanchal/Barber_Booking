@@ -6,11 +6,21 @@ import {
   asyncHandler,
   ApiError,
   ApiResponse,
-  generateToken,
+  generateAccessToken,
+  generateRefreshToken,
+  verifyRefreshToken,
   forgotPasswordOTPContent,
   sendEmail,
-  verifyToken,
 } from '../utils/index.js';
+
+const REFRESH_COOKIE_MS = 7 * 24 * 60 * 60 * 1000;
+
+const refreshCookieOptions = {
+  httpOnly: true,
+  secure: true,
+  sameSite: 'strict',
+  maxAge: REFRESH_COOKIE_MS,
+};
 
 /*===========================================================================
                             Main Functions
@@ -72,7 +82,10 @@ export const RegisterUser = asyncHandler(async (req, res) => {
     });
   }
 
-  const token = generateToken({ id: user.id, role: user.role });
+  const token = generateAccessToken({ id: user.id, role: user.role });
+  const refreshToken = generateRefreshToken({ id: user.id, role: user.role });
+
+  res.cookie('refreshToken', refreshToken, refreshCookieOptions);
 
   const responseData = { user, token };
 
@@ -119,7 +132,10 @@ export const LoginUser = asyncHandler(async (req, res) => {
 
   const { passwordHash, ...safeUser } = user;
 
-  const token = generateToken({ id: user.id, role: user.role });
+  const token = generateAccessToken({ id: user.id, role: user.role });
+  const refreshToken = generateRefreshToken({ id: user.id, role: user.role });
+
+  res.cookie('refreshToken', refreshToken, refreshCookieOptions);
 
   const responseData = { user: safeUser, token };
 
@@ -202,6 +218,7 @@ export const ResendOTP = asyncHandler(async (req, res) => {
     select: {
       id: true,
       email: true,
+      name: true,
       role: true,
       isActive: true,
       isEmailVerified: true,
@@ -300,6 +317,12 @@ export const LogoutUser = asyncHandler(async (req, res) => {
     sameSite: 'strict',
   });
 
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'strict',
+  });
+
   return res.status(200).json(new ApiResponse(200, { message: 'User logged out successfully' }));
 });
 
@@ -311,11 +334,22 @@ export const RefreshToken = asyncHandler(async (req, res) => {
     throw new ApiError(401, 'Unauthorized');
   }
 
-  const decodedToken = await verifyToken({ token: refreshToken });
+  const decodedToken = verifyRefreshToken({ token: refreshToken });
 
   const user = await prisma.user.findUnique({
     where: {
       id: decodedToken.id,
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      imageUrl: true,
+      role: true,
+      isActive: true,
+      isEmailVerified: true,
+      createdAt: true,
     },
   });
 
@@ -323,7 +357,14 @@ export const RefreshToken = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'User not found');
   }
 
-  const token = generateToken({ id: user.id, role: user.role });
+  if (!user.isActive) {
+    throw new ApiError(403, 'Your account is not active');
+  }
+
+  const token = generateAccessToken({ id: user.id, role: user.role });
+  const newRefreshToken = generateRefreshToken({ id: user.id, role: user.role });
+
+  res.cookie('refreshToken', newRefreshToken, refreshCookieOptions);
 
   const responseData = { user, token };
 

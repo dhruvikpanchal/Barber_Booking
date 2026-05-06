@@ -7,16 +7,17 @@ import {
   ApiResponse,
   getPaginationParams,
   paginationFn,
-  formatSlot,
   parseDateUTC,
   getStartOfDayUTC,
   getEndOfDayUTC,
   getLast7DaysUTC,
+  isFutureDate,
 } from '../utils/index.js';
 
 // Helper Functions
 import { VerifyAndUpdatePassword } from '../helpers/ChangePasswordHelper.js';
 import { uploadProfileImage } from '../helpers/updateImageHelper.js';
+import { parseAndValidateId } from '../helpers/validater.js';
 import {
   checkUserAndRole,
   barberVerifyAndStatusCheck,
@@ -25,6 +26,8 @@ import {
   findExistingSchedule,
   findExistingTimeSlot,
   findExistingBooking,
+  formatBookingResponse,
+  earningsPeriodKeyUTC,
 } from '../helpers/OnlyBarberHelper.js';
 
 /*===========================================================================
@@ -236,12 +239,10 @@ export const createService = asyncHandler(async (req, res) => {
 // [6] Update Service
 export const updateService = asyncHandler(async (req, res) => {
   const userId = req.user?.id;
-  const serviceId = Number(req.params?.id);
+  const serviceId = parseAndValidateId({ value: req.params?.id, name: 'Service Id' });
   const { name, description, price, durationMinutes } = req.body;
 
   checkUserAndRole({ userId: req.user?.id, userRole: req.user?.role });
-
-  if (!serviceId || isNaN(serviceId)) throw new ApiError(400, 'Invalid service Id');
 
   if (!name && !description && price == null && durationMinutes == null)
     throw new ApiError(400, 'At least one field is required');
@@ -290,12 +291,10 @@ export const updateService = asyncHandler(async (req, res) => {
 // [7] Toggle Service
 export const toggleServiceStatus = asyncHandler(async (req, res) => {
   const userId = req.user?.id;
-  const serviceId = Number(req.params?.id);
+  const serviceId = parseAndValidateId({ value: req.params?.id, name: 'Service Id' });
   const { status } = req.body;
 
   checkUserAndRole({ userId: req.user?.id, userRole: req.user?.role });
-
-  if (!serviceId || isNaN(serviceId)) throw new ApiError(400, 'Invalid service Id');
 
   if (status === null || status === undefined) throw new ApiError(400, 'Status is required');
 
@@ -324,11 +323,9 @@ export const toggleServiceStatus = asyncHandler(async (req, res) => {
 // [8] Delete Service
 export const deleteService = asyncHandler(async (req, res) => {
   const userId = req.user?.id;
-  const serviceId = Number(req.params?.id);
+  const serviceId = parseAndValidateId({ value: req.params?.id, name: 'Service Id' });
 
   checkUserAndRole({ userId: req.user?.id, userRole: req.user?.role });
-
-  if (!serviceId || isNaN(serviceId)) throw new ApiError(400, 'Invalid service Id');
 
   const barber = await barberVerifyAndStatusCheck({ userId: userId });
 
@@ -452,12 +449,10 @@ export const createSchedule = asyncHandler(async (req, res) => {
 // [11] Update Schedule
 export const updateSchedule = asyncHandler(async (req, res) => {
   const userId = req.user?.id;
-  const scheduleId = Number(req.params?.id);
+  const scheduleId = parseAndValidateId({ value: req.params?.id, name: 'Schedule Id' });
   const { dayOfWeek, startTime, endTime, isDayOff } = req.body;
 
   checkUserAndRole({ userId: req.user?.id, userRole: req.user?.role });
-
-  if (!scheduleId || isNaN(scheduleId)) throw new ApiError(400, 'Invalid schedule Id');
 
   if (
     dayOfWeek === undefined &&
@@ -528,13 +523,9 @@ export const updateSchedule = asyncHandler(async (req, res) => {
 // [12] Delete Schedule
 export const deleteSchedule = asyncHandler(async (req, res) => {
   const userId = req.user?.id;
-  const scheduleId = Number(req.params?.id);
+  const scheduleId = parseAndValidateId({ value: req.params?.id, name: 'Schedule Id' });
 
   checkUserAndRole({ userId: req.user?.id, userRole: req.user?.role });
-
-  if (!scheduleId || isNaN(scheduleId)) {
-    throw new ApiError(400, 'Invalid schedule Id');
-  }
 
   const barber = await barberVerifyAndStatusCheck({ userId: userId });
 
@@ -605,6 +596,10 @@ export const createTimeSlot = asyncHandler(async (req, res) => {
 
   const parsedDate = parseDateUTC({ dateStr: date });
 
+  if (!isFutureDate({ date: parsedDate })) {
+    throw new ApiError(400, 'Cannot create slots for past dates');
+  }
+
   const dayOfWeek = parsedDate.getUTCDay();
 
   const barber = await barberVerifyAndStatusCheck({ userId: userId });
@@ -667,6 +662,11 @@ export const createBulkTimeSlots = asyncHandler(async (req, res) => {
 
   for (const dateStr of dates) {
     const parsedDate = parseDateUTC({ dateStr: dateStr });
+
+    if (!isFutureDate({ date: parsedDate })) {
+      skippedDates.push({ date: dateStr, reason: 'Past date' });
+      continue;
+    }
 
     const dayOfWeek = parsedDate.getUTCDay();
 
@@ -805,14 +805,10 @@ export const getTimeSlots = asyncHandler(async (req, res) => {
 // [17] Update Time Slot
 export const updateTimeSlot = asyncHandler(async (req, res) => {
   const userId = req.user?.id;
-  const slotId = Number(req.params?.id);
+  const slotId = parseAndValidateId({ value: req.params?.id, name: 'Slot Id' });
   const { date, status } = req.body;
 
   checkUserAndRole({ userId: req.user?.id, userRole: req.user?.role });
-
-  if (!slotId || isNaN(slotId)) {
-    throw new ApiError(400, 'Invalid slot Id');
-  }
 
   if (date === undefined && status === undefined) {
     throw new ApiError(400, 'At least one field is required');
@@ -841,12 +837,7 @@ export const updateTimeSlot = asyncHandler(async (req, res) => {
   if (date !== undefined) {
     const parsedDate = parseDateUTC({ dateStr: date });
 
-    const today = new Date();
-    const todayUTC = new Date(
-      Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()),
-    );
-
-    if (parsedDate < todayUTC) {
+    if (!isFutureDate({ date: parsedDate })) {
       throw new ApiError(400, 'Cannot move slot to past date');
     }
 
@@ -875,13 +866,9 @@ export const updateTimeSlot = asyncHandler(async (req, res) => {
 // [18] Delete Time Slot
 export const deleteTimeSlot = asyncHandler(async (req, res) => {
   const userId = req.user?.id;
-  const slotId = Number(req.params?.id);
+  const slotId = parseAndValidateId({ value: req.params?.id, name: 'Slot Id' });
 
   checkUserAndRole({ userId: req.user?.id, userRole: req.user?.role });
-
-  if (!slotId || isNaN(slotId)) {
-    throw new ApiError(400, 'Invalid slot Id');
-  }
 
   const barber = await barberVerifyAndStatusCheck({ userId: userId });
 
@@ -969,13 +956,15 @@ export const getBookings = asyncHandler(async (req, res) => {
 
   const pagination = paginationFn({ total: total, page: page, limit: limit });
 
+  const formattedBookings = bookings.map((b) => formatBookingResponse({ booking: b }));
+
   return res
     .status(200)
     .json(
       new ApiResponse(
         200,
-        { bookings, pagination },
-        bookings.length ? 'Bookings list fetched successfully' : 'No bookings found',
+        { bookings: formattedBookings, pagination },
+        formattedBookings.length ? 'Bookings list fetched successfully' : 'No bookings found',
       ),
     );
 });
@@ -983,14 +972,10 @@ export const getBookings = asyncHandler(async (req, res) => {
 // [20] Update Booking Status
 export const updateBookingStatus = asyncHandler(async (req, res) => {
   const userId = req.user?.id;
-  const bookingId = Number(req.params?.id);
+  const bookingId = parseAndValidateId({ value: req.params?.id, name: 'Booking Id' });
   const { status } = req.body;
 
   checkUserAndRole({ userId: req.user?.id, userRole: req.user?.role });
-
-  if (!bookingId || isNaN(bookingId)) {
-    throw new ApiError(400, 'Invalid booking Id');
-  }
 
   if (!status) {
     throw new ApiError(400, 'Status is required');
@@ -1042,13 +1027,9 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
 // [21] Get Booking by Id
 export const getBookingById = asyncHandler(async (req, res) => {
   const userId = req.user?.id;
-  const bookingId = Number(req.params?.id);
+  const bookingId = parseAndValidateId({ value: req.params?.id, name: 'Booking Id' });
 
   checkUserAndRole({ userId: req.user?.id, userRole: req.user?.role });
-
-  if (!bookingId || isNaN(bookingId)) {
-    throw new ApiError(400, 'Invalid booking Id');
-  }
 
   const barber = await barberVerifyAndStatusCheck({ userId: userId });
 
@@ -1097,29 +1078,23 @@ export const getBookingById = asyncHandler(async (req, res) => {
     throw new ApiError(404, 'Booking not found');
   }
 
-  if (booking?.slot) {
-    booking.slot = formatSlot({ slot: booking.slot });
-  }
-
-  return res.status(200).json(new ApiResponse(200, booking, 'Booking fetched successfully'));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, formatBookingResponse({ booking }), 'Booking fetched successfully'));
 });
 
 // [22] Delete Booking
 export const deleteBooking = asyncHandler(async (req, res) => {
   const userId = req.user?.id;
-  const bookingId = Number(req.params?.id);
+  const bookingId = parseAndValidateId({ value: req.params?.id, name: 'Booking Id' });
 
   checkUserAndRole({ userId: req.user?.id, userRole: req.user?.role });
-
-  if (!bookingId || isNaN(bookingId)) {
-    throw new ApiError(400, 'Invalid booking Id');
-  }
 
   const barber = await barberVerifyAndStatusCheck({ userId: userId });
 
   const booking = await findExistingBooking({
     bookingId: bookingId,
-    barberId: barber.id,
+    barberId: barber?.id,
     client: prisma,
   });
 
@@ -1395,4 +1370,156 @@ export const getAllReviews = asyncHandler(async (req, res) => {
         reviews.length ? 'Reviews list fetched successfully' : 'No reviews found',
       ),
     );
+});
+
+// [26] Create Walk-in Booking
+export const createWalkInBooking = asyncHandler(async (req, res) => {
+  const userId = req.user?.id;
+  const { walkInName, serviceId, slotId, notes } = req.body;
+
+  checkUserAndRole({ userId: req.user?.id, userRole: req.user?.role });
+
+  if (!walkInName?.trim() || !serviceId || !slotId) {
+    throw new ApiError(400, 'walkInName, serviceId and slotId are required');
+  }
+
+  const barber = await barberVerifyAndStatusCheck({ userId: userId });
+
+  const booking = await prisma.$transaction(async (tx) => {
+    const slot = await tx.timeSlot.findUnique({
+      where: { id: Number(slotId) },
+      select: {
+        id: true,
+        status: true,
+        barberId: true,
+        slotDate: true,
+      },
+    });
+
+    if (!slot || slot.status !== 'AVAILABLE') {
+      throw new ApiError(400, 'Slot not available');
+    }
+
+    if (slot.barberId !== barber.id) {
+      throw new ApiError(400, 'Slot does not belong to this barber');
+    }
+
+    if (!isFutureDate({ date: slot.slotDate })) {
+      throw new ApiError(400, 'Cannot create walk-in booking for past dates');
+    }
+
+    const existingService = await findExistingService({
+      serviceId: Number(serviceId),
+      barberId: barber.id,
+      client: tx,
+    });
+
+    if (!existingService.isActive) {
+      throw new ApiError(400, 'Service is not active');
+    }
+
+    await tx.timeSlot.update({
+      where: { id: Number(slotId) },
+      data: { status: 'WALKIN' },
+    });
+
+    const newBooking = await tx.booking.create({
+      data: {
+        userId: null,
+        barberId: barber.id,
+        serviceId: Number(serviceId),
+        slotId: Number(slotId),
+        bookingType: 'WALKIN',
+        walkInName: walkInName.trim(),
+        bookedAt: new Date(),
+        status: 'CONFIRMED',
+        ...(notes?.trim() && { notes: notes.trim() }),
+      },
+      include: {
+        service: true,
+        slot: true,
+      },
+    });
+
+    return newBooking;
+  });
+
+  return res
+    .status(201)
+    .json(
+      new ApiResponse(
+        201,
+        formatBookingResponse({ booking }),
+        'Walk-in booking created successfully',
+      ),
+    );
+});
+
+// [27] Earnings Summary
+export const getEarningsSummary = asyncHandler(async (req, res) => {
+  const userId = req.user?.id;
+  const groupBy = req.query?.groupBy === 'month' ? 'month' : 'week';
+  const fromStr = req.query?.from;
+  const toStr = req.query?.to;
+
+  checkUserAndRole({ userId: req.user?.id, userRole: req.user?.role });
+
+  const barber = await barberVerifyAndStatusCheck({ userId: userId });
+
+  const rangeFilter = {};
+  if (fromStr) {
+    const fromDate = parseDateUTC({ dateStr: fromStr });
+    rangeFilter.gte = getStartOfDayUTC({ date: fromDate });
+  }
+  if (toStr) {
+    const toDate = parseDateUTC({ dateStr: toStr });
+    rangeFilter.lte = getEndOfDayUTC({ date: toDate });
+  }
+
+  const bookings = await prisma.booking.findMany({
+    where: {
+      barberId: barber.id,
+      status: 'COMPLETED',
+      ...(Object.keys(rangeFilter).length && { updatedAt: rangeFilter }),
+    },
+    select: {
+      id: true,
+      updatedAt: true,
+      service: {
+        select: {
+          price: true,
+          name: true,
+        },
+      },
+    },
+  });
+
+  const bucketMap = new Map();
+
+  for (const b of bookings) {
+    const key = earningsPeriodKeyUTC({ date: b.updatedAt, groupBy });
+    const prev = bucketMap.get(key) || { periodKey: key, bookingCount: 0, totalEarnings: 0 };
+    prev.bookingCount += 1;
+    prev.totalEarnings += Number(b.service.price);
+    bucketMap.set(key, prev);
+  }
+
+  const periods = Array.from(bucketMap.values()).sort((a, b) =>
+    a.periodKey.localeCompare(b.periodKey),
+  );
+
+  const grandTotal = bookings.reduce((sum, b) => sum + Number(b.service.price), 0);
+
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      {
+        groupBy,
+        periods,
+        grandTotal,
+        completedBookingCount: bookings.length,
+      },
+      'Earnings summary fetched successfully',
+    ),
+  );
 });

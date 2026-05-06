@@ -61,3 +61,12 @@ export const combineDateAndTimeUTC = ({ date, time }) => {
 
   return combined;
 };
+
+// Used in: barber [14] createTimeSlot, barber [17] updateTimeSlot
+export const isFutureDate = ({ date }) => {
+  const today = new Date();
+  const todayUTC = new Date(Date.UTC(
+    today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()
+  ));
+  return new Date(date) >= todayUTC;
+};

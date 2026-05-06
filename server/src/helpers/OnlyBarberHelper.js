@@ -1,5 +1,5 @@
 import { prisma } from '../config/prismaClient.js';
-import { ApiError } from '../utils/index.js';
+import { ApiError, formatSlot } from '../utils/index.js';
 
 // Check req.user.id and req.user.role from req.user
 export const checkUserAndRole = ({ userId, userRole }) => {
@@ -31,12 +31,16 @@ export const barberVerifyAndStatusCheck = async ({ userId }) => {
     },
   });
 
-  if (!barber) {
+  if (!barberRowData) {
     throw new ApiError(404, 'Barber not found');
   }
 
   if (!barberRowData.user?.isActive) {
     throw new ApiError(403, 'User account is inactive');
+  }
+
+  if (barberRowData.status !== 'APPROVED') {
+    throw new ApiError(403, 'Barber not approved');
   }
 
   const barber = {
@@ -166,6 +170,12 @@ export const findExistingTimeSlot = async ({ slotId, barberId, client = prisma }
   return existingTimeSlot;
 };
 
+// helper function for api [19] and [21]
+export const formatBookingResponse = ({ booking }) => ({
+  ...booking,
+  slot: booking.slot ? formatSlot({ slot: booking.slot }) : null,
+});
+
 // helper function for api [20] and [22]
 export const findExistingBooking = async ({ bookingId, barberId, client = prisma }) => {
   const existingBooking = await client.booking.findFirst({
@@ -184,4 +194,18 @@ export const findExistingBooking = async ({ bookingId, barberId, client = prisma
   }
 
   return existingBooking;
+};
+
+// helper function for api [27]
+export const earningsPeriodKeyUTC = ({ date, groupBy }) => {
+  const d = new Date(date);
+  if (groupBy === 'month') {
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  }
+  const dow = d.getUTCDay();
+  const mondayOffset = dow === 0 ? -6 : 1 - dow;
+  const monday = new Date(d);
+  monday.setUTCDate(d.getUTCDate() + mondayOffset);
+  monday.setUTCHours(0, 0, 0, 0);
+  return monday.toISOString().slice(0, 10);
 };
