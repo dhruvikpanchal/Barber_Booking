@@ -1,116 +1,144 @@
-import { images } from '../../config/imagePath.js';
+import Link from "next/link";
 
-function Footer() {
+export default function Footer() {
   return (
-    <div className="flex flex-col w-full justify-between items-center">
-      <div
-        className="w-full px-4 sm:px-8 lg:px-16 py-12 sm:py-16"
-        style={{ background: 'var(--color-f1)', color: 'var(--color-white)' }}
-      >
-        <div className="flex flex-col gap-10">
-          <div className="flex flex-col sm:flex-row justify-between items-center sm:items-start lg:items-center gap-6">
-            {/* logo and name */}
-            <div className="flex flex-row gap-2 justify-center items-center">
-              <img src={images.logo2} alt="logo2" className="" />
-              <p className="text-white font-bold text-2xl">Vector</p>
-            </div>
+    <footer className="w-full px-4 md:px-16 py-16 bg-[#1b1c1c] border-t-2 border-[#53443c]">
+      <div className="max-w-[1280px] mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-12">
+          {/* Brand */}
+          <div className="md:col-span-4 flex flex-col gap-6">
+            <Link
+              href="/"
+              className="text-[#e4e2e1] text-3xl font-black tracking-tight hover:text-[#ffb68c] transition-colors"
+            >
+              IRON &amp; OAK
+            </Link>
 
-            {/* icons and links */}
-            <div className="flex flex-row flex-wrap justify-center sm:justify-start gap-1">
-              <div className="">
-                <a href="#facebook" className="">
-                  <img src={images.icon1} alt="icon1" className="" />
-                </a>
-              </div>
-              <div className="">
-                <a href="#twitter" className="">
-                  <img src={images.icon2} alt="icon2" className="" />
-                </a>
-              </div>
-              <div className="">
-                <a href="#linkdin" className="">
-                  <img src={images.icon3} alt="icon3" className="" />
-                </a>
-              </div>
-              <div className="">
-                <a href="#instagram" className="">
-                  <img src={images.icon4} alt="icon4" className="" />
-                </a>
-              </div>
+            <p className="text-[#b7b5b4] text-base leading-relaxed max-w-xs">
+              Crafting the standard of modern grooming. Heritage techniques for
+              the contemporary man.
+            </p>
+
+            <div className="flex gap-4 mt-2">
+              {["IG", "FB", "X"].map((item) => (
+                <Link
+                  key={item}
+                  href="#"
+                  className="w-9 h-9 border border-[#53443c] flex items-center justify-center text-[#d8c2b7] hover:border-[#ffb68c] hover:text-[#ffb68c] transition-colors text-sm"
+                >
+                  {item}
+                </Link>
+              ))}
             </div>
           </div>
 
-          {/* divider */}
-          <hr className="w-full text-white" style={{}} />
+          {/* Explore */}
+          <div className="md:col-span-2 md:col-start-6 flex flex-col gap-4">
+            <span className="text-[#ffb68c] text-xs font-semibold tracking-[0.1em]">
+              EXPLORE
+            </span>
 
-          {/* text info container */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 text-center sm:text-left">
-            {/* pages links */}
-            <div className="flex flex-col gap-3">
-              <h1 className="text-xl font-bold">Explore</h1>
-              <div className="flex flex-col gap-1 text-sm sm:text-base">
-                <a href="#home" className="">
-                  Home
-                </a>
-                <a href="#about" className="">
-                  About
-                </a>
-                <a href="#services" className="">
-                  Services
-                </a>
-                <a href="#blog" className="">
-                  Blog
-                </a>
-                <a href="#contact" className="">
-                  Contact
-                </a>
-              </div>
-            </div>
+            <nav className="flex flex-col gap-3">
+              {[
+                "Services",
+                "Our Barbers",
+                "Gallery",
+                "About Us",
+                "Contact",
+              ].map((item) => (
+                <Link
+                  key={item}
+                  href="#"
+                  className="text-[#b7b5b4] hover:text-[#ffb68c] transition-colors"
+                >
+                  {item}
+                </Link>
+              ))}
+            </nav>
+          </div>
 
-            {/* service pages */}
-            <div className="flex flex-col gap-3">
-              <h1 className="text-xl font-bold">Utility Pages</h1>
-              <div className="flex flex-col gap-1 text-sm sm:text-base">
-                <a href="#policy" className="">
-                  Privacy Policy
-                </a>
-                <a href="#terms" className="">
-                  Terms of Use
-                </a>
-              </div>
-            </div>
+          {/* Account */}
+          <div className="md:col-span-2 flex flex-col gap-4">
+            <span className="text-[#ffb68c] text-xs font-semibold tracking-[0.1em]">
+              ACCOUNT
+            </span>
 
-            {/* contact pages */}
-            <div className="flex flex-col gap-3 sm:col-span-2 lg:col-span-1">
-              <h1 className="text-xl font-bold">Keep in Touch</h1>
+            <nav className="flex flex-col gap-3">
+              {["Sign In", "Register", "My Bookings", "Book Now"].map(
+                (item) => (
+                  <Link
+                    key={item}
+                    href="#"
+                    className="text-[#b7b5b4] hover:text-[#ffb68c] transition-colors"
+                  >
+                    {item}
+                  </Link>
+                ),
+              )}
+            </nav>
+          </div>
 
-              {/* email , phone , address */}
-              <div className="flex flex-col gap-2 text-sm sm:text-base">
-                <div className="grid grid-cols-1 sm:grid-cols-[90px_1fr] gap-1 sm:gap-2">
-                  <p>Address :</p>
-                  <p>Mariendalsvej 50D 2 2000 Frederiksberg.</p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-[90px_1fr] gap-1 sm:gap-2">
-                  <p>Email :</p>
-                  <p className="break-all sm:break-normal">support@servicemarket.com</p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-[90px_1fr] gap-1 sm:gap-2">
-                  <p>Phone :</p>
-                  <p>(+22) 123 - 4567 - 900</p>
-                </div>
-              </div>
+          {/* Visit */}
+          <div className="md:col-span-3 flex flex-col gap-4">
+            <span className="text-[#ffb68c] text-xs font-semibold tracking-[0.1em]">
+              VISIT US
+            </span>
+
+            <address className="not-italic text-[#b7b5b4] leading-relaxed">
+              124 Industrial Avenue
+              <br />
+              Steel District, New York
+              <br />
+              NY 10012
+              <br />
+              <br />
+              <Link
+                href="tel:+12125550178"
+                className="hover:text-[#ffb68c] transition-colors"
+              >
+                (212) 555-0178
+              </Link>
+              <br />
+              <Link
+                href="mailto:hello@ironandoak.com"
+                className="hover:text-[#ffb68c] transition-colors"
+              >
+                hello@ironandoak.com
+              </Link>
+            </address>
+
+            <div className="mt-2 text-[#b7b5b4]">
+              <p className="text-[10px] tracking-[0.1em] text-[#a08d83] mb-1">
+                HOURS
+              </p>
+              Mon – Fri: 9am – 8pm
+              <br />
+              Sat: 8am – 6pm
+              <br />
+              Sun: Closed
             </div>
           </div>
         </div>
+
+        {/* Bottom */}
+        <div className="border-t border-[#53443c] pt-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <p className="text-[#b7b5b4] text-[10px] tracking-[0.2em]">
+            © 2026 IRON &amp; OAK BARBERSHOP. ALL RIGHTS RESERVED.
+          </p>
+
+          <nav className="flex gap-6">
+            {["Privacy Policy", "Terms of Service", "Contact"].map((item) => (
+              <Link
+                key={item}
+                href="#"
+                className="text-[#b7b5b4] hover:text-[#ffb68c] transition-colors text-[10px] tracking-[0.1em]"
+              >
+                {item.toUpperCase()}
+              </Link>
+            ))}
+          </nav>
+        </div>
       </div>
-      <div
-        className="flex w-full justify-center items-center text-center px-4 py-3 text-sm sm:text-base"
-        style={{ background: 'var(--color-f2)', color: 'var(--color-white)' }}
-      >
-        ©️ 2026, ServiceMarket.dk | All rights reserved.
-      </div>
-    </div>
+    </footer>
   );
 }
-
-export default Footer;

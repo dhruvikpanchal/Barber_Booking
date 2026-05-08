@@ -1,49 +1,51 @@
-# 🔹 Node modules
 node_modules/
+.next/
 
-# 🔹 Environment variables (VERY IMPORTANT)
 .env
 .env.*
+!.env.example
 
-# 🔹 Logs
+.next/
+out/
+
+dist/
+build/
+
+coverage/
+
 logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# 🔹 Build output
-dist/
-build/
-
-# 🔹 OS files
-.DS_Store
-Thumbs.db
-
-# 🔹 Editor
-.vscode/
-.idea/
-
-# 🔹 Cache
 .cache/
 .eslintcache
 
-# 🔹 Prisma
+.vercel/
+
+*.tsbuildinfo
+next-env.d.ts
+
 prisma/*.db
 prisma/*.db-journal
 
-# ❗ Keep migrations (recommended for backend)
-# prisma/migrations/   <-- DO NOT ignore (important)
+!prisma/migrations/
 
-# 🔹 Temporary files
+.vscode/
+.idea/
+
+.DS_Store
+Thumbs.db
+
 tmp/
 temp/
 
-# 🔹 Coverage
-coverage/
+*.pem
 
-# my files setup
-.editorconfig
-.prettierrc
-.prettierignore
-.eslintrc.js
+client/.next/
+client/node_modules/
+
+server/node_modules/
+server/dist/

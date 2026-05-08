@@ -1,0 +1,43 @@
+# Dependencies
+node_modules
+
+# Next.js
+.next
+out
+
+# Build folders
+dist
+build
+
+# Coverage
+coverage
+
+# Logs
+logs
+*.log
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Minified files
+*.min.js
+*.min.css
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Generated files
+*.tsbuildinfo
+
+# Static exports
+public/build
+
+# OS files
+.DS_Store
+Thumbs.db
