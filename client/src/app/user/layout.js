@@ -1,12 +1,12 @@
-import Footer from "@/components/common/Footer";
-import Header from "@/components/common/Header";
+import UserHeader from '@/components/common/UserHeader.jsx';
+import UserSidebar from '@/components/common/UserSidebar.jsx';
 
 export default function UserLayout({ children }) {
   return (
-    <>
-      <Header />
-      {children}
-      <Footer />
-    </>
+    <div className="min-h-screen bg-[#131313]">
+      <UserHeader />
+      <UserSidebar />
+      <main className="pt-[65px] lg:ml-[260px] min-h-screen bg-[#131313]">{children}</main>
+    </div>
   );
 }

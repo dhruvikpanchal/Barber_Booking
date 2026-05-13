@@ -1,12 +1,4 @@
-function SmallServiceCard({
-  key,
-  title,
-  duration,
-  badge,
-  price,
-  description,
-  tags,
-}) {
+function SmallServiceCard({ title, duration, badge, price, description, tags }) {
   return (
     <div className="bg-[#1f2020] border border-[#53443c] hover:border-[#ffb68c] transition-colors group">
       <div className="p-8">
@@ -19,17 +11,13 @@ function SmallServiceCard({
             <div className="flex items-center gap-2 mt-2">
               <span className="text-[#a08d83] text-xs">⏱</span>
 
-              <span className="text-[#a08d83] text-[10px] tracking-[0.1em]">
-                {duration}
-              </span>
+              <span className="text-[#a08d83] text-[10px] tracking-[0.1em]">{duration}</span>
 
               {badge && (
                 <>
                   <span className="text-[#a08d83] text-[10px]">·</span>
 
-                  <span className="text-[#a08d83] text-[10px] tracking-[0.1em]">
-                    {badge}
-                  </span>
+                  <span className="text-[#a08d83] text-[10px] tracking-[0.1em]">{badge}</span>
                 </>
               )}
             </div>

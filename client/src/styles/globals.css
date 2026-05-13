@@ -1,7 +1,7 @@
-@import url("https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&family=Noto+Serif:wght@500;600;700;900&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200");
+@import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&family=Noto+Serif:wght@500;600;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
 
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
   --color-primary: #ffb68c;
@@ -66,8 +66,8 @@
   --space-margin-desktop: 64px;
   --space-container-max: 1280px;
 
-  --font-serif: "Noto Serif", Georgia, serif;
-  --font-sans: "Work Sans", system-ui, sans-serif;
+  --font-serif: 'Noto Serif', Georgia, serif;
+  --font-sans: 'Work Sans', system-ui, sans-serif;
 
   --border-radius: 0px;
 
@@ -121,16 +121,16 @@ body {
 /* ─── MATERIAL SYMBOLS ────────────────────────────────── */
 .material-symbols-outlined {
   font-variation-settings:
-    "FILL" 0,
-    "wght" 400,
-    "GRAD" 0,
-    "opsz" 24;
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
   vertical-align: middle;
 }
 
 /* ─── UTILITY: OVERLAY GRADIENT ──────────────────────── */
 .img-overlay-dark::after {
-  content: "";
+  content: '';
   position: absolute;
   inset: 0;
   background: linear-gradient(
@@ -147,7 +147,7 @@ body {
   position: relative;
 }
 .link-underline::after {
-  content: "";
+  content: '';
   position: absolute;
   bottom: -2px;
   left: 0;
@@ -184,4 +184,18 @@ body {
 
 .animate-marquee {
   animation: marquee 20s linear infinite;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.date-input::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
 }

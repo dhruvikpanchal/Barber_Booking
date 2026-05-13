@@ -1,4 +1,10 @@
-import Link from "next/link";
+import Link from 'next/link';
+
+const Navigations = [
+  { title: 'Privacy Policy', href: '/privacy' },
+  { title: 'Terms of Service', href: '/service' },
+  { title: 'Contact', href: '/contact' },
+];
 
 export default function Footer() {
   return (
@@ -15,12 +21,12 @@ export default function Footer() {
             </Link>
 
             <p className="text-[#b7b5b4] text-base leading-relaxed max-w-xs">
-              Crafting the standard of modern grooming. Heritage techniques for
-              the contemporary man.
+              Crafting the standard of modern grooming. Heritage techniques for the contemporary
+              man.
             </p>
 
             <div className="flex gap-4 mt-2">
-              {["IG", "FB", "X"].map((item) => (
+              {['IG', 'FB', 'X'].map((item) => (
                 <Link
                   key={item}
                   href="#"
@@ -34,18 +40,10 @@ export default function Footer() {
 
           {/* Explore */}
           <div className="md:col-span-2 md:col-start-6 flex flex-col gap-4">
-            <span className="text-[#ffb68c] text-xs font-semibold tracking-[0.1em]">
-              EXPLORE
-            </span>
+            <span className="text-[#ffb68c] text-xs font-semibold tracking-[0.1em]">EXPLORE</span>
 
             <nav className="flex flex-col gap-3">
-              {[
-                "Services",
-                "Our Barbers",
-                "Gallery",
-                "About Us",
-                "Contact",
-              ].map((item) => (
+              {['Services', 'Our Barbers', 'Gallery', 'About Us', 'Contact'].map((item) => (
                 <Link
                   key={item}
                   href="#"
@@ -59,30 +57,24 @@ export default function Footer() {
 
           {/* Account */}
           <div className="md:col-span-2 flex flex-col gap-4">
-            <span className="text-[#ffb68c] text-xs font-semibold tracking-[0.1em]">
-              ACCOUNT
-            </span>
+            <span className="text-[#ffb68c] text-xs font-semibold tracking-[0.1em]">ACCOUNT</span>
 
             <nav className="flex flex-col gap-3">
-              {["Sign In", "Register", "My Bookings", "Book Now"].map(
-                (item) => (
-                  <Link
-                    key={item}
-                    href="#"
-                    className="text-[#b7b5b4] hover:text-[#ffb68c] transition-colors"
-                  >
-                    {item}
-                  </Link>
-                ),
-              )}
+              {['Sign In', 'Register', 'My Bookings', 'Book Now'].map((item) => (
+                <Link
+                  key={item}
+                  href="#"
+                  className="text-[#b7b5b4] hover:text-[#ffb68c] transition-colors"
+                >
+                  {item}
+                </Link>
+              ))}
             </nav>
           </div>
 
           {/* Visit */}
           <div className="md:col-span-3 flex flex-col gap-4">
-            <span className="text-[#ffb68c] text-xs font-semibold tracking-[0.1em]">
-              VISIT US
-            </span>
+            <span className="text-[#ffb68c] text-xs font-semibold tracking-[0.1em]">VISIT US</span>
 
             <address className="not-italic text-[#b7b5b4] leading-relaxed">
               124 Industrial Avenue
@@ -92,10 +84,7 @@ export default function Footer() {
               NY 10012
               <br />
               <br />
-              <Link
-                href="tel:+12125550178"
-                className="hover:text-[#ffb68c] transition-colors"
-              >
+              <Link href="tel:+12125550178" className="hover:text-[#ffb68c] transition-colors">
                 (212) 555-0178
               </Link>
               <br />
@@ -108,9 +97,7 @@ export default function Footer() {
             </address>
 
             <div className="mt-2 text-[#b7b5b4]">
-              <p className="text-[10px] tracking-[0.1em] text-[#a08d83] mb-1">
-                HOURS
-              </p>
+              <p className="text-[10px] tracking-[0.1em] text-[#a08d83] mb-1">HOURS</p>
               Mon – Fri: 9am – 8pm
               <br />
               Sat: 8am – 6pm
@@ -127,13 +114,13 @@ export default function Footer() {
           </p>
 
           <nav className="flex gap-6">
-            {["Privacy Policy", "Terms of Service", "Contact"].map((item) => (
+            {Navigations.map((item) => (
               <Link
-                key={item}
-                href="#"
+                key={item.title}
+                href={item.href}
                 className="text-[#b7b5b4] hover:text-[#ffb68c] transition-colors text-[10px] tracking-[0.1em]"
               >
-                {item.toUpperCase()}
+                {item.title.toUpperCase()}
               </Link>
             ))}
           </nav>

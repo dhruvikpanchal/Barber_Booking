@@ -2,7 +2,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export default function ServiceCard({
-  key,
   title,
   image,
   price,
@@ -11,15 +10,13 @@ export default function ServiceCard({
   BookingLink = '/login',
 }) {
   return (
-    <div
-      // key={key}
-      className="bg-[#131313] border border-[#53443c] hover:border-[#ffb68c] transition-colors group"
-    >
+    <div className="bg-[#131313] border border-[#53443c] hover:border-[#ffb68c] transition-colors group">
       <div className="relative w-full aspect-video overflow-hidden">
         <Image
           src={image}
           alt={title}
           fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1280px) 33vw, 420px"
           className="object-cover grayscale group-hover:grayscale-0 transition-all duration-500"
         />
       </div>
