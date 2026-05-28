@@ -1,12 +1,5 @@
-import Footer from "@/components/common/Footer";
-import Header from "@/components/common/Header";
+import PublicShell from "@/components/layout/shell/PublicShell";
 
 export default function PublicLayout({ children }) {
-  return (
-    <>
-      <Header />
-      {children}
-      <Footer />
-    </>
-  );
+  return <PublicShell>{children}</PublicShell>;
 }

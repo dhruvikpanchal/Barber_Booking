@@ -1,12 +1,15 @@
-import Footer from "@/components/common/Footer";
-import Header from "@/components/common/Header";
+import AppShell from "@/components/layout/shell/AppShell";
+import BarberSidebar from "@/components/layout/sidebar/BarberSidebar";
+import BarberBottomNav from "@/components/layout/bottom-nav/BarberBottomNav";
 
 export default function BarberLayout({ children }) {
   return (
-    <>
-      <Header />
+    <AppShell
+      role="barber"
+      sidebar={<BarberSidebar />}
+      bottomNav={<BarberBottomNav />}
+    >
       {children}
-      <Footer />
-    </>
+    </AppShell>
   );
 }

@@ -1,5 +1,9 @@
-import ForgotPassword from '@/components/modules/auth/ForgotPassword.jsx';
+import ForgotPassword from "@/modules/auth/ForgotPassword.jsx";
 
 export default function ForgotPasswordPage() {
-  return <ForgotPassword />;
+  return (
+    <div className="min-h-screen bg-background">
+      <ForgotPassword />
+    </div>
+  );
 }

@@ -1,5 +1,5 @@
-import Services from '@/components/modules/public/Services.jsx';
+import ServicesList from "@/modules/public/ServicesList.jsx";
 
-export default function ServicePage() {
-  return <Services />;
+export default function ServicesPage() {
+  return <ServicesList />;
 }

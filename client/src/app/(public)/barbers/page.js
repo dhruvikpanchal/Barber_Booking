@@ -1,5 +1,11 @@
-import Barbers from '@/components/modules/public/Barbers.jsx';
+import BarbersList from "@/modules/public/BarbersList.jsx";
 
-export default function BarberPage() {
-  return <Barbers />;
+export const metadata = {
+  title: "Barbers · Iron & Oak",
+  description:
+    "Browse barbers, compare ratings and services, and book your next appointment.",
+};
+
+export default function BarbersPage() {
+  return <BarbersList />;
 }

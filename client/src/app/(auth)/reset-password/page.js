@@ -1,5 +1,9 @@
-import ResetPassword from '@/components/modules/auth/ResetPassword.jsx';
+import ResetPassword from "@/modules/auth/ResetPassword.jsx";
 
 export default function ResetPasswordPage() {
-  return <ResetPassword />;
+  return (
+    <div className="min-h-screen bg-background">
+      <ResetPassword />
+    </div>
+  );
 }

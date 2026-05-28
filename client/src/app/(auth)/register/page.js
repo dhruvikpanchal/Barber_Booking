@@ -1,5 +1,9 @@
-import Register from '@/components/modules/auth/Register.jsx';
+import Register from "@/modules/auth/Register.jsx";
 
 export default function RegisterPage() {
-  return <Register />;
+  return (
+    <div className="min-h-screen bg-background">
+      <Register />
+    </div>
+  );
 }

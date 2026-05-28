@@ -1,12 +1,15 @@
-import Footer from "@/components/common/Footer";
-import Header from "@/components/common/Header";
+import AppShell from "@/components/layout/shell/AppShell";
+import AdminSidebar from "@/components/layout/sidebar/AdminSidebar";
+import AdminBottomNav from "@/components/layout/bottom-nav/AdminBottomNav";
 
 export default function AdminLayout({ children }) {
   return (
-    <>
-      <Header />
+    <AppShell
+      role="admin"
+      sidebar={<AdminSidebar />}
+      bottomNav={<AdminBottomNav />}
+    >
       {children}
-      <Footer />
-    </>
+    </AppShell>
   );
 }

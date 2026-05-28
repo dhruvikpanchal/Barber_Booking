@@ -1,5 +1,9 @@
-import Home from '@/components/modules/public/Home.jsx';
+import Home from "@/modules/public/Home.jsx";
 
 export default function HomePage() {
-  return <Home />;
+  return (
+    <div className="min-h-screen bg-background">
+      <Home />
+    </div>
+  );
 }
