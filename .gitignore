@@ -73,3 +73,4 @@ desktop.ini
 # ── Temp ─────────────────────────────────────────────────────
 tmp/
 temp/
+web/.env.example
