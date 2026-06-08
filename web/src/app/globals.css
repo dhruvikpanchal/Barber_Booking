@@ -1,0 +1,286 @@
+@import "tailwindcss";
+
+/*
+ * IRON & OAK design tokens.
+ * Components consume these via Tailwind utilities only — no per-component CSS.
+ */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-container-lowest: var(--surface-container-lowest);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+  --color-surface-bright: var(--surface-bright);
+
+  --color-on-background: var(--on-background);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-primary-container: var(--primary-container);
+  --color-on-primary-container: var(--on-primary-container);
+
+  --color-secondary: var(--secondary);
+  --color-on-secondary: var(--on-secondary);
+
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+
+  --color-error: var(--error);
+  --color-on-error: var(--on-error);
+
+  --color-status-confirmed: var(--status-confirmed);
+  --color-status-cancelled: var(--status-cancelled);
+  --color-status-pending: var(--status-pending);
+
+  --font-sans: var(--font-work-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-noto-serif), ui-serif, Georgia, serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+}
+
+:root {
+  --background: oklch(0.18 0 0);
+  --surface: oklch(0.18 0 0);
+  --surface-container-lowest: oklch(0.14 0 0);
+  --surface-container-low: oklch(0.21 0 0);
+  --surface-container: oklch(0.23 0 0);
+  --surface-container-high: oklch(0.28 0 0);
+  --surface-container-highest: oklch(0.33 0 0);
+  --surface-bright: oklch(0.4 0 0);
+
+  --on-background: oklch(0.92 0.005 60);
+  --on-surface: oklch(0.92 0.005 60);
+  --on-surface-variant: oklch(0.78 0.015 55);
+
+  --primary: oklch(0.82 0.09 55);
+  --on-primary: oklch(0.25 0.08 45);
+  --primary-container: oklch(0.65 0.12 45);
+  --on-primary-container: oklch(0.97 0.02 55);
+
+  --secondary: oklch(0.82 0.005 60);
+  --on-secondary: oklch(0.3 0 0);
+
+  --outline: oklch(0.55 0.02 50);
+  --outline-variant: oklch(0.32 0.015 50);
+
+  --error: oklch(0.72 0.18 25);
+  --on-error: oklch(0.98 0 0);
+
+  --status-confirmed: oklch(0.78 0.16 145);
+  --status-cancelled: oklch(0.7 0.18 25);
+  --status-pending: oklch(0.82 0.14 85);
+
+  /* Layout tokens */
+  --header-height: 64px;
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 76px;
+  --bottom-nav-height: 64px;
+}
+
+.theme-light {
+  --background: oklch(0.98 0.005 70);
+  --surface: oklch(0.98 0.005 70);
+  --surface-container-lowest: oklch(1 0 0);
+  --surface-container-low: oklch(0.96 0.005 70);
+  --surface-container: oklch(0.94 0.008 70);
+  --surface-container-high: oklch(0.91 0.01 70);
+  --surface-container-highest: oklch(0.88 0.012 70);
+  --surface-bright: oklch(1 0 0);
+
+  --on-background: oklch(0.2 0.01 50);
+  --on-surface: oklch(0.2 0.01 50);
+  --on-surface-variant: oklch(0.4 0.015 50);
+
+  --outline: oklch(0.7 0.015 50);
+  --outline-variant: oklch(0.85 0.01 50);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-outline-variant);
+  }
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-outline-variant) transparent;
+  }
+  html::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  html::-webkit-scrollbar-thumb {
+    background: var(--color-outline-variant);
+    border-radius: 999px;
+  }
+  html::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-on-surface);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-serif);
+  }
+  *:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+.font-label-caps {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.link-underline {
+  position: relative;
+}
+.link-underline::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: var(--color-primary);
+  transition: width 250ms ease;
+}
+.link-underline:hover::after {
+  width: 100%;
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-outline-variant) transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--color-outline-variant);
+  border-radius: 999px;
+}
+
+/*
+ * AppShell layouts: keep a single scroll container (`<main>`).
+ * Without this, `body` (min-height from root layout) also scrolls and shows a
+ * second, unthemed scrollbar (e.g. barber Services / Profile).
+ */
+@supports selector(:has(*)) {
+  html:has(.app-dashboard-root) {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  html:has(.app-dashboard-root) body {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+}
+
+/*
+ * Marketing / public routes: document scroll uses the same thin thumb as in-app.
+ */
+@supports selector(:has(*)) {
+  html:has(.app-public-root),
+  html:has(.app-public-root) body {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-outline-variant) transparent;
+  }
+
+  html:has(.app-public-root)::-webkit-scrollbar,
+  html:has(.app-public-root) body::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  html:has(.app-public-root)::-webkit-scrollbar-thumb,
+  html:has(.app-public-root) body::-webkit-scrollbar-thumb {
+    background: var(--color-outline-variant);
+    border-radius: 999px;
+  }
+
+  html:has(.app-public-root)::-webkit-scrollbar-track,
+  html:has(.app-public-root) body::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@keyframes modal-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes drawer-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes drawer-panel-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes drawer-panel-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes drawer-panel-in-bottom {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
