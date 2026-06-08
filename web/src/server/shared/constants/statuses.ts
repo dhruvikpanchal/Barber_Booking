@@ -1,0 +1,38 @@
+export const APPOINTMENT_STATUS = {
+  PENDING: "PENDING",
+  CONFIRMED: "CONFIRMED",
+  IN_SERVICE: "IN_SERVICE",
+  COMPLETED: "COMPLETED",
+  CANCELLED: "CANCELLED",
+  NO_SHOW: "NO_SHOW",
+} as const;
+
+export const SERVICE_CHANGE_STATUS = {
+  PENDING: "PENDING",
+  ACCEPTED: "ACCEPTED",
+  REJECTED: "REJECTED",
+} as const;
+
+export const BARBER_REQUEST_STATUS = {
+  PENDING: "PENDING",
+  APPROVED: "APPROVED",
+  REJECTED: "REJECTED",
+} as const;
+
+export const WALK_IN_STATUS = {
+  WAITING: "WAITING",
+  IN_SERVICE: "IN_SERVICE",
+  DONE: "DONE",
+  CANCELLED: "CANCELLED",
+} as const;
+
+export const CONTACT_REPLY_STATUS = {
+  UNREPLIED: "UNREPLIED",
+  REPLIED: "REPLIED",
+} as const;
+
+export const CANCELLED_BY = {
+  CUSTOMER: "CUSTOMER",
+  BARBER: "BARBER",
+  ADMIN: "ADMIN",
+} as const;
