@@ -5,9 +5,7 @@ import { customerAuthedRoute, invoke } from "@/server/modules/customer/route";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const handler = customerAuthedRoute((req) =>
-  customerController.markAllNotificationsRead(req),
-);
+const handler = customerAuthedRoute((req) => customerController.markAllNotificationsRead(req));
 
 export function POST(req: NextRequest) {
   return invoke(handler, req);

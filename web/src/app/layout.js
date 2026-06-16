@@ -1,5 +1,6 @@
 import { Work_Sans, Noto_Serif, Geist_Mono } from "next/font/google";
-import QueryProvider from "@/client/providers/QueryProvider";
+import QueryProvider from "@/client/lib/providers/QueryProvider";
+import SystemStatusBanner from "@/client/modules/shared/components/layout/SystemStatusBanner.jsx";
 import Toast from "@/client/modules/shared/components/layout/toast/Toast.jsx";
 import "./globals.css";
 
@@ -42,6 +43,7 @@ export default function RootLayout({ children }) {
     >
       <body className="bg-background text-on-surface min-h-full">
         <QueryProvider>
+          <SystemStatusBanner />
           {children}
           <Toast />
         </QueryProvider>

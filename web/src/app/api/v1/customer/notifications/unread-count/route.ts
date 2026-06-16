@@ -5,9 +5,7 @@ import { customerAuthedRoute, invoke } from "@/server/modules/customer/route";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const handler = customerAuthedRoute((req) =>
-  customerController.getUnreadNotificationCount(req),
-);
+const handler = customerAuthedRoute((req) => customerController.getUnreadNotificationCount(req));
 
 export function GET(req: NextRequest) {
   return invoke(handler, req);

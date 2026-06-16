@@ -1,4 +1,6 @@
-import WalkIns from "@/client/modules/barber/pages/WalkIns";
+import { loadBarberPage } from "@/client/modules/barber/loadBarberPage.js";
+
+const WalkIns = loadBarberPage(() => import("@/client/modules/barber/pages/WalkIns"));
 
 export const metadata = {
   title: "Walk-ins · Barber",

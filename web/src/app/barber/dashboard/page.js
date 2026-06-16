@@ -1,4 +1,6 @@
-import Dashboard from "@/client/modules/barber/pages/Dashboard";
+import { loadBarberPage } from "@/client/modules/barber/loadBarberPage.js";
+
+const Dashboard = loadBarberPage(() => import("@/client/modules/barber/pages/Dashboard"));
 
 export const metadata = {
   title: "Dashboard · Barber",

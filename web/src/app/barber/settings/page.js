@@ -1,5 +1,7 @@
-import Settings from "@/client/modules/barber/pages/Settings.jsx";
+import { loadBarberPage } from "@/client/modules/barber/loadBarberPage.js";
 
-export default function BarberServicesPage() {
+const Settings = loadBarberPage(() => import("@/client/modules/barber/pages/Settings.jsx"));
+
+export default function BarberSettingsPage() {
   return <Settings />;
 }

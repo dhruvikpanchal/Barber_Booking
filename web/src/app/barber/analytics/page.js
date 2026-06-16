@@ -1,4 +1,9 @@
-import Analytics from "@/client/modules/barber/pages/Analytics.jsx";
+import { loadBarberPage } from "@/client/modules/barber/loadBarberPage.js";
+
+const Analytics = loadBarberPage(() => import("@/client/modules/barber/pages/Analytics.jsx"), {
+  tiles: 5,
+  ssr: false,
+});
 
 export const metadata = {
   title: "Analytics · Barber",

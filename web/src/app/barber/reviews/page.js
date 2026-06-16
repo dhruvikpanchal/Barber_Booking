@@ -1,9 +1,7 @@
-import Reviews from "@/client/modules/barber/pages/Reviews";
+import { loadBarberPage } from "@/client/modules/barber/loadBarberPage.js";
+
+const Reviews = loadBarberPage(() => import("@/client/modules/barber/pages/Reviews"));
 
 export default function ReviewsPage() {
-  return (
-    <div>
-      <Reviews />
-    </div>
-  );
+  return <Reviews />;
 }

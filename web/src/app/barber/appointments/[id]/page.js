@@ -1,26 +1,15 @@
-import { notFound } from "next/navigation";
-import AppointmentDetail from "@/client/modules/barber/pages/AppointmentDetail.jsx";
-import {
-  INITIAL_APPOINTMENTS,
-  getAppointmentById,
-} from "@/client/modules/barber/data/appointmentsData.js";
+import { loadBarberPage } from "@/client/modules/barber/loadBarberPage.js";
 
-export function generateStaticParams() {
-  return INITIAL_APPOINTMENTS.map((a) => ({ id: a.id }));
-}
+const AppointmentDetail = loadBarberPage(
+  () => import("@/client/modules/barber/pages/AppointmentDetail.jsx"),
+);
 
-export async function generateMetadata({ params }) {
-  const { id } = await params;
-  const appt = getAppointmentById(id);
-  return {
-    title: appt ? `${appt.customer.name} · Appointment` : "Appointment not found · Barber",
-  };
-}
+export const metadata = {
+  title: "Appointment · Barber",
+  description: "Appointment details and actions.",
+};
 
 export default async function BarberAppointmentDetailPage({ params }) {
   const { id } = await params;
-  const appt = getAppointmentById(id);
-  if (!appt) notFound();
-
-  return <AppointmentDetail appt={appt} />;
+  return <AppointmentDetail appointmentId={id} />;
 }

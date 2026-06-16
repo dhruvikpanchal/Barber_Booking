@@ -1,11 +1,10 @@
 import type { NextRequest } from "next/server";
 import { publicController } from "@/server/modules/public/controller";
-import { invoke, publicRoute } from "@/server/modules/public/route";
+import { invoke, publicCachedRoute } from "@/server/modules/public/route";
 
-export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const handler = publicRoute((req) => publicController.listShops(req));
+const handler = publicCachedRoute((req) => publicController.listShops(req));
 
 export function GET(req: NextRequest) {
   return invoke(handler, req);

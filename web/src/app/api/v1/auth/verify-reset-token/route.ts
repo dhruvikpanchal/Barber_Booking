@@ -7,4 +7,3 @@ const handler = publicAuthRoute((req) => authController.verifyResetToken(req), "
 export function POST(req: NextRequest) {
   return invoke(handler, req);
 }
-
