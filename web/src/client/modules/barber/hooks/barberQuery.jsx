@@ -1,121 +1,166 @@
 import { createQuery, createMutation } from "@/client/modules/shared/hooks/useTanstack.js";
-import { barberServices } from "@/client/modules/barber/service/barberServices.jsx";
+import { barberServices } from "@/client/modules/barber/services/barberServices.jsx";
+
+export { useBarberInvalidation } from "@/client/modules/barber/hooks/useBarberInvalidation.js";
 
 export const barberHook = {
   Profile: {
-    useGetProfile: () => createQuery("getProfile", barberServices.getProfile),
+    useGetProfile: () => createQuery("barberGetProfile", barberServices.getProfile),
 
-    useUpdateProfile: (data) => createMutation("updateProfile", barberServices.updateProfile, data),
+    useUpdateProfile: () => createMutation("barberUpdateProfile", barberServices.updateProfile),
 
-    useUploadPhoto: (file) => createMutation("uploadPhoto", barberServices.uploadPhoto, file),
+    useUploadPhoto: () => createMutation("barberUploadPhoto", barberServices.uploadPhoto),
 
-    useAddGalleryImage: (data) =>
-      createMutation("addGalleryImage", barberServices.addGalleryImage, data),
+    useUploadGalleryPhoto: () =>
+      createMutation("barberUploadGalleryPhoto", ({ file, alt = "" }) =>
+        barberServices.uploadGalleryPhoto(file, alt),
+      ),
 
-    useUpdateGalleryImage: (id, data) =>
-      createMutation("updateGalleryImage", barberServices.updateGalleryImage, id, data),
+    useAddGalleryImage: () =>
+      createMutation("barberAddGalleryImage", barberServices.addGalleryImage),
 
-    useDeleteGalleryImage: (id) =>
-      createMutation("deleteGalleryImage", barberServices.deleteGalleryImage, id),
+    useUpdateGalleryImage: () =>
+      createMutation("barberUpdateGalleryImage", ({ id, ...data }) =>
+        barberServices.updateGalleryImage(id, data),
+      ),
+
+    useDeleteGalleryImage: () =>
+      createMutation("barberDeleteGalleryImage", (id) => barberServices.deleteGalleryImage(id)),
   },
 
   Services: {
-    useListServices: (params) => createQuery("listServices", barberServices.listServices, params),
+    useListServices: (params) =>
+      createQuery("barberListServices", barberServices.listServices, params),
 
-    useCreateService: (data) => createMutation("createService", barberServices.createService, data),
+    useCreateService: () => createMutation("barberCreateService", barberServices.createService),
 
-    useUpdateService: (id, data) =>
-      createMutation("updateService", barberServices.updateService, id, data),
+    useUpdateService: () =>
+      createMutation("barberUpdateService", ({ id, ...data }) =>
+        barberServices.updateService(id, data),
+      ),
 
-    useToggleService: (id, data) =>
-      createMutation("toggleService", barberServices.toggleService, id, data),
+    useToggleService: () =>
+      createMutation("barberToggleService", ({ id, ...data }) =>
+        barberServices.toggleService(id, data),
+      ),
 
-    useDeleteService: (id) => createMutation("deleteService", barberServices.deleteService, id),
+    useDeleteService: () =>
+      createMutation("barberDeleteService", (id) => barberServices.deleteService(id)),
   },
 
   Schedule: {
-    useGetSchedule: () => createQuery("getSchedule", barberServices.getSchedule),
+    useGetSchedule: () => createQuery("barberGetSchedule", barberServices.getSchedule),
 
-    useSaveSchedule: (data) => createMutation("saveSchedule", barberServices.saveSchedule, data),
+    useSaveSchedule: () => createMutation("barberSaveSchedule", barberServices.saveSchedule),
 
-    useAddUnavailableDate: (data) =>
-      createMutation("addUnavailableDate", barberServices.addUnavailableDate, data),
+    useAddUnavailableDate: () =>
+      createMutation("barberAddUnavailableDate", barberServices.addUnavailableDate),
 
-    useRemoveUnavailableDate: (date) =>
-      createMutation("removeUnavailableDate", barberServices.removeUnavailableDate, date),
+    useRemoveUnavailableDate: () =>
+      createMutation("barberRemoveUnavailableDate", (date) =>
+        barberServices.removeUnavailableDate(date),
+      ),
   },
 
   Appointments: {
     useListAppointments: (params) =>
-      createQuery("listAppointments", barberServices.listAppointments, params),
+      createQuery("barberListAppointments", barberServices.listAppointments, params),
 
-    useGetAppointment: (id) => createQuery("getAppointment", barberServices.getAppointment, id),
+    useGetAppointment: (id) =>
+      createQuery("barberGetAppointment", barberServices.getAppointment, id),
 
-    useUpdateAppointmentStatus: (id, data) =>
-      createMutation("updateAppointmentStatus", barberServices.updateAppointmentStatus, id, data),
+    useUpdateAppointmentStatus: () =>
+      createMutation("barberUpdateAppointmentStatus", ({ id, ...data }) =>
+        barberServices.updateAppointmentStatus(id, data),
+      ),
 
-    useRescheduleAppointment: (id, data) =>
-      createMutation("rescheduleAppointment", barberServices.rescheduleAppointment, id, data),
+    useRescheduleAppointment: () =>
+      createMutation("barberRescheduleAppointment", ({ id, ...data }) =>
+        barberServices.rescheduleAppointment(id, data),
+      ),
 
-    useRespondServiceChange: (appointmentId, reqId, data) =>
-      createMutation(
-        "respondServiceChange",
-        barberServices.respondServiceChange,
-        appointmentId,
-        reqId,
-        data,
+    useRespondServiceChange: () =>
+      createMutation("barberRespondServiceChange", ({ appointmentId, reqId, ...data }) =>
+        barberServices.respondServiceChange(appointmentId, reqId, data),
       ),
   },
 
   Queue: {
-    useGetQueue: (params) => createQuery("getQueue", barberServices.getQueue, params),
+    useGetQueue: (params) => createQuery("barberGetQueue", barberServices.getQueue, params),
 
-    useAddToQueue: (data) => createMutation("addToQueue", barberServices.addToQueue, data),
+    useAddToQueue: () => createMutation("barberAddToQueue", barberServices.addToQueue),
 
-    useUpdateQueueStatus: (id, data) =>
-      createMutation("updateQueueStatus", barberServices.updateQueueStatus, id, data),
+    useUpdateQueueStatus: () =>
+      createMutation("barberUpdateQueueStatus", ({ id, ...data }) =>
+        barberServices.updateQueueStatus(id, data),
+      ),
 
-    useAssignChair: (id, data) =>
-      createMutation("assignChair", barberServices.assignChair, id, data),
+    useAssignChair: () =>
+      createMutation("barberAssignChair", ({ id, ...data }) =>
+        barberServices.assignChair(id, data),
+      ),
 
-    useRemoveFromQueue: (id) =>
-      createMutation("removeFromQueue", barberServices.removeFromQueue, id),
+    useRemoveFromQueue: () =>
+      createMutation("barberRemoveFromQueue", (id) => barberServices.removeFromQueue(id)),
   },
 
   WalkIns: {
-    useListWalkIns: (params) => createQuery("listWalkIns", barberServices.listWalkIns, params),
+    useListWalkIns: (params) =>
+      createQuery("barberListWalkIns", barberServices.listWalkIns, params),
 
-    useCreateWalkIn: (data) => createMutation("createWalkIn", barberServices.createWalkIn, data),
+    useCreateWalkIn: () => createMutation("barberCreateWalkIn", barberServices.createWalkIn),
 
-    useUpdateWalkInStatus: (id, data) =>
-      createMutation("updateWalkInStatus", barberServices.updateWalkInStatus, id, data),
+    useUpdateWalkInStatus: () =>
+      createMutation("barberUpdateWalkInStatus", ({ id, ...data }) =>
+        barberServices.updateWalkInStatus(id, data),
+      ),
   },
 
   Reviews: {
-    useListReviews: (params) => createQuery("listReviews", barberServices.listReviews, params),
+    useListReviews: (params) =>
+      createQuery("barberListReviews", barberServices.listReviews, params),
 
-    useGetReview: (id) => createQuery("getReview", barberServices.getReview, id),
+    useGetReview: (id) => createQuery("barberGetReview", barberServices.getReview, id),
 
-    useReplyToReview: (id, data) =>
-      createMutation("replyToReview", barberServices.replyToReview, id, data),
+    useReplyToReview: () =>
+      createMutation("barberReplyToReview", ({ id, ...data }) =>
+        barberServices.replyToReview(id, data),
+      ),
   },
 
   Analytics: {
-    useGetAnalytics: (params) => createQuery("getAnalytics", barberServices.getAnalytics, params),
+    useGetAnalytics: (params) =>
+      createQuery("barberGetAnalytics", barberServices.getAnalytics, params),
   },
 
   Notifications: {
     useListNotifications: (params) =>
-      createQuery("listNotifications", barberServices.listNotifications, params),
+      createQuery("barberListNotifications", barberServices.listNotifications, params),
 
-    useMarkNotificationRead: (id, data) =>
-      createMutation("markNotificationRead", barberServices.markNotificationRead, id, data),
+    useMarkNotificationRead: () =>
+      createMutation("barberMarkNotificationRead", ({ id, ...data }) =>
+        barberServices.markNotificationRead(id, data),
+      ),
 
     useMarkAllNotificationsRead: () =>
-      createMutation("markAllNotificationsRead", barberServices.markAllNotificationsRead),
+      createMutation("barberMarkAllNotificationsRead", barberServices.markAllNotificationsRead),
+
+    useUnreadNotificationCount: (options) =>
+      createQuery(
+        "barberUnreadNotificationCount",
+        barberServices.getUnreadNotificationCount,
+        options,
+      ),
   },
 
   Dashboard: {
-    useGetDashboard: (params) => createQuery("getDashboard", barberServices.getDashboard, params),
+    useGetDashboard: (params) =>
+      createQuery("barberGetDashboard", barberServices.getDashboard, params),
+  },
+
+  Settings: {
+    useUpdatePassword: () => createMutation("barberUpdatePassword", barberServices.updatePassword),
+
+    useDeleteAccount: () => createMutation("barberDeleteAccount", barberServices.deleteAccount),
   },
 };

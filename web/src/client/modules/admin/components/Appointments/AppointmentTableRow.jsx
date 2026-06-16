@@ -1,16 +1,8 @@
 "use client";
 
-import {
-  Activity,
-  Eye,
-  History,
-  MapPin,
-  Scissors,
-  Sparkles,
-  User,
-} from "lucide-react";
+import { Activity, Eye, History, MapPin, Scissors, Sparkles, User } from "lucide-react";
 import StatusBadge from "@/client/modules/shared/components/ui/StatusBadge";
-import { APPOINTMENT_STATUSES } from "@/modules/admin/constants/admin.js";
+import { APPOINTMENT_STATUSES } from "@/client/modules/admin/constants/adminConstants.js";
 
 export function formatWhen(iso) {
   const d = new Date(iso);
@@ -40,14 +32,7 @@ function hasServiceUpdate(appt) {
   return Boolean(appt.originalService);
 }
 
-function AdminActions({
-  appt,
-  compact,
-  onView,
-  onMonitor,
-  onHistory,
-  onServiceUpdated,
-}) {
+function AdminActions({ appt, compact, onView, onMonitor, onHistory, onServiceUpdated }) {
   const btn =
     "inline-flex items-center justify-center gap-1 rounded-md border border-outline-variant text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface";
   const size = compact ? "h-8 px-2 text-[11px]" : "h-9 px-2.5 text-xs";
@@ -91,11 +76,7 @@ function AdminActions({
             ? "border-primary/40 text-primary hover:bg-primary/10"
             : "cursor-not-allowed opacity-40"
         }`}
-        title={
-          serviceChanged
-            ? "View service update"
-            : "No service changes on this booking"
-        }
+        title={serviceChanged ? "View service update" : "No service changes on this booking"}
       >
         <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
         <span className="hidden xl:inline">Service</span>
@@ -107,58 +88,49 @@ function AdminActions({
 export function AppointmentTableRow({ appt, ...handlers }) {
   const { date, time } = formatWhen(appt.startAt);
   return (
-    <tr className="border-t border-outline-variant transition-colors hover:bg-surface-container/40">
+    <tr className="border-outline-variant hover:bg-surface-container/40 border-t transition-colors">
       <td className="px-4 py-3">
-        <p className="font-mono text-xs font-semibold text-primary">
-          {appt.id}
-        </p>
-        <p className="mt-0.5 text-[11px] text-on-surface-variant">
+        <p className="text-primary font-mono text-xs font-semibold">{appt.id}</p>
+        <p className="text-on-surface-variant mt-0.5 text-[11px]">
           {new Date(appt.createdAt).toLocaleDateString()}
         </p>
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/15 font-serif text-sm font-bold text-primary">
+          <span className="bg-primary/15 text-primary flex h-10 w-10 items-center justify-center rounded-full font-serif text-sm font-bold">
             {initials(appt.customer.name)}
           </span>
           <div className="min-w-0">
-            <p className="truncate font-semibold text-on-surface">
-              {appt.customer.name}
-            </p>
-            <p className="truncate text-xs text-on-surface-variant">
-              {appt.customer.phone}
-            </p>
+            <p className="text-on-surface truncate font-semibold">{appt.customer.name}</p>
+            <p className="text-on-surface-variant truncate text-xs">{appt.customer.phone}</p>
           </div>
         </div>
       </td>
       <td className="px-4 py-3">
-        <p className="font-semibold text-on-surface">{appt.barberName}</p>
-        <p className="text-xs text-on-surface-variant">{appt.shop}</p>
+        <p className="text-on-surface font-semibold">{appt.barberName}</p>
+        <p className="text-on-surface-variant text-xs">{appt.shop}</p>
       </td>
       <td className="px-4 py-3">
-        <span className="inline-flex items-center gap-1 text-sm text-on-surface">
-          <MapPin className="h-3.5 w-3.5 text-on-surface-variant" aria-hidden />
+        <span className="text-on-surface inline-flex items-center gap-1 text-sm">
+          <MapPin className="text-on-surface-variant h-3.5 w-3.5" aria-hidden />
           {appt.city}
         </span>
       </td>
       <td className="px-4 py-3">
-        <div className="flex items-center gap-2 text-sm text-on-surface">
-          <Scissors
-            className="h-3.5 w-3.5 text-on-surface-variant"
-            aria-hidden
-          />
+        <div className="text-on-surface flex items-center gap-2 text-sm">
+          <Scissors className="text-on-surface-variant h-3.5 w-3.5" aria-hidden />
           {appt.service}
         </div>
         {hasServiceUpdate(appt) && (
-          <p className="mt-0.5 text-[11px] text-primary">Service updated</p>
+          <p className="text-primary mt-0.5 text-[11px]">Service updated</p>
         )}
-        <p className="mt-0.5 text-xs text-on-surface-variant">
+        <p className="text-on-surface-variant mt-0.5 text-xs">
           ${appt.price} · {appt.duration}m
         </p>
       </td>
       <td className="px-4 py-3 text-sm">
-        <p className="font-semibold text-on-surface">{date}</p>
-        <p className="text-xs text-on-surface-variant">{time}</p>
+        <p className="text-on-surface font-semibold">{date}</p>
+        <p className="text-on-surface-variant text-xs">{time}</p>
       </td>
       <td className="px-4 py-3">
         <StatusBadge status={appt.status} config={APPOINTMENT_STATUSES} />
@@ -173,31 +145,27 @@ export function AppointmentTableRow({ appt, ...handlers }) {
 export function AppointmentCard({ appt, ...handlers }) {
   const { date, time } = formatWhen(appt.startAt);
   return (
-    <article className="rounded-xl border border-outline-variant bg-surface-container-low p-4">
-      <div className="flex items-start justify-between gap-3 flex-col sm:flex-row">
+    <article className="border-outline-variant bg-surface-container-low rounded-xl border p-4">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/15 font-serif text-sm font-bold text-primary">
+          <span className="bg-primary/15 text-primary flex h-11 w-11 shrink-0 items-center justify-center rounded-full font-serif text-sm font-bold">
             {initials(appt.customer.name)}
           </span>
           <div className="min-w-0">
-            <p className="font-mono text-xs font-semibold text-primary">
-              {appt.id}
-            </p>
-            <h3 className="font-serif text-base font-bold text-on-surface">
-              {appt.customer.name}
-            </h3>
-            <p className="text-xs text-on-surface-variant">
+            <p className="text-primary font-mono text-xs font-semibold">{appt.id}</p>
+            <h3 className="text-on-surface font-serif text-base font-bold">{appt.customer.name}</h3>
+            <p className="text-on-surface-variant text-xs">
               <User className="mr-1 inline h-3 w-3" aria-hidden />
               {appt.barberName} · {appt.shop}
             </p>
-            <p className="mt-1 text-xs text-on-surface-variant">
+            <p className="text-on-surface-variant mt-1 text-xs">
               {appt.city} · {date} {time}
             </p>
           </div>
         </div>
         <StatusBadge status={appt.status} config={APPOINTMENT_STATUSES} />
       </div>
-      <p className="mt-3 text-sm text-on-surface">
+      <p className="text-on-surface mt-3 text-sm">
         {appt.service}
         <span className="text-on-surface-variant"> · ${appt.price}</span>
       </p>

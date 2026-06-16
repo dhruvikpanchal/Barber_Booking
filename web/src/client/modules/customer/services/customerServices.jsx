@@ -12,7 +12,11 @@ export const customerServices = {
 
   updateProfile: (data) => patch("/customer/profile", data),
 
-  uploadProfilePhoto: (file) => post("/customer/profile/photo", file),
+  uploadProfilePhoto: (file) => {
+    const form = new FormData();
+    form.append("photo", file);
+    return post("/customer/profile/photo", form);
+  },
 
   // Dashboard
   getDashboard: (params) => get("/customer/dashboard", params),
@@ -62,6 +66,10 @@ export const customerServices = {
   markAllNotificationsRead: () => post("/customer/notifications/read-all"),
 
   deleteNotification: (id) => del(`/customer/notifications/${id}`),
+
+  updatePassword: (data) => patch("/customer/settings/password", data),
+
+  deleteAccount: () => del("/customer/settings/account"),
 };
 
 export default customerServices;

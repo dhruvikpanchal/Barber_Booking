@@ -53,16 +53,6 @@ export default function LoginForm({
 
   return (
     <form className="space-y-6" onSubmit={handleSubmit} noValidate>
-      {fieldErrors.form && (
-        <div
-          className="flex items-center gap-3 border border-red-400/30 bg-[#93000a] px-4 py-3"
-          role="alert"
-        >
-          <span className="material-symbols-outlined text-[20px] text-red-300">error</span>
-          <p className="text-[11px] tracking-[0.1em] text-[#ffdad6]">{fieldErrors.form}</p>
-        </div>
-      )}
-
       <div>
         <label htmlFor="login-email" className="mb-2 block text-xs tracking-[0.1em] text-[#d8c2b7]">
           EMAIL ADDRESS

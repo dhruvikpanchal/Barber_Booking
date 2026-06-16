@@ -1,14 +1,18 @@
 "use client";
 
 import { useState } from "react";
-
 import { CheckCircle2, Loader2, Send, XCircle } from "lucide-react";
+import { toast } from "sonner";
 
-import { CONTACT_INFO, SUBJECTS } from "@/client/modules/public/data/contact.js";
-import { publicServices } from "@/client/modules/public/services/publicServices.jsx";
-import { FieldError, validate } from "@/client/modules/public/components/Contact/Primitives.jsx";
+import { CONTACT_INFO, SUBJECTS } from "@/client/modules/public/constants/contactConstants.js";
+import { publicHook } from "@/client/modules/public/hooks/publicQuery.jsx";
+import { FieldError } from "@/client/modules/public/components/Contact/Primitives.jsx";
+import { validate } from "@/client/modules/public/helpers/contactHelpers.js";
 
-export function ContactForm() {
+export function ContactForm({ disabled = false }) {
+  const submitMutation = publicHook.ContactInfo.useSubmitContact();
+  const isPending = disabled || submitMutation.isPending;
+
   const [fields, setFields] = useState({
     name: "",
     email: "",
@@ -16,24 +20,32 @@ export function ContactForm() {
     message: "",
   });
   const [errors, setErrors] = useState({});
-  const [status, setStatus] = useState("idle"); // idle | submitting | success | error
+  const [status, setStatus] = useState("idle"); // idle | success | error
 
   const set = (key) => (e) => setFields((prev) => ({ ...prev, [key]: e.target.value }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isPending) return;
+
     const errs = validate(fields);
     setErrors(errs);
     if (Object.keys(errs).length) return;
 
-    setStatus("submitting");
     try {
-      await publicServices.submitContact({
-        name: fields.name.trim(),
-        email: fields.email.trim(),
-        subject: fields.subject,
-        message: fields.message.trim(),
-      });
+      await toast.promise(
+        submitMutation.mutateAsync({
+          name: fields.name.trim(),
+          email: fields.email.trim(),
+          subject: fields.subject,
+          message: fields.message.trim(),
+        }),
+        {
+          loading: "Sending your message…",
+          success: "Message sent successfully!",
+          error: "Something went wrong. Please try again.",
+        },
+      );
       setStatus("success");
     } catch {
       setStatus("error");
@@ -46,7 +58,6 @@ export function ContactForm() {
     setStatus("idle");
   };
 
-  /* ── Success state ── */
   if (status === "success") {
     return (
       <div className="border-status-confirmed/25 bg-status-confirmed/8 flex flex-col items-center justify-center gap-5 rounded-xl border px-6 py-14 text-center">
@@ -66,7 +77,8 @@ export function ContactForm() {
         <button
           type="button"
           onClick={handleReset}
-          className="border-outline-variant bg-surface-container text-on-surface hover:bg-surface-container-high mt-1 inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors"
+          disabled={isPending}
+          className="border-outline-variant bg-surface-container text-on-surface hover:bg-surface-container-high mt-1 inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           Send another message
         </button>
@@ -75,7 +87,7 @@ export function ContactForm() {
   }
 
   const inputBase =
-    "w-full rounded-lg border bg-surface-container px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/50 transition-colors focus:outline-none";
+    "w-full rounded-lg border bg-surface-container px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/50 transition-colors focus:outline-none disabled:cursor-not-allowed disabled:opacity-50";
   const inputNormal = "border-outline-variant focus:border-primary focus:bg-surface-container-high";
   const inputError = "border-error/60 focus:border-error bg-error/5";
 
@@ -86,7 +98,6 @@ export function ContactForm() {
       aria-label="Contact inquiry form"
       className="space-y-5"
     >
-      {/* Error banner */}
       {status === "error" && (
         <div
           role="alert"
@@ -106,9 +117,7 @@ export function ContactForm() {
         </div>
       )}
 
-      {/* Name + Email row */}
       <div className="grid gap-5 sm:grid-cols-2">
-        {/* Full name */}
         <div>
           <label
             htmlFor="contact-name"
@@ -126,6 +135,7 @@ export function ContactForm() {
             value={fields.name}
             onChange={set("name")}
             placeholder="Jane Smith"
+            disabled={isPending}
             aria-invalid={!!errors.name}
             aria-describedby={errors.name ? "name-error" : undefined}
             className={`${inputBase} ${errors.name ? inputError : inputNormal}`}
@@ -133,7 +143,6 @@ export function ContactForm() {
           <FieldError message={errors.name} />
         </div>
 
-        {/* Email */}
         <div>
           <label
             htmlFor="contact-email"
@@ -151,6 +160,7 @@ export function ContactForm() {
             value={fields.email}
             onChange={set("email")}
             placeholder="jane@example.com"
+            disabled={isPending}
             aria-invalid={!!errors.email}
             aria-describedby={errors.email ? "email-error" : undefined}
             className={`${inputBase} ${errors.email ? inputError : inputNormal}`}
@@ -159,7 +169,6 @@ export function ContactForm() {
         </div>
       </div>
 
-      {/* Subject */}
       <div>
         <label
           htmlFor="contact-subject"
@@ -174,6 +183,7 @@ export function ContactForm() {
           id="contact-subject"
           value={fields.subject}
           onChange={set("subject")}
+          disabled={isPending}
           aria-invalid={!!errors.subject}
           className={`${inputBase} ${errors.subject ? inputError : inputNormal} appearance-none`}
         >
@@ -187,7 +197,6 @@ export function ContactForm() {
         <FieldError message={errors.subject} />
       </div>
 
-      {/* Message */}
       <div>
         <div className="mb-1.5 flex items-baseline justify-between">
           <label
@@ -212,13 +221,13 @@ export function ContactForm() {
             }))
           }
           placeholder="Describe your question or issue in as much detail as possible…"
+          disabled={isPending}
           aria-invalid={!!errors.message}
           className={`${inputBase} resize-y ${errors.message ? inputError : inputNormal}`}
         />
         <FieldError message={errors.message} />
       </div>
 
-      {/* Submit */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-on-surface-variant text-xs">
           <span className="text-error" aria-hidden>
@@ -228,10 +237,10 @@ export function ContactForm() {
         </p>
         <button
           type="submit"
-          disabled={status === "submitting"}
+          disabled={isPending}
           className="bg-primary text-on-primary hover:bg-primary/90 focus-visible:ring-primary/60 inline-flex h-11 items-center justify-center gap-2 rounded-lg px-6 text-sm font-bold transition-all focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {status === "submitting" ? (
+          {submitMutation.isPending ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               Sending…

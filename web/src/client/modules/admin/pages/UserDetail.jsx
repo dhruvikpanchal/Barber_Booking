@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import {
   Activity,
   ArrowLeft,
@@ -23,14 +22,14 @@ import {
   User,
   XCircle,
 } from "lucide-react";
+import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
-import { getAdminUserById } from "@/client/modules/admin/data/userDetailData.js";
-import { useHydrated } from "@/client/modules/shared/hooks/useHydrated.js";
-import { USER_STATUS_CONFIG } from "@/client/modules/admin/constants/admin.js";
-import { ActivityBadge, UserStatusBadge } from "@/client/modules/admin/helpers/badges.jsx";
+import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
+import { mapAdminUserDetail } from "@/client/modules/admin/helpers/adminMappers.js";
+import { USER_STATUS_CONFIG } from "@/client/modules/admin/constants/adminConstants.js";
+import { ActivityBadge, UserStatusBadge } from "@/client/modules/shared/components/ui/badges.jsx";
 import { StarRow } from "@/client/modules/shared/components/ui/StarRow.jsx";
 import { formatShortDate, formatRelativeAge } from "@/client/lib/format/formatDateTime.js";
-import { Toast } from "@/client/modules/shared/components/common/settings/TinyPrimitives.jsx";
 import {
   fullDateTime,
   SectionCard,
@@ -41,66 +40,58 @@ import {
   BookingStatusPill,
   PaymentPill,
 } from "@/client/modules/admin/components/UserDetail/Primitives.jsx";
-import { UserDetail_ACTIVITY_ICONS } from "@/client/modules/admin/constants/admin.js";
+import { UserDetail_ACTIVITY_ICONS } from "@/client/modules/admin/constants/adminConstants.js";
 
 /**
  * @param {{ id: string }} props
  */
 export default function UserDetail({ id }) {
-  const hydrated = useHydrated();
-  const seed = useMemo(() => getAdminUserById(id), [id]);
+  const { data, isPending, isError, error, refetch } = adminHook.Users.useUser(id);
+  const statusMutation = adminHook.Users.useUpdateUserStatus();
 
-  if (!seed) notFound();
+  const busy = isPending || statusMutation.isPending;
 
-  const [user, setUser] = useState(seed);
-  const [toast, setToast] = useState(null);
+  useEffect(() => {
+    if (isError) {
+      toast.error(error?.message || "Could not load customer profile.");
+    }
+  }, [isError, error]);
 
-  const statusCfg = USER_STATUS_CONFIG[user.status] ?? USER_STATUS_CONFIG.inactive;
-  const isActive = user.status === "active";
-  const isDeactivated = user.status === "disabled";
+  const user = useMemo(() => (data ? mapAdminUserDetail(data) : null), [data]);
 
-  const showToast = (message, type = "success") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
+  const statusCfg = USER_STATUS_CONFIG[user?.status] ?? USER_STATUS_CONFIG.inactive;
+  const isActive = user?.status === "active";
+  const isDeactivated = user?.status === "disabled";
 
-  function handleActivate() {
-    setUser((prev) => ({
-      ...prev,
-      status: "active",
-      activity: [
-        {
-          id: `${prev.id}-act-on-${Date.now()}`,
-          type: "status",
-          title: "Account activated",
-          description: "Customer access restored by admin.",
-          at: new Date().toISOString(),
-        },
-        ...prev.activity,
-      ],
-    }));
-    showToast("User account activated.");
+  async function handleActivate() {
+    if (busy || !user) return;
+    try {
+      await toast.promise(statusMutation.mutateAsync({ id: user.id, isActive: true }), {
+        loading: "Activating account…",
+        success: "User account activated.",
+        error: "Could not activate account.",
+      });
+      await refetch();
+    } catch {
+      /* toast handles error */
+    }
   }
 
-  function handleDeactivate() {
-    setUser((prev) => ({
-      ...prev,
-      status: "disabled",
-      activity: [
-        {
-          id: `${prev.id}-act-off-${Date.now()}`,
-          type: "status",
-          title: "Account deactivated",
-          description: "Access restricted by admin.",
-          at: new Date().toISOString(),
-        },
-        ...prev.activity,
-      ],
-    }));
-    showToast("User account deactivated.", "info");
+  async function handleDeactivate() {
+    if (busy || !user) return;
+    try {
+      await toast.promise(statusMutation.mutateAsync({ id: user.id, isActive: false }), {
+        loading: "Deactivating account…",
+        success: "User account deactivated.",
+        error: "Could not deactivate account.",
+      });
+      await refetch();
+    } catch {
+      /* toast handles error */
+    }
   }
 
-  if (!hydrated) {
+  if (isPending && !user) {
     return (
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="text-on-surface-variant flex items-center gap-2 text-sm">
@@ -108,6 +99,31 @@ export default function UserDetail({ id }) {
           Loading customer profile…
         </div>
         <LoadingSkeleton />
+      </div>
+    );
+  }
+
+  if (isError || !user) {
+    return (
+      <div className="text-on-surface mx-auto max-w-6xl py-16 text-center">
+        <p className="font-medium">Could not load customer profile.</p>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => refetch()}
+            disabled={busy}
+            className="text-primary text-sm font-semibold hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Try again
+          </button>
+          <Link
+            href={routes.admin.users}
+            className="border-outline-variant text-on-surface-variant hover:text-on-surface inline-flex items-center gap-2 rounded-md border px-4 py-2.5 text-xs font-semibold"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            Back to users
+          </Link>
+        </div>
       </div>
     );
   }
@@ -138,7 +154,7 @@ export default function UserDetail({ id }) {
             </h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <UserStatusBadge status={user.status} />
-              <ActivityBadge level={user.activity} />
+              <ActivityBadge level={user.activityLevel} />
             </div>
             <p className="text-on-surface-variant mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
               <span className="inline-flex items-center gap-1.5">
@@ -178,7 +194,6 @@ export default function UserDetail({ id }) {
         </div>
       )}
 
-      {/* Booking statistics */}
       <section aria-labelledby="booking-stats-heading">
         <h2 id="booking-stats-heading" className="font-label-caps text-on-surface-variant mb-3">
           Booking statistics
@@ -187,7 +202,7 @@ export default function UserDetail({ id }) {
           <StatCard
             label="Total bookings"
             value={stats.totalBookings}
-            sub={`${user.bookingsThisMonth} this month`}
+            sub={`${user.bookingsThisMonth ?? 0} this month`}
             icon={CalendarCheck}
           />
           <StatCard
@@ -213,13 +228,12 @@ export default function UserDetail({ id }) {
           <StatCard
             label="Lifetime spend"
             value={`$${stats.totalSpent.toLocaleString()}`}
-            sub="Mock total"
             icon={DollarSign}
           />
           <StatCard
             label="Reviews given"
             value={stats.reviewsGiven}
-            sub={`Avg ${user.avgRatingGiven.toFixed(1)} ★`}
+            sub={`Avg ${(user.avgRatingGiven ?? 0).toFixed(1)} ★`}
             icon={MessageSquare}
           />
         </div>
@@ -358,11 +372,11 @@ export default function UserDetail({ id }) {
             title="Activity overview"
             description="Logins, bookings, reviews, and account changes."
           >
-            {user.activity.length === 0 ? (
+            {user.activityEvents.length === 0 ? (
               <p className="text-on-surface-variant text-sm">No activity recorded.</p>
             ) : (
               <ol className="border-outline-variant relative space-y-0 border-l pl-6">
-                {user.activity.map((event, index) => {
+                {user.activityEvents.map((event, index) => {
                   const Icon = UserDetail_ACTIVITY_ICONS[event.type] ?? Activity;
                   return (
                     <li key={event.id} className="relative pb-6 last:pb-0">
@@ -403,16 +417,20 @@ export default function UserDetail({ id }) {
               <button
                 type="button"
                 onClick={handleActivate}
-                disabled={isActive}
+                disabled={isActive || busy}
                 className="bg-primary text-on-primary flex w-full items-center justify-center gap-2 rounded-md px-4 py-2.5 text-xs font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <ShieldCheck className="h-4 w-4" aria-hidden />
+                {statusMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                ) : (
+                  <ShieldCheck className="h-4 w-4" aria-hidden />
+                )}
                 Activate account
               </button>
               <button
                 type="button"
                 onClick={handleDeactivate}
-                disabled={isDeactivated}
+                disabled={isDeactivated || busy}
                 className="border-outline-variant text-on-surface-variant hover:border-status-cancelled/50 hover:text-status-cancelled flex w-full items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Ban className="h-4 w-4" aria-hidden />
@@ -451,19 +469,17 @@ export default function UserDetail({ id }) {
                 <Star className="text-primary h-3.5 w-3.5" aria-hidden />
                 Avg rating given:{" "}
                 <span className="text-on-surface font-semibold">
-                  {user.avgRatingGiven.toFixed(1)}
+                  {(user.avgRatingGiven ?? 0).toFixed(1)}
                 </span>
               </li>
               <li className="flex items-center gap-2">
                 <Activity className="text-primary h-3.5 w-3.5" aria-hidden />
-                Engagement: <ActivityBadge level={user.activity} />
+                Engagement: <ActivityBadge level={user.activityLevel} />
               </li>
             </ul>
           </div>
         </aside>
       </div>
-
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

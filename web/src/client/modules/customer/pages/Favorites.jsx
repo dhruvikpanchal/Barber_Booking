@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Heart, User, SlidersHorizontal, ArrowUpDown, Star, CheckCircle, X } from "lucide-react";
-import customerServices from "@/client/modules/customer/services/customerServices.jsx";
+import { useQueryClient } from "@tanstack/react-query";
+import { Heart, User, SlidersHorizontal, ArrowUpDown, Star, CheckCircle } from "lucide-react";
+import { toast } from "sonner";
+import { customerHook } from "@/client/modules/customer/hooks/customerQuery.jsx";
 import SavedBarberCard from "@/client/modules/customer/components/Favorites/SavedBarberCard.jsx";
 import FavoritesEmpty from "@/client/modules/customer/components/Favorites/FavoritesEmpty.jsx";
-import { BARBER_SORTS } from "@/client/modules/customer/constants/favorites.js";
+import { BARBER_SORTS } from "@/client/modules/customer/constants/favoritesConstants.js";
 import { routes } from "@/client/config/routes/routes.js";
 
 function sortBarbers(list, key) {
@@ -24,28 +26,6 @@ function sortBarbers(list, key) {
         return new Date(b.savedAt) - new Date(a.savedAt);
     }
   });
-}
-
-function Toast({ toast, onDismiss }) {
-  if (!toast) return null;
-  const colors = {
-    success: "border-status-confirmed/30 bg-status-confirmed/10 text-status-confirmed",
-    info: "border-primary/30 bg-primary/10 text-primary",
-    warn: "border-status-pending/30 bg-status-pending/10 text-status-pending",
-  };
-  return (
-    <div
-      className={`fixed right-6 bottom-6 z-50 flex items-center gap-3 rounded-xl border px-4 py-3 shadow-2xl backdrop-blur-sm ${colors[toast.type] ?? colors.info}`}
-    >
-      <span className="text-on-surface text-sm font-medium">{toast.message}</span>
-      <button
-        onClick={onDismiss}
-        className="text-on-surface-variant hover:text-on-surface ml-1 transition-colors"
-      >
-        <X className="h-4 w-4" />
-      </button>
-    </div>
-  );
 }
 
 function StatsStrip({ barbers }) {
@@ -83,14 +63,15 @@ function StatsStrip({ barbers }) {
   );
 }
 
-function SortDropdown({ options, value, onChange }) {
+function SortDropdown({ options, value, onChange, disabled = false }) {
   return (
     <div className="relative flex items-center gap-2">
       <ArrowUpDown className="text-on-surface-variant pointer-events-none absolute left-3 h-3.5 w-3.5" />
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="border-outline-variant bg-surface-container text-on-surface focus:border-primary h-9 appearance-none rounded-lg border pr-9 pl-8 text-xs font-medium transition-colors focus:outline-none"
+        disabled={disabled}
+        className="border-outline-variant bg-surface-container text-on-surface focus:border-primary h-9 appearance-none rounded-lg border pr-9 pl-8 text-xs font-medium transition-colors focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
       >
         {options.map((o) => (
           <option key={o.key} value={o.key}>
@@ -105,41 +86,46 @@ function SortDropdown({ options, value, onChange }) {
 
 export default function Favorites() {
   const router = useRouter();
-  const [barbers, setBarbers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [barberSort, setBarberSort] = useState("savedAt");
-  const [toast, setToast] = useState(null);
 
-  const loadFavorites = useCallback(() => {
-    setLoading(true);
-    customerServices
-      .listFavorites({ sort: barberSort })
-      .then(setBarbers)
-      .catch(() => setBarbers([]))
-      .finally(() => setLoading(false));
-  }, [barberSort]);
+  const {
+    data: barbers = [],
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = customerHook.Favorites.useListFavorites({
+    sort: barberSort,
+  });
+  const removeMutation = customerHook.Favorites.useRemoveFavorite();
+
+  const busy = isPending || removeMutation.isPending;
 
   useEffect(() => {
-    loadFavorites();
-  }, [loadFavorites]);
-
-  function showToast(message, type = "info") {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  }
+    if (isError) {
+      toast.error(error?.message || "Could not load favorites.");
+    }
+  }, [isError, error]);
 
   async function handleRemoveBarber(id) {
+    if (busy) return;
     const removed = barbers.find((b) => b.id === id);
     try {
-      await customerServices.removeFavorite(id);
-      setBarbers((prev) => prev.filter((b) => b.id !== id));
-      showToast(`${removed?.name ?? "Barber"} removed from favourites.`, "warn");
-    } catch (err) {
-      showToast(err?.message ?? "Could not remove favorite.", "warn");
+      await toast.promise(removeMutation.mutateAsync(id), {
+        loading: "Removing favorite…",
+        success: `${removed?.name ?? "Barber"} removed from favourites.`,
+        error: "Could not remove favorite.",
+      });
+      await refetch();
+      await queryClient.invalidateQueries({ queryKey: ["listFavorites"] });
+    } catch {
+      /* toast handles error */
     }
   }
 
   function handleBookBarber(barber) {
+    if (busy) return;
     router.push(`${routes.customer.bookAppointment}?barber=${encodeURIComponent(barber.id)}`);
   }
 
@@ -170,11 +156,16 @@ export default function Favorites() {
 
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {barbers.length > 1 && (
-          <SortDropdown options={BARBER_SORTS} value={barberSort} onChange={setBarberSort} />
+          <SortDropdown
+            options={BARBER_SORTS}
+            value={barberSort}
+            onChange={setBarberSort}
+            disabled={busy}
+          />
         )}
       </div>
 
-      {loading ? (
+      {isPending ? (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="bg-surface-container h-72 animate-pulse rounded-2xl" />
@@ -195,13 +186,12 @@ export default function Favorites() {
                 barber={barber}
                 onRemove={handleRemoveBarber}
                 onBook={handleBookBarber}
+                disabled={busy}
               />
             ))}
           </div>
         </>
       )}
-
-      <Toast toast={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }

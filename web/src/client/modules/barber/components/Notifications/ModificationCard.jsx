@@ -1,9 +1,9 @@
 import { CheckCheck, Trash2, Clock, ArrowRight } from "lucide-react";
-import { TYPE_META } from "../../constants/notifications.js";
+import { TYPE_META } from "../../constants/notificationsConstants.js";
 import { InitialsAvatar } from "@/client/modules/shared/components/ui/InitialsAvatar.jsx";
-import { Badge, ActionButtons } from "./helpers.jsx";
+import { ViewDetailsLink } from "./helpers.jsx";
 
-export default function ModificationCard({ notif, onAction, onRead, onDelete }) {
+export default function ModificationCard({ notif, onNavigate, onRead, onDelete, disabled }) {
   const meta = TYPE_META.modification;
   const Icon = meta.icon;
   return (
@@ -59,11 +59,7 @@ export default function ModificationCard({ notif, onAction, onRead, onDelete }) 
         </div>
 
         <div className="mt-3 ml-11 flex flex-wrap items-center justify-between gap-2">
-          {notif.actionable ? (
-            <ActionButtons id={notif.id} type="modification" onAction={onAction} />
-          ) : (
-            <Badge label="Resolved" color="confirmed" />
-          )}
+          <ViewDetailsLink notif={notif} onNavigate={onNavigate} disabled={disabled} />
           <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
             {!notif.read && (
               <button

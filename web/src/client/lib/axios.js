@@ -1,4 +1,8 @@
 import axios from "axios";
+import {
+  clearDatabaseUnavailable,
+  markDatabaseUnavailable,
+} from "@/client/lib/systemStatus.js";
 
 const ACCESS_TOKEN_KEY = "io.auth.accessToken";
 const REFRESH_TOKEN_KEY = "io.auth.refreshToken";
@@ -28,6 +32,7 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => {
+    clearDatabaseUnavailable();
     const body = response.data;
     if (body && typeof body === "object" && body.success === true) {
       if (body.meta != null && Array.isArray(body.data)) {
@@ -40,10 +45,16 @@ api.interceptors.response.use(
   },
   (error) => {
     const apiError = error.response?.data?.error;
+    const status = error.response?.status;
     const err = new Error(apiError?.message ?? error.message ?? "Something went wrong");
-    err.status = error.response?.status;
+    err.status = status;
     err.code = apiError?.code;
     err.fields = apiError?.fields;
+
+    if (status === 503 || apiError?.code === "DATABASE_UNAVAILABLE") {
+      markDatabaseUnavailable(apiError?.message);
+    }
+
     return Promise.reject(err);
   },
 );

@@ -12,7 +12,7 @@ import {
   XCircle,
   CalendarCheck,
 } from "lucide-react";
-import { formatLastVisited } from "../../data/favoritesData.js";
+import { formatLastVisited } from "@/client/modules/customer/helpers/favoritesHelpers.js";
 
 function StarRow({ rating, yourRating }) {
   return (
@@ -41,17 +41,19 @@ function StarRow({ rating, yourRating }) {
   );
 }
 
-export default function SavedBarberCard({ barber, onRemove, onBook }) {
+export default function SavedBarberCard({ barber, onRemove, onBook, disabled = false }) {
   const [removing, setRemoving] = useState(false);
   const [booked, setBooked] = useState(false);
 
   async function handleRemove() {
+    if (disabled) return;
     setRemoving(true);
     await new Promise((r) => setTimeout(r, 400));
     onRemove(barber.id);
   }
 
   async function handleBook() {
+    if (disabled) return;
     setBooked(true);
     await new Promise((r) => setTimeout(r, 600));
     onBook(barber);
@@ -80,7 +82,7 @@ export default function SavedBarberCard({ barber, onRemove, onBook }) {
       <button
         type="button"
         onClick={handleRemove}
-        disabled={removing}
+        disabled={disabled || removing}
         title="Remove from favorites"
         className="border-outline-variant bg-surface-container/80 text-on-surface-variant hover:border-status-cancelled/40 hover:bg-status-cancelled/10 hover:text-status-cancelled absolute top-3 left-3 z-10 flex h-8 w-8 items-center justify-center rounded-full border opacity-0 backdrop-blur-sm transition-all group-hover:opacity-100"
       >
@@ -155,7 +157,7 @@ export default function SavedBarberCard({ barber, onRemove, onBook }) {
           <button
             type="button"
             onClick={handleBook}
-            disabled={!barber.available || booked}
+            disabled={disabled || !barber.available || booked}
             className={`flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-semibold transition-all ${
               booked
                 ? "border-status-confirmed/30 bg-status-confirmed/10 text-status-confirmed border"

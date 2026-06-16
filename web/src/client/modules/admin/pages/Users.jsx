@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
-import { INITIAL_USERS } from "@/client/modules/admin/data/usersData.js";
 import UserTableRow from "@/client/modules/admin/components/Users/UserTableRow.jsx";
 import UserCard from "@/client/modules/admin/components/Users/UserCard.jsx";
 import DetailDrawer from "@/client/modules/admin/components/Users/DetailDrawer.jsx";
@@ -25,13 +25,13 @@ import {
 } from "lucide-react";
 import {
   USER_SORT_OPTIONS,
-  ACTIVITY_ORDER,
   PAGE_SIZE,
-} from "@/client/modules/admin/constants/admin.js";
+} from "@/client/modules/admin/constants/adminConstants.js";
+import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
+import { mapAdminUserListItem } from "@/client/modules/admin/helpers/adminMappers.js";
 
 export default function AdminUsers() {
   const router = useRouter();
-  const [users, setUsers] = useState(INITIAL_USERS);
   const [query, setQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterActivity, setFilterActivity] = useState("all");
@@ -44,14 +44,33 @@ export default function AdminUsers() {
     variant: null,
     user: null,
   });
-  const [toast, setToast] = useState(null);
 
-  function showToast(msg) {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2800);
-  }
+  const listParams = useMemo(
+    () => ({
+      status: filterStatus === "all" ? undefined : filterStatus,
+      activity: filterActivity === "all" ? undefined : filterActivity,
+      sort: sortKey,
+      q: query.trim() || undefined,
+      page,
+      limit: PAGE_SIZE,
+    }),
+    [filterStatus, filterActivity, sortKey, query, page],
+  );
+
+  const listQuery = adminHook.Users.useListUsers(listParams);
+  const statusMutation = adminHook.Users.useUpdateUserStatus();
+  const deleteMutation = adminHook.Users.useDeleteUser();
+
+  const busy = listQuery.isPending || statusMutation.isPending || deleteMutation.isPending;
+
+  useEffect(() => {
+    if (listQuery.isError) {
+      toast.error(listQuery.error?.message || "Could not load users.");
+    }
+  }, [listQuery.isError, listQuery.error]);
 
   function handleAction(type, user) {
+    if (busy) return;
     if (type === "view") {
       router.push(routes.admin.usersDetail(user.id));
       return;
@@ -63,70 +82,85 @@ export default function AdminUsers() {
         variant: type === "enable" ? "enable" : type,
         user,
       });
-      return;
     }
   }
 
-  function handleConfirm(id, variant) {
-    if (variant === "delete") {
-      setUsers((prev) => prev.filter((u) => u.id !== id));
-      showToast("User deleted successfully.");
-    } else if (variant === "disable") {
-      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, status: "disabled" } : u)));
-      showToast("User has been disabled.");
-    } else if (variant === "enable") {
-      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, status: "active" } : u)));
-      showToast("User re-enabled successfully.");
+  async function handleConfirm(id, variant) {
+    if (busy) return;
+    try {
+      if (variant === "delete") {
+        await toast.promise(deleteMutation.mutateAsync(id), {
+          loading: "Deleting user…",
+          success: "User deleted successfully.",
+          error: "Could not delete user.",
+        });
+      } else if (variant === "disable") {
+        await toast.promise(statusMutation.mutateAsync({ id, isActive: false }), {
+          loading: "Disabling user…",
+          success: "User has been disabled.",
+          error: "Could not disable user.",
+        });
+      } else if (variant === "enable") {
+        await toast.promise(statusMutation.mutateAsync({ id, isActive: true }), {
+          loading: "Enabling user…",
+          success: "User re-enabled successfully.",
+          error: "Could not enable user.",
+        });
+      }
+      await listQuery.refetch();
+    } catch {
+      /* toast handles error */
     }
   }
 
-  const filtered = useMemo(() => {
-    let list = users;
-    if (filterStatus !== "all") list = list.filter((u) => u.status === filterStatus);
-    if (filterActivity !== "all") list = list.filter((u) => u.activity === filterActivity);
-    if (query.trim()) {
-      const q = query.trim().toLowerCase();
-      list = list.filter(
-        (u) =>
-          u.name.toLowerCase().includes(q) ||
-          u.email.toLowerCase().includes(q) ||
-          u.city.toLowerCase().includes(q) ||
-          u.favoriteBarber.toLowerCase().includes(q),
-      );
-    }
-    return list.slice().sort((a, b) => {
-      if (sortKey === "name_asc") return a.name.localeCompare(b.name);
-      if (sortKey === "name_desc") return b.name.localeCompare(a.name);
-      if (sortKey === "bookings_desc") return b.bookingsTotal - a.bookingsTotal;
-      if (sortKey === "reviews_desc") return b.reviewsGiven - a.reviewsGiven;
-      if (sortKey === "spent_desc") return b.totalSpent - a.totalSpent;
-      if (sortKey === "activity") return ACTIVITY_ORDER[a.activity] - ACTIVITY_ORDER[b.activity];
-      if (sortKey === "joined_desc") return new Date(b.joinedAt) - new Date(a.joinedAt);
-      if (sortKey === "joined_asc") return new Date(a.joinedAt) - new Date(b.joinedAt);
-      if (sortKey === "last_active") return new Date(b.lastActive) - new Date(a.lastActive);
-      return 0;
-    });
-  }, [users, filterStatus, filterActivity, query, sortKey]);
+  const users = useMemo(
+    () => (listQuery.data?.items ?? []).map(mapAdminUserListItem),
+    [listQuery.data],
+  );
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = listQuery.data?.meta?.totalPages ?? 1;
+  const filtered = users;
   const isFiltered = filterStatus !== "all" || filterActivity !== "all" || query.trim() !== "";
 
   const stats = useMemo(
     () => ({
-      total: users.length,
+      total: listQuery.data?.meta?.total ?? users.length,
       active: users.filter((u) => u.status === "active").length,
       disabled: users.filter((u) => u.status === "disabled").length,
       highActivity: users.filter((u) => u.activity === "high").length,
       totalBookings: users.reduce((s, u) => s + u.bookingsTotal, 0),
-      totalReviews: users.reduce((s, u) => s + u.reviewsGiven, 0),
+      totalReviews: users.reduce((s, u) => s + (u.reviewsGiven ?? 0), 0),
     }),
-    [users],
+    [users, listQuery.data],
   );
+
+  if (listQuery.isPending && users.length === 0) {
+    return (
+      <div className="mx-auto max-w-7xl space-y-8 pb-4">
+        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
+        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
+      </div>
+    );
+  }
+
+  if (listQuery.isError && users.length === 0) {
+    return (
+      <div className="text-on-surface mx-auto max-w-7xl py-16 text-center">
+        <p className="font-medium">Could not load users.</p>
+        <button
+          type="button"
+          onClick={() => listQuery.refetch()}
+          disabled={busy}
+          className="text-primary mt-3 text-sm font-semibold hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 pb-4">
-      {/* Page header */}
       <header className="space-y-2">
         <p className="font-label-caps text-primary">Admin · People</p>
         <h1 className="text-on-surface font-serif text-2xl font-bold tracking-tight md:text-3xl">
@@ -138,7 +172,6 @@ export default function AdminUsers() {
         </p>
       </header>
 
-      {/* Stat pills */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { Icon: Users, label: "Total Users", value: stats.total },
@@ -165,7 +198,6 @@ export default function AdminUsers() {
         ))}
       </div>
 
-      {/* Activity + Reviews summary bar */}
       <div className="grid gap-4 sm:grid-cols-3">
         {[
           {
@@ -203,9 +235,7 @@ export default function AdminUsers() {
         ))}
       </div>
 
-      {/* Main list card */}
       <section className="border-outline-variant bg-surface-container-low rounded-xl border">
-        {/* Section header */}
         <div className="border-outline-variant border-b px-5 py-4 md:px-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3">
@@ -215,12 +245,12 @@ export default function AdminUsers() {
               <div>
                 <h2 className="text-on-surface font-serif text-lg font-bold">All Users</h2>
                 <p className="text-on-surface-variant text-sm">
-                  {filtered.length} user{filtered.length !== 1 ? "s" : ""}
+                  {listQuery.data?.meta?.total ?? filtered.length} user
+                  {(listQuery.data?.meta?.total ?? filtered.length) !== 1 ? "s" : ""}
                   {isFiltered ? " matching filters" : " registered"}
                 </p>
               </div>
             </div>
-            {/* Search */}
             <label className="relative block md:w-64">
               <Search
                 className="text-on-surface-variant pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2"
@@ -239,9 +269,7 @@ export default function AdminUsers() {
           </div>
         </div>
 
-        {/* Filter & sort bar */}
         <div className="border-outline-variant flex flex-wrap items-center gap-2 border-b px-4 py-3 md:px-6">
-          {/* Status filter */}
           <div className="flex flex-wrap gap-1">
             {[
               { key: "all", label: "All" },
@@ -250,8 +278,6 @@ export default function AdminUsers() {
               { key: "disabled", label: "Disabled" },
             ].map((opt) => {
               const isActive = filterStatus === opt.key;
-              const count =
-                opt.key === "all" ? users.length : users.filter((u) => u.status === opt.key).length;
               return (
                 <button
                   key={opt.key}
@@ -262,17 +288,11 @@ export default function AdminUsers() {
                   className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${isActive ? "border-primary bg-primary text-on-primary" : "border-outline-variant text-on-surface-variant hover:text-on-surface"}`}
                 >
                   {opt.label}
-                  <span
-                    className={`rounded-full px-1.5 text-[10px] font-bold ${isActive ? "bg-on-primary/20 text-on-primary" : "bg-surface-container text-on-surface-variant"}`}
-                  >
-                    {count}
-                  </span>
                 </button>
               );
             })}
           </div>
 
-          {/* Activity filter */}
           <div className="flex flex-wrap gap-1">
             {[
               { key: "all", label: "All Activity" },
@@ -294,7 +314,6 @@ export default function AdminUsers() {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            {/* Sort */}
             <div className="relative">
               <button
                 onClick={() => setSortOpen((o) => !o)}
@@ -339,8 +358,7 @@ export default function AdminUsers() {
           </div>
         </div>
 
-        {/* Empty state */}
-        {paged.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="px-4 py-16 text-center">
             <Users className="text-on-surface-variant mx-auto h-10 w-10 opacity-30" aria-hidden />
             <p className="text-on-surface mt-3 font-serif text-base font-bold">No users found</p>
@@ -350,7 +368,6 @@ export default function AdminUsers() {
           </div>
         ) : (
           <>
-            {/* Desktop table */}
             <div className="hidden md:block">
               <table className="w-full table-fixed text-left text-sm">
                 <colgroup>
@@ -372,32 +389,31 @@ export default function AdminUsers() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paged.map((user) => (
+                  {filtered.map((user) => (
                     <UserTableRow key={user.id} user={user} onAction={handleAction} />
                   ))}
                 </tbody>
               </table>
             </div>
 
-            {/* Mobile cards */}
             <div className="space-y-2 p-3 md:hidden">
-              {paged.map((user) => (
+              {filtered.map((user) => (
                 <UserCard key={user.id} user={user} onAction={handleAction} />
               ))}
             </div>
           </>
         )}
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="border-outline-variant flex items-center justify-between border-t px-5 py-3 md:px-6">
             <p className="text-on-surface-variant text-xs">
-              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of{" "}
-              {filtered.length}
+              Showing {(page - 1) * PAGE_SIZE + 1}–
+              {Math.min(page * PAGE_SIZE, listQuery.data?.meta?.total ?? filtered.length)} of{" "}
+              {listQuery.data?.meta?.total ?? filtered.length}
             </p>
             <div className="flex items-center gap-1">
               <button
-                disabled={page === 1}
+                disabled={page === 1 || busy}
                 onClick={() => setPage((p) => p - 1)}
                 className="border-outline-variant text-on-surface-variant hover:bg-surface-container flex h-8 w-8 items-center justify-center rounded-md border transition-colors disabled:opacity-40"
               >
@@ -407,13 +423,14 @@ export default function AdminUsers() {
                 <button
                   key={n}
                   onClick={() => setPage(n)}
+                  disabled={busy}
                   className={`flex h-8 w-8 items-center justify-center rounded-md text-xs font-medium transition-colors ${n === page ? "bg-primary text-on-primary" : "border-outline-variant text-on-surface-variant hover:bg-surface-container border"}`}
                 >
                   {n}
                 </button>
               ))}
               <button
-                disabled={page === totalPages}
+                disabled={page === totalPages || busy}
                 onClick={() => setPage((p) => p + 1)}
                 className="border-outline-variant text-on-surface-variant hover:bg-surface-container flex h-8 w-8 items-center justify-center rounded-md border transition-colors disabled:opacity-40"
               >
@@ -424,14 +441,12 @@ export default function AdminUsers() {
         )}
       </section>
 
-      {/* Detail drawer */}
       <DetailDrawer
         user={detailDrawer}
         onClose={() => setDetailDrawer(null)}
         onAction={handleAction}
       />
 
-      {/* Confirm modal */}
       <ConfirmModal
         open={confirmModal.open}
         variant={confirmModal.variant}
@@ -439,13 +454,6 @@ export default function AdminUsers() {
         onClose={() => setConfirmModal({ open: false, variant: null, user: null })}
         onConfirm={handleConfirm}
       />
-
-      {/* Toast */}
-      {toast && (
-        <div className="border-outline-variant bg-surface-container fixed bottom-[calc(var(--bottom-nav-height)+1rem)] left-1/2 z-50 -translate-x-1/2 rounded-lg border px-4 py-2.5 shadow-xl">
-          <p className="text-on-surface text-sm font-medium">{toast}</p>
-        </div>
-      )}
     </div>
   );
 }

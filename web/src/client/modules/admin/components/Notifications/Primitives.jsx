@@ -1,13 +1,9 @@
-import {
-  Bell,
-  CalendarCheck,
-  MessageSquare,
-  Scissors,
-  ShieldAlert,
-  Activity,
-} from "lucide-react";
+import { Bell, CalendarCheck, MessageSquare, Scissors, ShieldAlert, Activity } from "lucide-react";
 
-import { NOTIFICATION_TABS, NOTIFICATION_VARIANT_CONFIG } from "@/modules/admin/constants/admin.js";
+import {
+  NOTIFICATION_TABS,
+  NOTIFICATION_VARIANT_CONFIG,
+} from "@/client/modules/admin/constants/adminConstants.js";
 
 export { formatActivityTimestamp as formatTimestamp } from "@/client/lib/format/formatDateTime.js";
 

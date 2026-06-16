@@ -1,5 +1,5 @@
 import { ArrowRight } from "lucide-react";
-import { TYPE_META } from "@/modules/customer/constants/notifications.js";
+import { TYPE_META } from "@/client/modules/customer/constants/notificationsConstants.js";
 import { getNotificationDeepLink } from "@/config/routes/notificationRoutes";
 import { BarberAvatar, CardActions, ViewLink } from "./helpers.jsx";
 

@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { ChevronRight, Home } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";
-import { BOOKING_STATUS_CONFIG } from "@/modules/admin/constants/admin.js";
+import { BOOKING_STATUS_CONFIG } from "@/client/modules/admin/constants/adminConstants.js";
 
 export function fullDateTime(iso) {
   const d = new Date(iso);

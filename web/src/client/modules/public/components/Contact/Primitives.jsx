@@ -5,22 +5,9 @@ import { ChevronRight, Home, XCircle } from "lucide-react";
 
 import { routes } from "@/client/config/routes/routes";
 
-function isValidEmail(v) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
-}
+import { validate, isValidEmail } from "@/client/modules/public/helpers/contactHelpers.js";
 
-export function validate(fields) {
-  const errs = {};
-  if (!fields.name.trim()) errs.name = "Full name is required.";
-  if (!fields.email.trim()) errs.email = "Email address is required.";
-  else if (!isValidEmail(fields.email)) errs.email = "Enter a valid email address.";
-  if (!fields.subject) errs.subject = "Please choose a subject.";
-  if (!fields.message.trim()) errs.message = "Message cannot be empty.";
-  else if (fields.message.trim().length < 20) errs.message = "Please write at least 20 characters.";
-  return errs;
-}
-
-export function Breadcrumb() {
+export function Breadcrumb({ disabled = false }) {
   return (
     <nav
       aria-label="Breadcrumb"
@@ -28,7 +15,9 @@ export function Breadcrumb() {
     >
       <Link
         href={routes.public.home}
-        className="hover:text-primary inline-flex items-center gap-1 transition-colors"
+        aria-disabled={disabled}
+        tabIndex={disabled ? -1 : undefined}
+        className="hover:text-primary inline-flex items-center gap-1 transition-colors aria-disabled:pointer-events-none aria-disabled:opacity-50"
       >
         <Home className="h-3 w-3" aria-hidden />
         Home

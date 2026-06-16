@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Camera,
   Eye,
@@ -15,26 +16,91 @@ import {
   User,
   X,
 } from "lucide-react";
-import { INPUT_CLASS, EXP_TIERS, SPECIALTIES } from "@/client/modules/barber/constants/barber.js";
+import { toast } from "sonner";
+import {
+  INPUT_CLASS,
+  EXP_TIERS,
+  SPECIALTIES,
+} from "@/client/modules/barber/constants/barberConstants.js";
 import { Field, IconInput } from "@/client/modules/shared/components/forms/FormPrimitives.jsx";
 import PublicPreview from "@/client/modules/barber/components/Profile/PublicPreview.jsx";
 import SectionCard from "@/client/modules/shared/components/ui/SectionCard";
-import { INITIAL_PROFILE } from "@/client/modules/barber/data/profileData.js";
-import { createId } from "@/client/modules/shared/helpers/createId.js";
+import { barberHook } from "@/client/modules/barber/hooks/barberQuery.jsx";
+import {
+  mapProfileFromApi,
+  mapProfileToApi,
+} from "@/client/modules/barber/helpers/barberMappers.js";
+
+function isLocalImage(url) {
+  return typeof url === "string" && url.startsWith("blob:");
+}
+
+function mapGalleryItemFromApi(item) {
+  return {
+    id: item.id,
+    url: item.src ?? item.url,
+    caption: item.alt ?? item.caption ?? "",
+  };
+}
+
+function cacheBustUrl(url) {
+  if (!url || url.startsWith("blob:")) return url;
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}v=${Date.now()}`;
+}
+
+function patchProfileCache(queryClient, updates) {
+  queryClient.setQueryData(["barberGetProfile"], (current) =>
+    current ? { ...current, ...updates } : current,
+  );
+}
 
 export default function BarberProfile() {
-  const [profile, setProfile] = useState(INITIAL_PROFILE);
+  const queryClient = useQueryClient();
+  const {
+    data: profileData,
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = barberHook.Profile.useGetProfile();
+  const updateMutation = barberHook.Profile.useUpdateProfile();
+  const uploadMutation = barberHook.Profile.useUploadPhoto();
+  const uploadGalleryMutation = barberHook.Profile.useUploadGalleryPhoto();
+  const updateGalleryMutation = barberHook.Profile.useUpdateGalleryImage();
+  const deleteGalleryMutation = barberHook.Profile.useDeleteGalleryImage();
+
+  const [profile, setProfile] = useState(null);
   const [saved, setSaved] = useState(false);
   const [activeSection, setActiveSection] = useState("shop");
 
+  const busy =
+    isPending ||
+    updateMutation.isPending ||
+    uploadMutation.isPending ||
+    uploadGalleryMutation.isPending ||
+    updateGalleryMutation.isPending ||
+    deleteGalleryMutation.isPending;
+
+  useEffect(() => {
+    if (isError) {
+      toast.error(error?.message || "Failed to load profile");
+    }
+  }, [isError, error]);
+
+  useEffect(() => {
+    if (profileData) setProfile(mapProfileFromApi(profileData));
+  }, [profileData]);
+
   const displayName = useMemo(
-    () => `${profile.firstName} ${profile.lastName}`.trim() || "Your name",
-    [profile.firstName, profile.lastName],
+    () =>
+      profile ? `${profile.firstName} ${profile.lastName}`.trim() || "Your name" : "Your name",
+    [profile],
   );
 
   const experienceLabel = useMemo(
-    () => EXP_TIERS.find((t) => t.value === profile.experience)?.label ?? "—",
-    [profile.experience],
+    () => EXP_TIERS.find((t) => t.value === profile?.experience)?.label ?? "—",
+    [profile?.experience],
   );
 
   const sections = [
@@ -45,56 +111,190 @@ export default function BarberProfile() {
     { id: "preview", label: "Preview" },
   ];
 
-  function patch(updates) {
-    setProfile((prev) => ({ ...prev, ...updates }));
-  }
+  const patch = useCallback((updates) => {
+    setProfile((prev) => (prev ? { ...prev, ...updates } : prev));
+  }, []);
 
-  function toggleSpecialty(name) {
-    setProfile((prev) => ({
-      ...prev,
-      specialties: prev.specialties.includes(name)
-        ? prev.specialties.filter((s) => s !== name)
-        : [...prev.specialties, name],
-    }));
-  }
+  const toggleSpecialty = useCallback((name) => {
+    setProfile((prev) =>
+      prev
+        ? {
+            ...prev,
+            specialties: prev.specialties.includes(name)
+              ? prev.specialties.filter((s) => s !== name)
+              : [...prev.specialties, name],
+          }
+        : prev,
+    );
+  }, []);
 
-  function handleAvatarChange(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    patch({ photoPreview: URL.createObjectURL(file) });
-  }
+  const handleAvatarChange = useCallback(
+    async (e) => {
+      const file = e.target.files?.[0];
+      if (!file || busy) return;
+      e.target.value = "";
 
-  function handleGalleryAdd(e) {
-    const files = Array.from(e.target.files ?? []);
-    if (!files.length) return;
-    const added = files.slice(0, 8 - profile.portfolio.length).map((file) => ({
-      id: createId(),
-      url: URL.createObjectURL(file),
-      caption: "",
-    }));
-    patch({ portfolio: [...profile.portfolio, ...added] });
-    e.target.value = "";
-  }
+      const localPreview = URL.createObjectURL(file);
+      patch({ photoPreview: localPreview });
 
-  function removeGalleryItem(id) {
-    patch({ portfolio: profile.portfolio.filter((p) => p.id !== id) });
-  }
+      try {
+        const result = await uploadMutation.mutateAsync(file);
+        const photoUrl = result?.photoUrl ?? result?.url;
+        if (photoUrl) {
+          patch({ photoPreview: cacheBustUrl(photoUrl) });
+          patchProfileCache(queryClient, { photoUrl });
+        }
+        await queryClient.refetchQueries({ queryKey: ["barberGetProfile"] });
+        toast.success("Profile photo updated");
+        setSaved(true);
+        window.setTimeout(() => setSaved(false), 2400);
+      } catch (err) {
+        patch({ photoPreview: profileData?.photoUrl ? cacheBustUrl(profileData.photoUrl) : "" });
+        toast.error(err?.message || "Photo upload failed");
+      } finally {
+        URL.revokeObjectURL(localPreview);
+      }
+    },
+    [busy, uploadMutation, patch, queryClient, profileData?.photoUrl],
+  );
 
-  function updateCaption(id, caption) {
-    patch({
-      portfolio: profile.portfolio.map((p) => (p.id === id ? { ...p, caption } : p)),
-    });
-  }
+  const handleGalleryAdd = useCallback(
+    async (e) => {
+      const files = Array.from(e.target.files ?? []);
+      if (!files.length || !profile || busy) return;
+      e.target.value = "";
 
-  function handleSave() {
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2400);
-  }
+      const slotsLeft = 8 - profile.portfolio.length;
+      const toUpload = files.slice(0, slotsLeft);
+
+      for (const file of toUpload) {
+        try {
+          const item = await uploadGalleryMutation.mutateAsync({ file, alt: "" });
+          const mapped = mapGalleryItemFromApi(item);
+          setProfile((prev) =>
+            prev ? { ...prev, portfolio: [...prev.portfolio, mapped] } : prev,
+          );
+          queryClient.setQueryData(["barberGetProfile"], (current) => {
+            if (!current) return current;
+            const gallery = current.gallery ?? [];
+            return {
+              ...current,
+              gallery: [
+                ...gallery,
+                {
+                  id: mapped.id,
+                  src: mapped.url,
+                  alt: mapped.caption,
+                  sortOrder: gallery.length,
+                },
+              ],
+            };
+          });
+          toast.success("Photo added to gallery");
+        } catch (err) {
+          toast.error(err?.message || "Gallery upload failed");
+          break;
+        }
+      }
+
+      await queryClient.refetchQueries({ queryKey: ["barberGetProfile"] });
+    },
+    [profile, busy, uploadGalleryMutation, queryClient],
+  );
+
+  const removeGalleryItem = useCallback(
+    async (id) => {
+      if (!profile || busy) return;
+      const item = profile.portfolio.find((p) => p.id === id);
+      if (item?.url?.startsWith("blob:")) {
+        patch({ portfolio: profile.portfolio.filter((p) => p.id !== id) });
+        return;
+      }
+      try {
+        await toast.promise(deleteGalleryMutation.mutateAsync(id), {
+          loading: "Removing photo…",
+          success: "Photo removed",
+          error: "Could not remove photo",
+        });
+        patch({ portfolio: profile.portfolio.filter((p) => p.id !== id) });
+        await refetch();
+      } catch {
+        /* toast handles error */
+      }
+    },
+    [profile, busy, patch, deleteGalleryMutation, refetch],
+  );
+
+  const updateCaption = useCallback(
+    (id, caption) => {
+      patch({
+        portfolio: profile?.portfolio.map((p) => (p.id === id ? { ...p, caption } : p)) ?? [],
+      });
+    },
+    [patch, profile?.portfolio],
+  );
+
+  const saveCaption = useCallback(
+    async (id, caption) => {
+      const item = profile?.portfolio.find((p) => p.id === id);
+      if (!item || isLocalImage(item.url) || busy) return;
+
+      try {
+        await updateGalleryMutation.mutateAsync({ id, alt: caption });
+      } catch {
+        toast.error("Could not save caption");
+      }
+    },
+    [profile?.portfolio, busy, updateGalleryMutation],
+  );
+
+  const handleSave = useCallback(async () => {
+    if (!profile || busy) return;
+    try {
+      const updated = await toast.promise(updateMutation.mutateAsync(mapProfileToApi(profile)), {
+        loading: "Saving profile…",
+        success: "Profile saved",
+        error: "Could not save profile",
+      });
+      setProfile(mapProfileFromApi(updated));
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 2400);
+    } catch {
+      /* toast handles error */
+    }
+  }, [profile, busy, updateMutation]);
 
   function scrollToSection(id) {
     setActiveSection(id);
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
+
+  if (isPending && !profile) {
+    return (
+      <div className="mx-auto max-w-6xl space-y-6 pb-28">
+        <div className="bg-surface-container h-32 animate-pulse rounded-xl" />
+        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="text-on-surface mx-auto max-w-6xl py-16 text-center">
+        <p>{error?.message ?? "Profile unavailable."}</p>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          disabled={busy}
+          className="text-primary mt-3 text-sm font-semibold hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  const fieldDisabled = busy;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 pb-28 md:space-y-8 md:pb-8">
@@ -119,7 +319,8 @@ export default function BarberProfile() {
               key={s.id}
               type="button"
               onClick={() => scrollToSection(s.id)}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+              disabled={fieldDisabled}
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                 activeSection === s.id
                   ? "border-primary bg-primary text-on-primary"
                   : "border-outline-variant text-on-surface-variant"
@@ -147,6 +348,7 @@ export default function BarberProfile() {
                     value={profile.shopName}
                     onChange={(e) => patch({ shopName: e.target.value })}
                     placeholder="Steel District"
+                    disabled={fieldDisabled}
                     className={INPUT_CLASS}
                   />
                 </Field>
@@ -159,6 +361,7 @@ export default function BarberProfile() {
                     value={profile.shopAddress}
                     onChange={(e) => patch({ shopAddress: e.target.value })}
                     placeholder="Street, city, ZIP"
+                    disabled={fieldDisabled}
                   />
                 </Field>
               </div>
@@ -168,6 +371,7 @@ export default function BarberProfile() {
                   type="tel"
                   value={profile.shopPhone}
                   onChange={(e) => patch({ shopPhone: e.target.value })}
+                  disabled={fieldDisabled}
                 />
               </Field>
               <Field label="Hours">
@@ -176,6 +380,7 @@ export default function BarberProfile() {
                   value={profile.shopHours}
                   onChange={(e) => patch({ shopHours: e.target.value })}
                   placeholder="Mon–Sat 9am–7pm"
+                  disabled={fieldDisabled}
                   className={INPUT_CLASS}
                 />
               </Field>
@@ -186,6 +391,7 @@ export default function BarberProfile() {
                     value={profile.shopAbout}
                     onChange={(e) => patch({ shopAbout: e.target.value })}
                     placeholder="Describe the vibe, services, and neighborhood…"
+                    disabled={fieldDisabled}
                     className={`${INPUT_CLASS} min-h-[5rem] resize-y py-2.5`}
                   />
                 </Field>
@@ -204,24 +410,28 @@ export default function BarberProfile() {
                 <div className="border-outline-variant bg-surface-container relative mx-auto h-28 w-28 shrink-0 overflow-hidden rounded-xl border sm:mx-0">
                   {profile.photoPreview ? (
                     <Image
+                      key={profile.photoPreview}
                       src={profile.photoPreview}
                       alt=""
                       fill
                       className="object-cover"
                       sizes="112px"
-                      unoptimized={profile.photoPreview.startsWith("blob:")}
+                      unoptimized={isLocalImage(profile.photoPreview)}
                     />
                   ) : (
                     <div className="text-on-surface-variant flex h-full w-full items-center justify-center">
                       <User className="h-10 w-10" aria-hidden />
                     </div>
                   )}
-                  <label className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/50 opacity-0 transition-opacity hover:opacity-100">
+                  <label
+                    className={`absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity hover:opacity-100 ${fieldDisabled ? "pointer-events-none" : "cursor-pointer"}`}
+                  >
                     <Camera className="text-on-primary h-6 w-6" aria-hidden />
                     <input
                       type="file"
                       accept="image/*"
                       className="sr-only"
+                      disabled={fieldDisabled}
                       onChange={handleAvatarChange}
                     />
                   </label>
@@ -233,6 +443,7 @@ export default function BarberProfile() {
                         type="text"
                         value={profile.firstName}
                         onChange={(e) => patch({ firstName: e.target.value })}
+                        disabled={fieldDisabled}
                         className={INPUT_CLASS}
                       />
                     </Field>
@@ -241,6 +452,7 @@ export default function BarberProfile() {
                         type="text"
                         value={profile.lastName}
                         onChange={(e) => patch({ lastName: e.target.value })}
+                        disabled={fieldDisabled}
                         className={INPUT_CLASS}
                       />
                     </Field>
@@ -250,8 +462,9 @@ export default function BarberProfile() {
                       type="button"
                       role="switch"
                       aria-checked={profile.availableToday}
+                      disabled={fieldDisabled}
                       onClick={() => patch({ availableToday: !profile.availableToday })}
-                      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors ${
+                      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                         profile.availableToday
                           ? "border-primary bg-primary"
                           : "border-outline-variant bg-surface-container-high"
@@ -283,8 +496,9 @@ export default function BarberProfile() {
                       <button
                         key={tier.value}
                         type="button"
+                        disabled={fieldDisabled}
                         onClick={() => patch({ experience: tier.value })}
-                        className={`rounded-lg border px-2 py-3 text-center transition-colors ${
+                        className={`rounded-lg border px-2 py-3 text-center transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                           active
                             ? "border-primary bg-primary/10 text-primary"
                             : "border-outline-variant text-on-surface-variant hover:border-primary/40"
@@ -304,6 +518,7 @@ export default function BarberProfile() {
                   rows={3}
                   value={profile.bio}
                   onChange={(e) => patch({ bio: e.target.value })}
+                  disabled={fieldDisabled}
                   className={`${INPUT_CLASS} min-h-[5rem] resize-y py-2.5`}
                 />
               </Field>
@@ -316,8 +531,9 @@ export default function BarberProfile() {
                       <button
                         key={s}
                         type="button"
+                        disabled={fieldDisabled}
                         onClick={() => toggleSpecialty(s)}
-                        className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                        className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                           active
                             ? "border-primary bg-primary/15 text-primary"
                             : "border-outline-variant text-on-surface-variant"
@@ -336,7 +552,7 @@ export default function BarberProfile() {
             id="portfolio"
             icon={ImagePlus}
             title="Portfolio / gallery"
-            description="Show your best work — up to 8 photos on your public profile."
+            description="Photos upload immediately — up to 8 on your public profile."
           >
             <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {profile.portfolio.map((item) => (
@@ -350,14 +566,16 @@ export default function BarberProfile() {
                       alt={item.caption || "Portfolio"}
                       fill
                       className="object-cover"
+                      loading="lazy"
                       sizes="(max-width: 640px) 50vw, 160px"
-                      unoptimized={item.url.startsWith("blob:")}
+                      unoptimized={isLocalImage(item.url)}
                     />
                     <button
                       type="button"
                       onClick={() => removeGalleryItem(item.id)}
+                      disabled={fieldDisabled}
                       aria-label="Remove photo"
-                      className="text-on-primary absolute top-1.5 right-1.5 inline-flex h-7 w-7 items-center justify-center rounded-md bg-black/60 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100"
+                      className="text-on-primary absolute top-1.5 right-1.5 inline-flex h-7 w-7 items-center justify-center rounded-md bg-black/60 opacity-100 transition-opacity disabled:cursor-not-allowed disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100"
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -366,14 +584,18 @@ export default function BarberProfile() {
                     type="text"
                     value={item.caption}
                     onChange={(e) => updateCaption(item.id, e.target.value)}
+                    onBlur={(e) => saveCaption(item.id, e.target.value)}
                     placeholder="Caption"
-                    className="border-outline-variant text-on-surface placeholder:text-on-surface-variant/50 w-full border-t bg-transparent px-2 py-1.5 text-xs focus:outline-none"
+                    disabled={fieldDisabled}
+                    className="border-outline-variant text-on-surface placeholder:text-on-surface-variant/50 w-full border-t bg-transparent px-2 py-1.5 text-xs focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                   />
                 </li>
               ))}
               {profile.portfolio.length < 8 ? (
                 <li>
-                  <label className="border-outline-variant bg-surface-container text-on-surface-variant hover:border-primary hover:text-primary flex aspect-square cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed transition-colors">
+                  <label
+                    className={`border-outline-variant bg-surface-container text-on-surface-variant flex aspect-square flex-col items-center justify-center gap-2 rounded-lg border border-dashed transition-colors ${fieldDisabled ? "pointer-events-none opacity-50" : "hover:border-primary hover:text-primary cursor-pointer"}`}
+                  >
                     <ImagePlus className="h-6 w-6" aria-hidden />
                     <span className="text-xs font-medium">Add photos</span>
                     <input
@@ -381,6 +603,7 @@ export default function BarberProfile() {
                       accept="image/*"
                       multiple
                       className="sr-only"
+                      disabled={fieldDisabled}
                       onChange={handleGalleryAdd}
                     />
                   </label>
@@ -403,6 +626,7 @@ export default function BarberProfile() {
                     type="email"
                     value={profile.email}
                     onChange={(e) => patch({ email: e.target.value })}
+                    disabled={true}
                   />
                 </Field>
               </div>
@@ -412,6 +636,7 @@ export default function BarberProfile() {
                   type="tel"
                   value={profile.phone}
                   onChange={(e) => patch({ phone: e.target.value })}
+                  disabled={fieldDisabled}
                 />
               </Field>
               <Field label="City / area">
@@ -420,6 +645,7 @@ export default function BarberProfile() {
                   type="text"
                   value={profile.city}
                   onChange={(e) => patch({ city: e.target.value })}
+                  disabled={fieldDisabled}
                 />
               </Field>
               <div className="sm:col-span-2">
@@ -429,6 +655,7 @@ export default function BarberProfile() {
                     value={profile.instagram}
                     onChange={(e) => patch({ instagram: e.target.value })}
                     placeholder="@yourhandle"
+                    disabled={fieldDisabled}
                     className={INPUT_CLASS}
                   />
                 </Field>
@@ -450,9 +677,6 @@ export default function BarberProfile() {
                 experienceLabel={experienceLabel}
               />
             </div>
-            <p className="text-on-surface-variant mt-3 text-[11px] leading-relaxed">
-              Star rating and review count are demo values until reviews sync from the platform.
-            </p>
           </SectionCard>
         </aside>
       </div>
@@ -460,12 +684,15 @@ export default function BarberProfile() {
       <div className="border-outline-variant bg-surface/95 fixed inset-x-0 bottom-[var(--bottom-nav-height)] z-30 border-t px-4 py-3 backdrop-blur md:static md:bottom-auto md:z-auto md:border-t md:bg-transparent md:px-0 md:py-0 md:pt-6">
         <div className="mx-auto flex max-w-6xl flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-on-surface-variant text-center text-xs sm:text-left">
-            {saved ? "Profile saved." : "Changes are local until backend is connected."}
+            {saved
+              ? "Profile saved."
+              : "Gallery photos save on upload. Tap Save profile for other changes."}
           </p>
           <button
             type="button"
             onClick={handleSave}
-            className="bg-primary text-on-primary inline-flex h-11 w-full items-center justify-center gap-2 rounded-md text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98] sm:w-auto sm:px-8"
+            disabled={fieldDisabled}
+            className="bg-primary text-on-primary inline-flex h-11 w-full items-center justify-center gap-2 rounded-md text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:px-8"
           >
             <Save className="h-4 w-4" aria-hidden />
             {saved ? "Profile saved" : "Save profile"}

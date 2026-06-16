@@ -4,8 +4,8 @@ import { CalendarDays, Filter, MapPin, Scissors, Search } from "lucide-react";
 import {
   APPOINTMENT_STATUSES,
   APPOINTMENT_STATUS_FILTER_ORDER,
-} from "@/modules/admin/constants/admin.js";
-import { BARBERS, CITIES } from "../../data/appointmentsData.js";
+} from "@/client/modules/admin/constants/adminConstants.js";
+import { BARBERS, CITIES } from "@/client/modules/admin/constants/appointmentsConstants.js";
 
 const DATE_OPTIONS = [
   { value: "all", label: "All dates" },
@@ -15,7 +15,7 @@ const DATE_OPTIONS = [
   { value: "past", label: "Past" },
 ];
 
-function SelectField({ label, icon: Icon, value, onChange, children }) {
+function SelectField({ label, icon: Icon, value, onChange, disabled, children }) {
   return (
     <label className="block min-w-0 flex-1 sm:max-w-[180px]">
       <span className="font-label-caps text-on-surface-variant mb-1.5 flex items-center gap-1.5 text-[10px]">
@@ -25,7 +25,8 @@ function SelectField({ label, icon: Icon, value, onChange, children }) {
       <select
         value={value}
         onChange={onChange}
-        className="border-outline-variant bg-surface-container text-on-surface focus:border-primary h-10 w-full rounded-md border px-3 text-sm focus:outline-none"
+        disabled={disabled}
+        className="border-outline-variant bg-surface-container text-on-surface focus:border-primary h-10 w-full rounded-md border px-3 text-sm focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
       >
         {children}
       </select>
@@ -45,6 +46,7 @@ export default function AppointmentFilters({
   query,
   onQueryChange,
   counts,
+  disabled = false,
 }) {
   return (
     <div className="border-outline-variant space-y-4 border-b px-4 py-4 md:px-6">
@@ -61,8 +63,9 @@ export default function AppointmentFilters({
             <button
               key={key}
               type="button"
+              disabled={disabled}
               onClick={() => onStatusChange(key)}
-              className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                 active
                   ? "bg-primary text-on-primary"
                   : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
@@ -88,6 +91,7 @@ export default function AppointmentFilters({
           label="Date"
           icon={CalendarDays}
           value={dateRange}
+          disabled={disabled}
           onChange={(e) => onDateRangeChange(e.target.value)}
         >
           {DATE_OPTIONS.map((opt) => (
@@ -101,6 +105,7 @@ export default function AppointmentFilters({
           label="City"
           icon={MapPin}
           value={city}
+          disabled={disabled}
           onChange={(e) => onCityChange(e.target.value)}
         >
           <option value="all">All cities</option>
@@ -115,6 +120,7 @@ export default function AppointmentFilters({
           label="Barber"
           icon={Scissors}
           value={barberId}
+          disabled={disabled}
           onChange={(e) => onBarberChange(e.target.value)}
         >
           <option value="all">All barbers</option>
@@ -137,7 +143,8 @@ export default function AppointmentFilters({
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             placeholder="Customer, booking ID, service…"
-            className="border-outline-variant bg-surface-container text-on-surface placeholder:text-on-surface-variant/70 focus:border-primary h-10 w-full rounded-md border py-2 pr-3 pl-9 text-sm focus:outline-none"
+            disabled={disabled}
+            className="border-outline-variant bg-surface-container text-on-surface placeholder:text-on-surface-variant/70 focus:border-primary h-10 w-full rounded-md border py-2 pr-3 pl-9 text-sm focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           />
         </label>
       </div>

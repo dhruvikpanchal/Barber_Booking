@@ -2,24 +2,66 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
-import { ArrowLeft, KeyRound } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowLeft, KeyRound, Loader2 } from "lucide-react";
 import { authHook } from "@/client/modules/auth/hooks/authQuery.jsx";
+import { authServices } from "@/client/modules/auth/services/authServices.jsx";
+import {
+  canAccessVerifyStep,
+  getVerifyStepEmail,
+  markTokenVerified,
+  startPasswordReset,
+} from "@/client/lib/auth/passwordResetFlow.js";
 import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
-import { Loader2 } from "lucide-react";
 
 export default function VerifyResetOtp() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const verifyResetTokenMutation = authHook.VerifyResetToken.useVerifyResetToken();
-  const email = searchParams.get("email") ?? "";
-
+  const [ready, setReady] = useState(false);
+  const [email, setEmail] = useState("");
   const [token, setToken] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function initFlow() {
+      const flowFromUrl = searchParams.get("flow");
+
+      if (flowFromUrl) {
+        try {
+          const result = await authServices.validateResetFlow({ resetFlowToken: flowFromUrl });
+          if (result?.email) {
+            startPasswordReset(result.email, flowFromUrl);
+          }
+        } catch {
+          if (!cancelled) router.replace(routes.auth.forgotPassword);
+          return;
+        }
+      }
+
+      if (!canAccessVerifyStep()) {
+        if (!cancelled) router.replace(routes.auth.forgotPassword);
+        return;
+      }
+
+      if (!cancelled) {
+        setEmail(getVerifyStepEmail());
+        setReady(true);
+      }
+    }
+
+    initFlow();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router, searchParams]);
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (verifyResetTokenMutation.isPending) return;
+    if (verifyResetTokenMutation.isPending || !ready) return;
 
     const plainToken = token.trim();
     if (!plainToken) {
@@ -28,15 +70,21 @@ export default function VerifyResetOtp() {
     }
 
     try {
-      await toast.promise(verifyResetTokenMutation.mutateAsync({ token: plainToken }), {
-        loading: "Verifying reset token...",
-        success: "Reset token verified successfully",
-        error: (err) => err?.message || "Failed to verify reset token.",
-      });
-      router.push(`${routes.auth.resetPassword}?token=${encodeURIComponent(plainToken)}`);
+      await verifyResetTokenMutation.mutateAsync({ token: plainToken });
+      toast.success("Reset token verified successfully");
+      markTokenVerified(plainToken);
+      router.push(routes.auth.resetPassword);
     } catch (error) {
       toast.error(error?.message || "Failed to verify reset token.");
     }
+  }
+
+  if (!ready) {
+    return (
+      <section className="flex min-h-screen items-center justify-center bg-[#131313] px-4 text-[#e4e2e1]">
+        <Loader2 className="h-8 w-8 animate-spin text-[#ffb68c]" aria-label="Loading" />
+      </section>
+    );
   }
 
   return (

@@ -1,34 +1,34 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
   CalendarDays,
   Check,
-  CheckCircle2,
   Clock,
   DollarSign,
   Mail,
   Phone,
   Scissors,
   StickyNote,
-  UserCheck,
   X,
   XCircle,
 } from "lucide-react";
+import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
 import {
-  buildBarberTimeline,
   getServiceChangeAppointmentId,
   normalizeBarberAppointment,
-} from "@/client/modules/barber/data/appointmentsData.js";
+} from "@/client/modules/barber/helpers/appointmentHelpers.js";
+import { mapAppointmentListItem } from "@/client/modules/barber/helpers/barberMappers.js";
 import { formatDateLabel, formatTimeLabel } from "@/client/lib/format/formatDateTime.js";
-import { useMergedBarberAppointment } from "@/client/lib/storage/serviceChangeStore.js";
 import StatusBadge from "@/client/modules/shared/components/ui/StatusBadge";
-import { STATUSES } from "@/modules/barber/constants/status.js";
+import { STATUSES } from "@/client/modules/barber/constants/statusConstants.js";
 import ServiceChangeRequestsSection from "@/client/modules/barber/components/Appointments/ServiceChangeRequestsSection.jsx";
 import AppointmentProgressTracker from "@/client/modules/customer/components/MyAppointments/AppointmentProgressTracker.jsx";
+import { customerInitials } from "@/client/lib/format/formatInitials.js";
+import { barberHook, useBarberInvalidation } from "@/client/modules/barber/hooks/barberQuery.jsx";
 
 function InfoRow({ Icon, label, value }) {
   if (value == null || value === "") return null;
@@ -45,16 +45,6 @@ function InfoRow({ Icon, label, value }) {
   );
 }
 
-function customerInitials(name = "") {
-  return name
-    .split(" ")
-    .map((p) => p[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
-
 function mapTimelineForTracker(timeline = []) {
   const labelMap = {
     created: "Booking created",
@@ -69,15 +59,77 @@ function mapTimelineForTracker(timeline = []) {
   }));
 }
 
-/**
- * @param {{ appt: ReturnType<typeof normalizeBarberAppointment> }} props
- */
-export default function AppointmentDetail({ appt: initialAppt }) {
-  const base = normalizeBarberAppointment(initialAppt);
-  const merged = useMergedBarberAppointment(base);
-  const [patch, setPatch] = useState({});
-  const appt = { ...merged, ...patch };
-  const [toast, setToast] = useState(null);
+function toApiStatus(status) {
+  return status.toUpperCase().replace("-", "_");
+}
+
+export default function AppointmentDetail({ appt: initialAppt, appointmentId }) {
+  const id = appointmentId ?? initialAppt?.id ?? "";
+
+  const {
+    data: apptFromQuery,
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = barberHook.Appointments.useGetAppointment(id);
+  const statusMutation = barberHook.Appointments.useUpdateAppointmentStatus();
+  const invalidate = useBarberInvalidation();
+
+  const busy = isPending || statusMutation.isPending;
+
+  const appt = useMemo(() => {
+    const raw = apptFromQuery ?? initialAppt;
+    if (!raw) return null;
+    return normalizeBarberAppointment(mapAppointmentListItem(raw));
+  }, [apptFromQuery, initialAppt]);
+
+  useEffect(() => {
+    if (isError) {
+      toast.error(error?.message || "Could not load appointment.");
+    }
+  }, [isError, error]);
+
+  const updateStatus = useCallback(
+    async (status, successMessage) => {
+      if (!id || busy) return;
+      try {
+        await toast.promise(statusMutation.mutateAsync({ id, status: toApiStatus(status) }), {
+          loading: "Updating appointment…",
+          success: successMessage,
+          error: "Could not update appointment.",
+        });
+        await refetch();
+        await invalidate.workflow();
+      } catch {
+        /* toast handles error */
+      }
+    },
+    [id, busy, statusMutation, refetch, invalidate],
+  );
+
+  if (isPending && !appt) {
+    return (
+      <div className="text-on-surface mx-auto w-full max-w-6xl min-w-0 space-y-6 pb-28 md:pb-8">
+        <div className="bg-surface-container h-32 animate-pulse rounded-xl" />
+        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
+      </div>
+    );
+  }
+
+  if (!appt) {
+    return (
+      <div className="text-on-surface mx-auto max-w-6xl py-16 text-center">
+        <p>{error?.message ?? "Appointment not found."}</p>
+        <Link
+          href={routes.barber.appointments}
+          className="text-primary mt-3 inline-block text-sm font-semibold hover:underline"
+        >
+          Back to appointments
+        </Link>
+      </div>
+    );
+  }
 
   const serviceChangeId = getServiceChangeAppointmentId(appt);
   const hasPendingChange = Boolean(appt.pendingChangeRequest);
@@ -89,68 +141,6 @@ export default function AppointmentDetail({ appt: initialAppt }) {
   });
   const time = formatTimeLabel(appt.startAt);
   const progressSteps = mapTimelineForTracker(appt.timeline);
-
-  const showToast = useCallback((message) => {
-    setToast(message);
-    setTimeout(() => setToast(null), 3500);
-  }, []);
-
-  const applyPatch = useCallback(
-    (updates) => {
-      setPatch((prev) => {
-        const next = { ...prev, ...updates };
-        const status = next.status ?? base.status;
-        return {
-          ...next,
-          timeline: buildBarberTimeline({
-            bookedAt: base.bookedAt,
-            acceptedAt: next.acceptedAt ?? base.acceptedAt ?? null,
-            arrivedAt: next.arrivedAt ?? base.arrivedAt ?? null,
-            inServiceAt: next.inServiceAt ?? base.inServiceAt ?? null,
-            completedAt: next.completedAt ?? base.completedAt ?? null,
-            status,
-          }),
-        };
-      });
-    },
-    [base],
-  );
-
-  const acceptBooking = () => {
-    const now = new Date().toISOString();
-    applyPatch({ status: "confirmed", acceptedAt: now });
-    showToast("Booking confirmed.");
-  };
-
-  const rejectBooking = () => {
-    applyPatch({ status: "cancelled" });
-    showToast("Booking rejected.");
-  };
-
-  const confirmArrival = () => {
-    const now = new Date().toISOString();
-    applyPatch({
-      status: "in-service",
-      arrivedAt: now,
-      inServiceAt: now,
-    });
-    showToast("Customer marked as arrived.");
-  };
-
-  const markCompleted = () => {
-    const now = new Date().toISOString();
-    applyPatch({
-      status: "completed",
-      completedAt: now,
-    });
-    showToast("Appointment marked completed.");
-  };
-
-  const markNoShow = () => {
-    applyPatch({ status: "no-show" });
-    showToast("Marked as no-show.");
-  };
-
   const phoneHref = appt.customer.phone?.replace(/[^\d+]/g, "");
   const canAct =
     appt.status === "pending" ||
@@ -290,16 +280,18 @@ export default function AppointmentDetail({ appt: initialAppt }) {
                 <>
                   <button
                     type="button"
-                    onClick={acceptBooking}
-                    className="bg-primary text-on-primary inline-flex h-11 items-center justify-center gap-2 rounded-md text-sm font-bold hover:opacity-90"
+                    onClick={() => updateStatus("confirmed", "Booking confirmed.")}
+                    disabled={busy}
+                    className="bg-primary text-on-primary inline-flex h-11 items-center justify-center gap-2 rounded-md text-sm font-bold hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Check className="h-4 w-4" aria-hidden />
                     Accept booking
                   </button>
                   <button
                     type="button"
-                    onClick={rejectBooking}
-                    className="border-outline-variant text-on-surface-variant hover:border-status-cancelled/50 hover:text-status-cancelled inline-flex h-11 items-center justify-center gap-2 rounded-md border text-sm font-semibold"
+                    onClick={() => updateStatus("cancelled", "Booking rejected.")}
+                    disabled={busy}
+                    className="border-outline-variant text-on-surface-variant hover:border-status-cancelled/50 hover:text-status-cancelled inline-flex h-11 items-center justify-center gap-2 rounded-md border text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <X className="h-4 w-4" aria-hidden />
                     Reject booking
@@ -308,26 +300,18 @@ export default function AppointmentDetail({ appt: initialAppt }) {
               )}
               {appt.status === "confirmed" && (
                 <>
+                  <p className="text-on-surface-variant rounded-lg border border-outline-variant bg-surface-container px-3 py-3 text-sm">
+                    This booking is confirmed. Seat the customer and complete the service from the{" "}
+                    <Link href={routes.barber.queue} className="text-primary font-semibold hover:underline">
+                      Queue
+                    </Link>{" "}
+                    page.
+                  </p>
                   <button
                     type="button"
-                    onClick={confirmArrival}
-                    className="bg-primary text-on-primary inline-flex h-11 items-center justify-center gap-2 rounded-md text-sm font-bold hover:opacity-90"
-                  >
-                    <UserCheck className="h-4 w-4" aria-hidden />
-                    Confirm arrival
-                  </button>
-                  <button
-                    type="button"
-                    onClick={markCompleted}
-                    className="bg-status-confirmed text-background inline-flex h-11 items-center justify-center gap-2 rounded-md text-sm font-semibold hover:opacity-90"
-                  >
-                    <CheckCircle2 className="h-4 w-4" aria-hidden />
-                    Mark completed
-                  </button>
-                  <button
-                    type="button"
-                    onClick={markNoShow}
-                    className="border-outline-variant text-on-surface-variant hover:text-status-cancelled inline-flex h-11 items-center justify-center gap-2 rounded-md border text-sm font-semibold"
+                    onClick={() => updateStatus("no-show", "Marked as no-show.")}
+                    disabled={busy}
+                    className="border-outline-variant text-on-surface-variant hover:text-status-cancelled inline-flex h-11 items-center justify-center gap-2 rounded-md border text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <XCircle className="h-4 w-4" aria-hidden />
                     No-show
@@ -335,14 +319,13 @@ export default function AppointmentDetail({ appt: initialAppt }) {
                 </>
               )}
               {appt.status === "in-service" && (
-                <button
-                  type="button"
-                  onClick={markCompleted}
-                  className="bg-status-confirmed text-background inline-flex h-11 items-center justify-center gap-2 rounded-md text-sm font-semibold hover:opacity-90"
-                >
-                  <CheckCircle2 className="h-4 w-4" aria-hidden />
-                  Mark completed
-                </button>
+                <p className="text-on-surface-variant rounded-lg border border-outline-variant bg-surface-container px-3 py-3 text-sm">
+                  Service in progress. Complete this visit from the{" "}
+                  <Link href={routes.barber.queue} className="text-primary font-semibold hover:underline">
+                    Queue
+                  </Link>{" "}
+                  page.
+                </p>
               )}
               {!canAct && (
                 <p className="border-outline-variant bg-surface-container text-on-surface-variant rounded-lg border px-3 py-3 text-sm">
@@ -378,15 +361,6 @@ export default function AppointmentDetail({ appt: initialAppt }) {
           </section>
         </aside>
       </div>
-
-      {toast ? (
-        <div
-          role="status"
-          className="border-outline-variant bg-surface-container-highest text-on-surface fixed bottom-24 left-1/2 z-50 max-w-sm -translate-x-1/2 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg md:bottom-8"
-        >
-          {toast}
-        </div>
-      ) : null}
     </div>
   );
 }

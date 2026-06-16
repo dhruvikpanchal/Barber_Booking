@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   BarChart3,
@@ -16,37 +16,31 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
-import { Toast } from "@/client/modules/shared/components/common/settings/TinyPrimitives.jsx";
-import { REPORT_DATE_RANGES, REPORT_TYPES } from "@/client/modules/admin/constants/admin.js";
+import { toast } from "sonner";
 import {
-  buildSummary,
-  buildTableRows,
-  getColumns,
-  rowsToCsv,
-  downloadFile,
-} from "@/client/modules/admin/components/Reports/MockDataBuilder";
+  REPORT_DATE_RANGES,
+  REPORT_TYPES,
+} from "@/client/modules/admin/constants/adminConstants.js";
+import { rowsToCsv, downloadFile } from "@/client/modules/admin/components/Reports/MockDataBuilder";
 import { StatusCell, SummaryCard } from "@/client/modules/admin/components/Reports/Primitives.jsx";
+import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
 
 export default function Reports() {
   const [reportType, setReportType] = useState("appointments");
   const [dateRange, setDateRange] = useState("month");
   const [customStart, setCustomStart] = useState("2026-05-01");
   const [customEnd, setCustomEnd] = useState("2026-05-19");
-  const [generated, setGenerated] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [reportData, setReportData] = useState(null);
   const [exporting, setExporting] = useState(null);
-  const [toast, setToast] = useState(null);
+
+  const generateMutation = adminHook.Reports.useGenerateReport();
+  const loading = generateMutation.isPending;
 
   const activeType = REPORT_TYPES.find((r) => r.key === reportType);
-  const columns = useMemo(() => getColumns(reportType), [reportType]);
-  const rows = useMemo(
-    () => (generated ? buildTableRows(reportType, dateRange) : []),
-    [generated, reportType, dateRange],
-  );
-  const summary = useMemo(
-    () => (generated ? buildSummary(dateRange) : null),
-    [generated, dateRange],
-  );
+  const columns = useMemo(() => reportData?.columns ?? [], [reportData]);
+  const rows = reportData?.rows ?? [];
+  const summary = reportData?.summary ?? null;
+  const generated = Boolean(reportData);
 
   const rangeLabel = useMemo(() => {
     if (dateRange === "custom") {
@@ -55,43 +49,55 @@ export default function Reports() {
     return REPORT_DATE_RANGES.find((d) => d.key === dateRange)?.label ?? "";
   }, [dateRange, customStart, customEnd]);
 
-  const showToast = (message, type = "success") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
-  };
+  useEffect(() => {
+    if (generateMutation.isError) {
+      toast.error(generateMutation.error?.message || "Could not generate report.");
+    }
+  }, [generateMutation.isError, generateMutation.error]);
 
   async function handleGenerate() {
     if (dateRange === "custom" && (!customStart || !customEnd)) {
-      showToast("Select both start and end dates for a custom range.", "error");
+      toast.error("Select both start and end dates for a custom range.");
       return;
     }
     if (dateRange === "custom" && new Date(customStart) > new Date(customEnd)) {
-      showToast("Start date must be before end date.", "error");
+      toast.error("Start date must be before end date.");
       return;
     }
 
-    setLoading(true);
-    setGenerated(false);
-    await new Promise((r) => setTimeout(r, 700));
-    setGenerated(true);
-    setLoading(false);
-    showToast("Report generated successfully.");
+    try {
+      const payload = {
+        type: reportType,
+        range: dateRange,
+        format: "csv",
+        ...(dateRange === "custom" ? { start: customStart, end: customEnd } : {}),
+      };
+
+      const result = await toast.promise(generateMutation.mutateAsync(payload), {
+        loading: "Generating report…",
+        success: "Report generated successfully.",
+        error: "Could not generate report.",
+      });
+
+      setReportData(result);
+    } catch {
+      /* toast handles error */
+    }
   }
 
   async function handleExport(format) {
     if (!generated || rows.length === 0) {
-      showToast("Generate a report before exporting.", "error");
+      toast.error("Generate a report before exporting.");
       return;
     }
 
     setExporting(format);
-    await new Promise((r) => setTimeout(r, 500));
 
     const slug = `${reportType}-${dateRange}-${Date.now()}`;
     if (format === "csv") {
       const csv = rowsToCsv(columns, rows);
       downloadFile(csv, `iron-oak-${slug}.csv`, "text/csv;charset=utf-8;");
-      showToast("CSV export downloaded.");
+      toast.success("CSV export downloaded.");
     } else {
       const text = [
         `Iron & Oak — ${activeType?.label ?? "Report"}`,
@@ -102,7 +108,7 @@ export default function Reports() {
         "— Demo PDF export (plain text). Use a PDF library in production.",
       ].join("\n");
       downloadFile(text, `iron-oak-${slug}.txt`, "text/plain;charset=utf-8;");
-      showToast("PDF export simulated as downloadable summary file.", "info");
+      toast.info("PDF export simulated as downloadable summary file.");
     }
 
     setExporting(null);
@@ -165,7 +171,6 @@ export default function Reports() {
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-        {/* Report type selection */}
         <aside className="space-y-3">
           <p className="font-label-caps text-on-surface-variant">Report type</p>
           <nav className="space-y-2" aria-label="Report types">
@@ -178,7 +183,7 @@ export default function Reports() {
                   type="button"
                   onClick={() => {
                     setReportType(type.key);
-                    setGenerated(false);
+                    setReportData(null);
                   }}
                   className={`w-full rounded-xl border p-4 text-left transition-colors ${
                     active
@@ -213,7 +218,6 @@ export default function Reports() {
         </aside>
 
         <div className="space-y-6">
-          {/* Filters */}
           <section className="border-outline-variant bg-surface-container-low rounded-xl border p-5 md:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -235,7 +239,7 @@ export default function Reports() {
                   type="button"
                   onClick={() => {
                     setDateRange(range.key);
-                    setGenerated(false);
+                    setReportData(null);
                   }}
                   className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
                     dateRange === range.key
@@ -257,7 +261,7 @@ export default function Reports() {
                     value={customStart}
                     onChange={(e) => {
                       setCustomStart(e.target.value);
-                      setGenerated(false);
+                      setReportData(null);
                     }}
                     className="border-outline-variant bg-surface-container text-on-surface focus:border-primary mt-1.5 w-full rounded-md border px-3 py-2 text-sm focus:outline-none"
                   />
@@ -269,7 +273,7 @@ export default function Reports() {
                     value={customEnd}
                     onChange={(e) => {
                       setCustomEnd(e.target.value);
-                      setGenerated(false);
+                      setReportData(null);
                     }}
                     className="border-outline-variant bg-surface-container text-on-surface focus:border-primary mt-1.5 w-full rounded-md border px-3 py-2 text-sm focus:outline-none"
                   />
@@ -278,7 +282,6 @@ export default function Reports() {
             )}
           </section>
 
-          {/* Summary metrics */}
           {loading && (
             <div className="border-outline-variant flex flex-col items-center justify-center rounded-xl border border-dashed py-20">
               <Loader2 className="text-primary h-8 w-8 animate-spin" aria-hidden />
@@ -343,7 +346,6 @@ export default function Reports() {
             </section>
           )}
 
-          {/* Preview table */}
           {!loading && (
             <section className="border-outline-variant bg-surface-container-low rounded-xl border">
               <header className="border-outline-variant flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4 md:px-6">
@@ -397,9 +399,9 @@ export default function Reports() {
                         </tr>
                       </thead>
                       <tbody>
-                        {rows.map((row) => (
+                        {rows.map((row, rowIndex) => (
                           <tr
-                            key={row.id}
+                            key={row.id ?? rowIndex}
                             className="border-outline-variant/60 hover:bg-surface-container/40 border-b transition-colors last:border-b-0"
                           >
                             {columns.map((col) => {
@@ -432,9 +434,9 @@ export default function Reports() {
                   </div>
 
                   <ul className="space-y-3 p-4 md:hidden">
-                    {rows.map((row) => (
+                    {rows.map((row, rowIndex) => (
                       <li
-                        key={row.id}
+                        key={row.id ?? rowIndex}
                         className="border-outline-variant bg-surface-container rounded-lg border p-4"
                       >
                         {columns.map((col) => (
@@ -464,8 +466,6 @@ export default function Reports() {
           )}
         </div>
       </div>
-
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

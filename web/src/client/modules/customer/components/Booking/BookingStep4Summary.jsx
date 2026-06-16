@@ -1,27 +1,18 @@
 "use client";
 
-import {
-  User,
-  Scissors,
-  Calendar,
-  Clock,
-  MapPin,
-  ChevronRight,
-  AlertCircle,
-} from "lucide-react";
+import { User, Scissors, Calendar, Clock, MapPin, ChevronRight, AlertCircle } from "lucide-react";
 
-import { formatLongDate, formatMoney } from "@/client/modules/customer/helpers/booking.js";
+import { formatLongDate } from "@/client/lib/format/formatDateTime.js";
+import { formatMoney } from "@/client/lib/format/formatMoney.js";
 
 function SummaryRow({ icon: Icon, label, value }) {
   return (
     <div className="flex items-start gap-4 py-4 first:pt-0">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-outline-variant bg-surface-container text-on-surface-variant">
+      <div className="border-outline-variant bg-surface-container text-on-surface-variant flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border">
         <Icon className="h-4 w-4" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="font-label-caps text-[10px] text-on-surface-variant">
-          {label}
-        </p>
+        <p className="font-label-caps text-on-surface-variant text-[10px]">{label}</p>
         <div className="mt-0.5">{value}</div>
       </div>
     </div>
@@ -32,13 +23,14 @@ export default function BookingStep4Summary({
   booking,
   onConfirm,
   confirming,
+  disabled = false,
 }) {
   const total = booking.services.reduce((s, sv) => s + sv.price, 0);
   const totalDuration = booking.services.reduce((s, sv) => s + sv.duration, 0);
 
   return (
     <div className="space-y-5">
-      <div className="overflow-hidden rounded-xl border border-outline-variant bg-surface-container-low">
+      <div className="border-outline-variant bg-surface-container-low overflow-hidden rounded-xl border">
         {booking.barber?.image && (
           <div className="relative h-24 overflow-hidden">
             <img
@@ -46,16 +38,16 @@ export default function BookingStep4Summary({
               alt={booking.barber.name}
               className="h-full w-full object-cover"
             />
-            <div className="absolute inset-0 bg-gradient-to-r from-surface-container-lowest/80 to-transparent" />
+            <div className="from-surface-container-lowest/80 absolute inset-0 bg-gradient-to-r to-transparent" />
             <div className="absolute inset-0 flex items-center px-5">
-              <p className="font-serif text-lg font-bold text-on-surface drop-shadow-sm">
+              <p className="text-on-surface font-serif text-lg font-bold drop-shadow-sm">
                 {booking.barber.name}
               </p>
             </div>
           </div>
         )}
 
-        <div className="divide-y divide-outline-variant px-5">
+        <div className="divide-outline-variant divide-y px-5">
           <SummaryRow
             icon={User}
             label="Barber"
@@ -65,16 +57,12 @@ export default function BookingStep4Summary({
                   <img
                     src={booking.barber.image}
                     alt={booking.barber.name}
-                    className="h-9 w-9 rounded-lg border border-outline-variant object-cover"
+                    className="border-outline-variant h-9 w-9 rounded-lg border object-cover"
                   />
                 )}
                 <div>
-                  <p className="text-sm font-semibold text-on-surface">
-                    {booking.barber?.name}
-                  </p>
-                  <p className="text-xs text-on-surface-variant">
-                    {booking.barber?.role}
-                  </p>
+                  <p className="text-on-surface text-sm font-semibold">{booking.barber?.name}</p>
+                  <p className="text-on-surface-variant text-xs">{booking.barber?.role}</p>
                 </div>
               </div>
             }
@@ -85,12 +73,8 @@ export default function BookingStep4Summary({
             label="Location"
             value={
               <div>
-                <p className="text-sm font-semibold text-on-surface">
-                  {booking.barber?.location}
-                </p>
-                <p className="text-xs text-on-surface-variant">
-                  {booking.barber?.address}
-                </p>
+                <p className="text-on-surface text-sm font-semibold">{booking.barber?.location}</p>
+                <p className="text-on-surface-variant text-xs">{booking.barber?.address}</p>
               </div>
             }
           />
@@ -101,19 +85,14 @@ export default function BookingStep4Summary({
             value={
               <div className="space-y-1.5 pt-0.5">
                 {booking.services.map((s) => (
-                  <div
-                    key={s.id}
-                    className="flex items-center justify-between gap-4"
-                  >
-                    <span className="text-sm text-on-surface">{s.name}</span>
-                    <div className="flex items-center gap-3 text-xs text-on-surface-variant">
+                  <div key={s.id} className="flex items-center justify-between gap-4">
+                    <span className="text-on-surface text-sm">{s.name}</span>
+                    <div className="text-on-surface-variant flex items-center gap-3 text-xs">
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         {s.duration} min
                       </span>
-                      <span className="font-semibold text-on-surface">
-                        {formatMoney(s.price)}
-                      </span>
+                      <span className="text-on-surface font-semibold">{formatMoney(s.price)}</span>
                     </div>
                   </div>
                 ))}
@@ -126,63 +105,54 @@ export default function BookingStep4Summary({
             label="Date & Time"
             value={
               <div>
-                <p className="text-sm font-semibold text-on-surface">
+                <p className="text-on-surface text-sm font-semibold">
                   {formatLongDate(booking.date)}
                 </p>
-                <p className="text-xs text-on-surface-variant">
-                  {booking.timeLabel ?? "—"}
-                </p>
+                <p className="text-on-surface-variant text-xs">{booking.timeLabel ?? "—"}</p>
               </div>
             }
           />
         </div>
       </div>
 
-      <div className="rounded-xl border border-outline-variant bg-surface-container-low p-5">
-        <p className="font-label-caps mb-3 text-xs text-on-surface-variant">
-          Estimated pricing
-        </p>
+      <div className="border-outline-variant bg-surface-container-low rounded-xl border p-5">
+        <p className="font-label-caps text-on-surface-variant mb-3 text-xs">Estimated pricing</p>
         <div className="space-y-2">
           {booking.services.map((s) => (
-            <div
-              key={s.id}
-              className="flex items-center justify-between text-sm"
-            >
+            <div key={s.id} className="flex items-center justify-between text-sm">
               <span className="text-on-surface-variant">{s.name}</span>
               <span className="text-on-surface">{formatMoney(s.price)}</span>
             </div>
           ))}
         </div>
-        <div className="mt-3 flex items-center justify-between border-t border-outline-variant pt-3">
+        <div className="border-outline-variant mt-3 flex items-center justify-between border-t pt-3">
           <div>
-            <p className="font-semibold text-on-surface">Estimated total</p>
-            <p className="text-xs text-on-surface-variant">
+            <p className="text-on-surface font-semibold">Estimated total</p>
+            <p className="text-on-surface-variant text-xs">
               {totalDuration} min · pay at the chair
             </p>
           </div>
-          <p className="font-serif text-2xl font-bold text-primary">
-            {formatMoney(total)}
-          </p>
+          <p className="text-primary font-serif text-2xl font-bold">{formatMoney(total)}</p>
         </div>
       </div>
 
-      <div className="flex gap-3 rounded-xl border border-outline-variant bg-surface-container px-4 py-3">
-        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-on-surface-variant" />
-        <p className="text-xs leading-relaxed text-on-surface-variant">
-          Free cancellation up to 24 hours before your appointment. Final price
-          is confirmed after your visit — no online payment required.
+      <div className="border-outline-variant bg-surface-container flex gap-3 rounded-xl border px-4 py-3">
+        <AlertCircle className="text-on-surface-variant mt-0.5 h-4 w-4 shrink-0" />
+        <p className="text-on-surface-variant text-xs leading-relaxed">
+          Free cancellation up to 24 hours before your appointment. Final price is confirmed after
+          your visit — no online payment required.
         </p>
       </div>
 
       <button
         type="button"
         onClick={onConfirm}
-        disabled={confirming}
-        className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold tracking-wide text-on-primary transition-all hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={confirming || disabled}
+        className="bg-primary text-on-primary flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-semibold tracking-wide transition-all hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {confirming ? (
           <>
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-on-primary/30 border-t-on-primary" />
+            <span className="border-on-primary/30 border-t-on-primary h-4 w-4 animate-spin rounded-full border-2" />
             Confirming…
           </>
         ) : (

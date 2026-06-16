@@ -12,7 +12,10 @@ import {
 } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";
 import { formatDateLabel, formatTimeLabel, formatTimeAgo } from "@/lib/format/formatDateTime.js";
-import { WORKFLOW_STATUS, STATUS_NEXT } from "@/modules/admin/data/contactMessageDetailData.js";
+import {
+  WORKFLOW_STATUS,
+  STATUS_NEXT,
+} from "@/client/modules/admin/constants/contactMessageDetailConstants.js";
 
 export function initials(name) {
   return name
@@ -162,7 +165,7 @@ export function SenderPanel({ message }) {
   );
 }
 
-export function StatusPanel({ status, onStatusChange }) {
+export function StatusPanel({ status, onStatusChange, disabled = false }) {
   const cfg = WORKFLOW_STATUS[status] ?? WORKFLOW_STATUS.new;
   const options = STATUS_NEXT[status] ?? [];
 
@@ -191,8 +194,9 @@ export function StatusPanel({ status, onStatusChange }) {
                 <button
                   key={next}
                   type="button"
+                  disabled={disabled}
                   onClick={() => onStatusChange(next)}
-                  className="border-outline-variant bg-surface-container text-on-surface hover:border-primary/40 hover:bg-primary/8 hover:text-primary inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2.5 text-left text-xs font-semibold transition-colors sm:justify-start"
+                  className="border-outline-variant bg-surface-container text-on-surface hover:border-primary/40 hover:bg-primary/8 hover:text-primary inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2.5 text-left text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:justify-start"
                 >
                   <NextIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
                   {nextCfg.label}

@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarCheck, Search } from "lucide-react";
+import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
 import AppointmentStats from "@/client/modules/barber/components/Appointments/AppointmentStats";
 import {
@@ -12,97 +13,148 @@ import {
 import RescheduleModal from "@/client/modules/barber/components/Appointments/RescheduleModal";
 import AppointmentDetailDrawer from "@/client/modules/barber/components/Appointments/AppointmentDetailDrawer";
 import ServiceChangeRequestsSection from "@/client/modules/barber/components/Appointments/ServiceChangeRequestsSection";
-import { INITIAL_APPOINTMENTS } from "@/client/modules/barber/data/appointmentsData";
-import { APPOINTMENT_TABS } from "@/client/modules/barber/constants/barber.js";
-import { STATUS_RANK } from "@/client/modules/barber/constants/appointment.js";
+import { APPOINTMENT_TABS } from "@/client/modules/barber/constants/barberConstants.js";
+import { STATUS_RANK } from "@/client/modules/barber/constants/appointmentConstants.js";
+import { barberHook, useBarberInvalidation } from "@/client/modules/barber/hooks/barberQuery.jsx";
+import { mapAppointmentListItem } from "@/client/modules/barber/helpers/barberMappers.js";
 
-function isSameDay(iso, ref) {
-  const d = new Date(iso);
-  return (
-    d.getFullYear() === ref.getFullYear() &&
-    d.getMonth() === ref.getMonth() &&
-    d.getDate() === ref.getDate()
-  );
+function toReschedulePayload(isoStart) {
+  const d = new Date(isoStart);
+  const pad = (n) => String(n).padStart(2, "0");
+  return {
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+    reason: "",
+  };
 }
 
 export default function Appointments() {
   const router = useRouter();
-  const [appointments, setAppointments] = useState(INITIAL_APPOINTMENTS);
+  const invalidate = useBarberInvalidation();
   const [tab, setTab] = useState("upcoming");
   const [query, setQuery] = useState("");
   const [rescheduleFor, setRescheduleFor] = useState(null);
   const [detailFor, setDetailFor] = useState(null);
 
-  const stats = useMemo(() => {
-    const today = new Date();
-    return {
-      pending: appointments.filter((a) => a.status === "pending").length,
-      confirmed: appointments.filter((a) => a.status === "confirmed").length,
-      completed: appointments.filter((a) => a.status === "completed").length,
-      today: appointments.filter((a) => isSameDay(a.startAt, today)).length,
-    };
-  }, [appointments]);
+  const listQuery = barberHook.Appointments.useListAppointments({
+    tab,
+    q: query.trim() || undefined,
+    page: 1,
+    limit: 100,
+  });
+  const statusMutation = barberHook.Appointments.useUpdateAppointmentStatus();
+  const rescheduleMutation = barberHook.Appointments.useRescheduleAppointment();
+
+  const busy = listQuery.isPending || statusMutation.isPending || rescheduleMutation.isPending;
+
+  useEffect(() => {
+    if (listQuery.isError) {
+      toast.error(listQuery.error?.message || "Could not load appointments.");
+    }
+  }, [listQuery.isError, listQuery.error]);
+
+  const appointments = useMemo(
+    () => (listQuery.data?.appointments ?? []).map(mapAppointmentListItem),
+    [listQuery.data],
+  );
+
+  const stats = listQuery.data?.stats ?? {
+    pending: 0,
+    confirmed: 0,
+    completed: 0,
+    today: 0,
+  };
 
   const filtered = useMemo(() => {
-    const now = Date.now();
-    let list = appointments;
-    if (tab === "upcoming") {
-      list = list.filter(
-        (a) =>
-          new Date(a.startAt).getTime() >= now - 60 * 60 * 1000 &&
-          (a.status === "pending" || a.status === "confirmed" || a.status === "rescheduled"),
-      );
-    } else if (tab !== "all") {
-      list = list.filter((a) => a.status === tab);
-    }
-    if (query.trim()) {
-      const q = query.trim().toLowerCase();
-      list = list.filter(
-        (a) =>
-          a.customer.name.toLowerCase().includes(q) ||
-          a.service.toLowerCase().includes(q) ||
-          a.customer.phone.toLowerCase().includes(q),
-      );
-    }
     const rank = (s) => {
       const i = STATUS_RANK.indexOf(s);
       return i === -1 ? STATUS_RANK.length : i;
     };
-    return [...list].sort((a, b) => {
+    return [...appointments].sort((a, b) => {
       if (tab === "upcoming") {
         const r = rank(a.status) - rank(b.status);
         if (r !== 0) return r;
       }
       return new Date(a.startAt) - new Date(b.startAt);
     });
-  }, [appointments, tab, query]);
+  }, [appointments, tab]);
 
-  function updateStatus(id, status) {
-    setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
-    setDetailFor((cur) => (cur && cur.id === id ? { ...cur, status } : cur));
+  async function refetch() {
+    await listQuery.refetch();
   }
+
+  async function updateStatus(id, status) {
+    if (busy) return;
+    try {
+      await toast.promise(
+        statusMutation.mutateAsync({ id, status: status.toUpperCase().replace("-", "_") }),
+        {
+          loading: "Updating appointment…",
+          success: "Appointment updated.",
+          error: "Could not update appointment.",
+        },
+      );
+      await refetch();
+      await invalidate.workflow();
+      setDetailFor((cur) => (cur && cur.id === id ? { ...cur, status } : cur));
+    } catch {
+      /* toast handles error */
+    }
+  }
+
   const accept = (id) => updateStatus(id, "confirmed");
   const reject = (id) => updateStatus(id, "cancelled");
-  const complete = (id) => updateStatus(id, "completed");
   const noShow = (id) => updateStatus(id, "no-show");
 
-  function applyReschedule(id, isoStart) {
-    setAppointments((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, startAt: isoStart, status: "rescheduled" } : a)),
-    );
-    setDetailFor((cur) =>
-      cur && cur.id === id ? { ...cur, startAt: isoStart, status: "rescheduled" } : cur,
-    );
-    setRescheduleFor(null);
+  async function applyReschedule(id, isoStart) {
+    if (busy) return;
+    try {
+      await toast.promise(
+        rescheduleMutation.mutateAsync({ id, ...toReschedulePayload(isoStart) }),
+        {
+          loading: "Rescheduling…",
+          success: "Appointment rescheduled.",
+          error: "Could not reschedule appointment.",
+        },
+      );
+      await refetch();
+      setRescheduleFor(null);
+    } catch {
+      /* toast handles error */
+    }
   }
 
   const handlers = {
     onAccept: accept,
     onReject: reject,
-    onComplete: complete,
-    onReschedule: (appt) => setRescheduleFor(appt),
-    onView: (appt) => router.push(routes.barber.appointmentsDetail(appt.id)),
+    onReschedule: (appt) => !busy && setRescheduleFor(appt),
+    onView: (appt) => !busy && router.push(routes.barber.appointmentsDetail(appt.id)),
   };
+
+  if (listQuery.isPending && appointments.length === 0) {
+    return (
+      <div className="mx-auto max-w-6xl space-y-8 pb-4">
+        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
+        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
+      </div>
+    );
+  }
+
+  if (listQuery.isError && appointments.length === 0) {
+    return (
+      <div className="text-on-surface mx-auto max-w-6xl py-16 text-center">
+        <p className="font-medium">Could not load appointments.</p>
+        <button
+          type="button"
+          onClick={() => listQuery.refetch()}
+          disabled={busy}
+          className="text-primary mt-3 text-sm font-semibold hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 pb-4">
@@ -112,8 +164,8 @@ export default function Appointments() {
           Appointments
         </h1>
         <p className="text-on-surface-variant max-w-xl text-sm leading-relaxed">
-          Review booking requests, confirm or reject, reschedule on the fly, and mark sessions
-          complete.
+          Manage online customer bookings. Accept requests here, then start and complete services
+          from the Queue.
         </p>
       </header>
 
@@ -144,7 +196,8 @@ export default function Appointments() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search name, service…"
-                className="border-outline-variant bg-surface-container text-on-surface placeholder:text-on-surface-variant/70 focus:border-primary h-10 w-full rounded-md border py-2 pr-3 pl-9 text-sm focus:outline-none md:w-64"
+                disabled={busy}
+                className="border-outline-variant bg-surface-container text-on-surface placeholder:text-on-surface-variant/70 focus:border-primary h-10 w-full rounded-md border py-2 pr-3 pl-9 text-sm focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 md:w-64"
               />
             </label>
           </div>
@@ -153,39 +206,19 @@ export default function Appointments() {
         <div className="scrollbar-thin border-outline-variant flex gap-1 overflow-x-auto border-b px-4 py-2 md:px-6">
           {APPOINTMENT_TABS.map((t) => {
             const active = tab === t.key;
-            const count =
-              t.key === "upcoming"
-                ? appointments.filter(
-                    (a) =>
-                      (a.status === "pending" ||
-                        a.status === "confirmed" ||
-                        a.status === "rescheduled") &&
-                      new Date(a.startAt).getTime() >= Date.now() - 3600_000,
-                  ).length
-                : t.key === "all"
-                  ? appointments.length
-                  : appointments.filter((a) => a.status === t.key).length;
             return (
               <button
                 key={t.key}
                 type="button"
-                onClick={() => setTab(t.key)}
-                className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                onClick={() => !busy && setTab(t.key)}
+                disabled={busy}
+                className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                   active
                     ? "bg-primary text-on-primary"
                     : "text-on-surface-variant hover:text-on-surface"
                 }`}
               >
                 {t.label}
-                <span
-                  className={`rounded-full px-1.5 text-[10px] font-bold ${
-                    active
-                      ? "bg-on-primary/20 text-on-primary"
-                      : "bg-surface-container text-on-surface-variant"
-                  }`}
-                >
-                  {count}
-                </span>
               </button>
             );
           })}
@@ -200,7 +233,6 @@ export default function Appointments() {
           </div>
         ) : (
           <>
-            {/* Desktop table */}
             <div className="hidden md:block">
               <table className="w-full table-fixed text-left text-sm">
                 <colgroup>
@@ -226,7 +258,6 @@ export default function Appointments() {
                 </tbody>
               </table>
             </div>
-            {/* Mobile cards */}
             <div className="space-y-2 p-3 md:hidden">
               {filtered.map((appt) => (
                 <AppointmentCard key={appt.id} appt={appt} {...handlers} />
@@ -251,7 +282,6 @@ export default function Appointments() {
           setDetailFor(null);
           setRescheduleFor(appt);
         }}
-        onComplete={complete}
         onNoShow={noShow}
       />
     </div>

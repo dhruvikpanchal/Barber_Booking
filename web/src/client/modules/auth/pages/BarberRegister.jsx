@@ -24,7 +24,7 @@ import {
   getPasswordChecks,
   PASSWORD_STRENGTH,
 } from "@/client/modules/shared/constants/password.js";
-import { SPECIALTIES, EXP_TIERS } from "@/client/modules/barber/constants/barber.js";
+import { SPECIALTIES, EXP_TIERS } from "@/client/modules/barber/constants/barberConstants.js";
 import { authHook } from "@/client/modules/auth/hooks/authQuery.jsx";
 import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";

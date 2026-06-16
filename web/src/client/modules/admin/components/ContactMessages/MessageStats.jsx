@@ -1,4 +1,4 @@
-import { CONTACT_MESSAGE_CARDS } from "@/modules/admin/constants/admin.js";
+import { CONTACT_MESSAGE_CARDS } from "@/client/modules/admin/constants/adminConstants.js";
 
 export default function MessageStats({ stats }) {
   return (

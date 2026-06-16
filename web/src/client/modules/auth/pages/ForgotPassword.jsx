@@ -9,6 +9,7 @@ import { isTurnstileEnabled } from "@/client/lib/turnstile.js";
 import TurnstileField from "@/client/modules/shared/components/forms/auth/TurnstileField.jsx";
 import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
+import { startPasswordReset } from "@/client/lib/auth/passwordResetFlow.js";
 import { Loader2 } from "lucide-react";
 
 export default function ForgotPassword() {
@@ -31,15 +32,15 @@ export default function ForgotPassword() {
     }
     const email = form.email.trim();
     try {
-      await toast.promise(
-        forgotPasswordMutation.mutateAsync({ email, turnstileToken: turnstileToken || undefined }),
-        {
-          loading: "Sending reset email...",
-          success: "Reset email sent successfully",
-          error: (err) => err?.message || "Failed to send reset email.",
-        },
-      );
-      router.push(`${routes.auth.verifyOtp}?email=${encodeURIComponent(email)}`);
+      const result = await forgotPasswordMutation.mutateAsync({
+        email,
+        turnstileToken: turnstileToken || undefined,
+      });
+      toast.success("Reset email sent successfully");
+      if (result?.resetFlowToken) {
+        startPasswordReset(email, result.resetFlowToken);
+      }
+      router.push(routes.auth.verifyOtp);
     } catch (error) {
       toast.error(error?.message || "Failed to send reset email.");
     }

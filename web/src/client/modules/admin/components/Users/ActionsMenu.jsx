@@ -2,7 +2,7 @@
 
 import { MoreHorizontal } from "lucide-react";
 import { useState } from "react";
-import { getUserActionsMenuItems } from "@/modules/admin/constants/admin.js";
+import { getUserActionsMenuItems } from "@/client/modules/admin/constants/adminConstants.js";
 
 export default function ActionsMenu({ user, onAction }) {
   const [open, setOpen] = useState(false);

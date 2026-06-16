@@ -4,13 +4,25 @@ import Link from "next/link";
 import { MapPin, Clock, Eye, RotateCcw, XCircle, Star, Calendar, ChevronRight } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";
 import StatusBadge from "@/client/modules/shared/components/ui/StatusBadge";
-import { CUSTOMER_APPOINTMENT_STATUSES } from "@/client/modules/customer/constants/appointmentStatuses.js";
-import { formatDateTime, getTotalDuration } from "../../data/appointmentsData.js";
+import { CUSTOMER_APPOINTMENT_STATUSES } from "@/client/modules/customer/constants/appointmentStatusesConstants.js";
+import {
+  formatDateTime,
+  formatShopLabel,
+  getServiceNames,
+  getTotalDuration,
+} from "@/client/modules/customer/helpers/appointmentsHelpers.js";
 
-export default function AppointmentCard({ appt, onView, onCancel, onRebook, onReview }) {
+export default function AppointmentCard({
+  appt,
+  onView,
+  onCancel,
+  onRebook,
+  onReview,
+  disabled = false,
+}) {
   const { date, time, relative } = formatDateTime(appt.startAt);
   const totalDuration = getTotalDuration(appt.services);
-  const serviceNames = appt.services.map((s) => s.name).join(", ");
+  const serviceNames = getServiceNames(appt.services);
 
   return (
     <article className="group border-outline-variant bg-surface-container-low hover:border-outline min-w-0 rounded-xl border transition-all hover:shadow-sm">
@@ -41,7 +53,7 @@ export default function AppointmentCard({ appt, onView, onCancel, onRebook, onRe
           <div className="text-on-surface-variant mt-2 flex flex-wrap gap-x-3 gap-y-1.5 text-xs">
             <span className="flex items-center gap-1">
               <MapPin className="text-primary/60 h-3.5 w-3.5 shrink-0" />
-              {appt.shop.name.replace("Iron & Oak — ", "")}
+              {formatShopLabel(appt.shop)}
             </span>
             <span className="flex items-center gap-1">
               <Calendar className="text-primary/60 h-3.5 w-3.5 shrink-0" />
@@ -68,7 +80,9 @@ export default function AppointmentCard({ appt, onView, onCancel, onRebook, onRe
         <Link
           href={routes.customer.appointmentsDetail(appt.id)}
           onClick={() => onView?.(appt)}
-          className="bg-primary/10 text-primary hover:bg-primary/20 inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors"
+          aria-disabled={disabled}
+          tabIndex={disabled ? -1 : undefined}
+          className="bg-primary/10 text-primary hover:bg-primary/20 inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors aria-disabled:pointer-events-none aria-disabled:opacity-50"
         >
           <Eye className="h-3.5 w-3.5" aria-hidden />
           Details
@@ -79,7 +93,8 @@ export default function AppointmentCard({ appt, onView, onCancel, onRebook, onRe
           <button
             type="button"
             onClick={() => onCancel(appt)}
-            className="border-status-cancelled/30 bg-status-cancelled/8 text-status-cancelled hover:bg-status-cancelled/15 inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-colors"
+            disabled={disabled}
+            className="border-status-cancelled/30 bg-status-cancelled/8 text-status-cancelled hover:bg-status-cancelled/15 inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
             <XCircle className="h-3.5 w-3.5" />
             Cancel
@@ -90,7 +105,8 @@ export default function AppointmentCard({ appt, onView, onCancel, onRebook, onRe
           <button
             type="button"
             onClick={() => onReview(appt)}
-            className="bg-primary text-on-primary inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-all hover:opacity-90"
+            disabled={disabled}
+            className="bg-primary text-on-primary inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Star className="h-3.5 w-3.5" />
             Leave Review
@@ -108,7 +124,8 @@ export default function AppointmentCard({ appt, onView, onCancel, onRebook, onRe
           <button
             type="button"
             onClick={() => onRebook(appt)}
-            className="border-outline-variant text-on-surface-variant hover:bg-surface-container hover:text-on-surface inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-colors"
+            disabled={disabled}
+            className="border-outline-variant text-on-surface-variant hover:bg-surface-container hover:text-on-surface inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             Rebook

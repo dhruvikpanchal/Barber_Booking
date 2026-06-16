@@ -1,8 +1,8 @@
 import { routes } from "@/config/routes/routes.js";
-import BarberProfileSummary from "@/components/domain/BarberProfileSummary.jsx";
+import BarberProfileSummary from "@/client/modules/shared/types/BarberProfileSummary.jsx";
 
 /**
- * @param {{ barber: import('@/modules/public/data/barbers.js').barbers[number] & import('@/modules/public/data/barberProfiles.js').BARBER_PROFILE_DETAILS[string] }} props
+ * @param {{ barber: import('@/client/modules/public/data/barbersData.js').barbers[number] & import('@/client/modules/public/data/barberProfilesData.js').BARBER_PROFILE_DETAILS[string] }} props
  */
 export default function BarberProfileHero({ barber }) {
   return (

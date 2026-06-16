@@ -1,5 +1,10 @@
+"use client";
+
+import { useEffect } from "react";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
 import BarberProfileHero from "@/client/modules/public/components/Barbers/BarberProfileHero.jsx";
 import BarberRatingSummary from "@/client/modules/public/components/Barbers/BarberRatingSummary.jsx";
@@ -8,16 +13,45 @@ import BarberWorkingHours from "@/client/modules/public/components/Barbers/Barbe
 import BarberGallery from "@/client/modules/public/components/Barbers/BarberGallery.jsx";
 import BarberReviewsSection from "@/client/modules/public/components/Barbers/BarberReviewsSection.jsx";
 import BarberBookingSidebar from "@/client/modules/public/components/Barbers/BarberBookingSidebar.jsx";
+import { publicHook } from "@/client/modules/public/hooks/publicQuery.jsx";
 
-/**
- * @param {{ barber: ReturnType<import('@/client/modules/public/data/barbers.js').getBarberById> }} props
- */
-export default function BarberDetail({ barber }) {
+export default function BarberDetail({ slug, initialBarber }) {
+  const { data: barber, isPending, isError, error } = publicHook.Barbers.useBarber(slug, {
+    initialData: initialBarber ?? undefined,
+  });
+
+  useEffect(() => {
+    if (isError) {
+      toast.error(error?.message || "Could not load barber profile.");
+    }
+  }, [isError, error]);
+
+  useEffect(() => {
+    if (!isPending && !isError && !barber) {
+      notFound();
+    }
+  }, [isPending, isError, barber]);
+
+  if (isPending && !barber) {
+    return (
+      <div className="text-on-surface-variant mx-auto max-w-6xl px-4 py-24 text-center text-sm md:px-16">
+        Loading barber profile…
+      </div>
+    );
+  }
+
+  if (!barber) return null;
+
   return (
     <div className="mx-auto w-full max-w-6xl min-w-0 px-4 pt-28 pb-24 md:px-16">
       <Link
         href={routes.public.barbers}
-        className="text-on-surface-variant hover:text-primary inline-flex items-center gap-1.5 text-sm font-medium transition-colors"
+        onClick={(e) => {
+          if (isPending) e.preventDefault();
+        }}
+        aria-disabled={isPending}
+        tabIndex={isPending ? -1 : undefined}
+        className="text-on-surface-variant hover:text-primary inline-flex items-center gap-1.5 text-sm font-medium transition-colors aria-disabled:pointer-events-none aria-disabled:opacity-50"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden />
         All barbers
@@ -57,7 +91,7 @@ export default function BarberDetail({ barber }) {
           </div>
 
           <div className="min-w-0 space-y-4">
-            <BarberBookingSidebar barber={barber} />
+            <BarberBookingSidebar barber={barber} disabled={isPending} />
             <BarberWorkingHours hours={barber.workingHours} />
           </div>
         </div>

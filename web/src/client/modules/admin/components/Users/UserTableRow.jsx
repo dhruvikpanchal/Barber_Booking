@@ -1,7 +1,7 @@
 import { Eye } from "lucide-react";
 import ActionsMenu from "./ActionsMenu.jsx";
-import { USER_STATUS_CONFIG } from "@/modules/admin/constants/admin.js";
-import { ActivityBadge, UserStatusBadge } from "@/client/modules/admin/helpers/badges.jsx";
+import { USER_STATUS_CONFIG } from "@/client/modules/admin/constants/adminConstants.js";
+import { ActivityBadge, UserStatusBadge } from "@/client/modules/shared/components/ui/badges.jsx";
 import { formatRelativeAge } from "@/client/lib/format/formatDateTime.js";
 import { StarRow } from "@/client/modules/shared/components/ui/StarRow.jsx";
 

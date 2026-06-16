@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
 import { CalendarCheck } from "lucide-react";
 import AppointmentStats from "@/client/modules/admin/components/Appointments/AppointmentStats.jsx";
@@ -14,15 +15,15 @@ import AppointmentDetailDrawer from "@/client/modules/admin/components/Appointme
 import MonitorUpdatesModal from "@/client/modules/admin/components/Appointments/MonitorUpdatesModal.jsx";
 import ModificationHistoryModal from "@/client/modules/admin/components/Appointments/ModificationHistoryModal.jsx";
 import ServiceUpdatedModal from "@/client/modules/admin/components/Appointments/ServiceUpdatedModal.jsx";
-import { INITIAL_ADMIN_APPOINTMENTS } from "@/client/modules/admin/data/appointmentsData.js";
+import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
 import {
-  buildStatusCounts,
-  matchesDateRange,
-} from "@/client/modules/admin/components/Appointments/helpers.jsx";
+  mapAdminAppointmentListItem,
+  mapAdminAppointmentStats,
+} from "@/client/modules/admin/helpers/adminMappers.js";
+import { buildStatusCounts } from "@/client/modules/admin/components/Appointments/helpers.jsx";
 
 export default function Appointments() {
   const router = useRouter();
-  const [appointments] = useState(INITIAL_ADMIN_APPOINTMENTS);
   const [status, setStatus] = useState("all");
   const [dateRange, setDateRange] = useState("all");
   const [city, setCity] = useState("all");
@@ -33,57 +34,89 @@ export default function Appointments() {
   const [historyFor, setHistoryFor] = useState(null);
   const [serviceFor, setServiceFor] = useState(null);
 
-  const stats = useMemo(
+  const listParams = useMemo(
     () => ({
-      pending: appointments.filter((a) => a.status === "pending").length,
-      confirmed: appointments.filter((a) => a.status === "confirmed").length,
-      inService: appointments.filter((a) => a.status === "in-service").length,
-      completed: appointments.filter((a) => a.status === "completed").length,
-      cancelled: appointments.filter((a) => a.status === "cancelled").length,
+      status: status === "all" ? undefined : status,
+      dateRange: dateRange === "all" ? undefined : dateRange,
+      city: city === "all" ? undefined : city,
+      barberId: barberId === "all" ? undefined : barberId,
+      q: query.trim() || undefined,
+      page: 1,
+      limit: 100,
     }),
-    [appointments],
+    [status, dateRange, city, barberId, query],
+  );
+
+  const statsQuery = adminHook.Appointments.useAppointmentStats();
+  const listQuery = adminHook.Appointments.useListAppointments(listParams);
+
+  const busy = statsQuery.isPending || listQuery.isPending;
+
+  useEffect(() => {
+    if (listQuery.isError) {
+      toast.error(listQuery.error?.message || "Could not load appointments.");
+    }
+  }, [listQuery.isError, listQuery.error]);
+
+  useEffect(() => {
+    if (statsQuery.isError) {
+      toast.error(statsQuery.error?.message || "Could not load appointment stats.");
+    }
+  }, [statsQuery.isError, statsQuery.error]);
+
+  const appointments = useMemo(
+    () => (listQuery.data?.items ?? []).map(mapAdminAppointmentListItem),
+    [listQuery.data],
+  );
+
+  const stats = useMemo(
+    () => mapAdminAppointmentStats(statsQuery.data),
+    [statsQuery.data],
   );
 
   const statusCounts = useMemo(() => buildStatusCounts(appointments), [appointments]);
 
-  const filtered = useMemo(() => {
-    let list = appointments;
-    if (status !== "all") {
-      list = list.filter((a) => a.status === status);
-    }
-    if (city !== "all") {
-      list = list.filter((a) => a.city === city);
-    }
-    if (barberId !== "all") {
-      list = list.filter((a) => a.barberId === barberId);
-    }
-    if (dateRange !== "all") {
-      list = list.filter((a) => matchesDateRange(a.startAt, dateRange));
-    }
-    if (query.trim()) {
-      const q = query.trim().toLowerCase();
-      list = list.filter(
-        (a) =>
-          a.customer.name.toLowerCase().includes(q) ||
-          a.id.toLowerCase().includes(q) ||
-          a.service.toLowerCase().includes(q) ||
-          a.barberName.toLowerCase().includes(q) ||
-          a.city.toLowerCase().includes(q),
-      );
-    }
-    return [...list].sort((a, b) => new Date(b.startAt) - new Date(a.startAt));
-  }, [appointments, status, city, barberId, dateRange, query]);
+  const filtered = useMemo(
+    () => [...appointments].sort((a, b) => new Date(b.startAt) - new Date(a.startAt)),
+    [appointments],
+  );
 
   function handleView(appt) {
+    if (busy) return;
     router.push(routes.admin.appointmentsDetail(appt.id));
   }
 
   const handlers = {
     onView: handleView,
-    onMonitor: setMonitorFor,
-    onHistory: setHistoryFor,
-    onServiceUpdated: setServiceFor,
+    onMonitor: (appt) => !busy && setMonitorFor(appt),
+    onHistory: (appt) => !busy && setHistoryFor(appt),
+    onServiceUpdated: (appt) => !busy && setServiceFor(appt),
   };
+
+  if (listQuery.isPending && appointments.length === 0) {
+    return (
+      <div className="mx-auto max-w-7xl space-y-8 pb-4">
+        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
+        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
+      </div>
+    );
+  }
+
+  if (listQuery.isError && appointments.length === 0) {
+    return (
+      <div className="text-on-surface mx-auto max-w-7xl py-16 text-center">
+        <p className="font-medium">Could not load appointments.</p>
+        <button
+          type="button"
+          onClick={() => listQuery.refetch()}
+          disabled={busy}
+          className="text-primary mt-3 text-sm font-semibold hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 pb-4">
@@ -109,7 +142,7 @@ export default function Appointments() {
             <div>
               <h2 className="text-on-surface font-serif text-lg font-bold">All bookings</h2>
               <p className="text-on-surface-variant text-sm">
-                {filtered.length} of {appointments.length} shown
+                {filtered.length} of {listQuery.data?.meta?.total ?? filtered.length} shown
               </p>
             </div>
           </div>
@@ -127,6 +160,7 @@ export default function Appointments() {
           query={query}
           onQueryChange={setQuery}
           counts={statusCounts}
+          disabled={busy}
         />
 
         {filtered.length === 0 ? (

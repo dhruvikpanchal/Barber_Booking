@@ -15,7 +15,7 @@ import {
   Armchair,
 } from "lucide-react";
 import StatusBadge from "@/client/modules/shared/components/ui/StatusBadge";
-import { SOURCES, STATUSES } from "../../constants/queue";
+import { SOURCES, STATUSES } from "@/client/modules/barber/constants/queueConstants.js";
 import { useHydrated } from "@/client/modules/shared/hooks/useHydrated.js";
 
 function initials(name) {

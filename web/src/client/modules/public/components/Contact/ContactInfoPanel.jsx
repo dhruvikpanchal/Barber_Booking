@@ -1,12 +1,17 @@
 import { ArrowRight, Clock, Mail, MapPin, MessageSquare, Phone } from "lucide-react";
 
-import { CONTACT_INFO } from "@/client/modules/public/data/contact.js";
+import { CONTACT_INFO } from "@/client/modules/public/constants/contactConstants.js";
 import { InfoRow } from "@/client/modules/public/components/Contact/Primitives.jsx";
 
-export function ContactInfoPanel() {
-  const { phone, email, address, hours, social } = CONTACT_INFO;
+export function ContactInfoPanel({ contactInfo = CONTACT_INFO, disabled = false }) {
+  const { phone, email, address, hours, social } = contactInfo ?? {};
+  const normalizedPhone = typeof phone === "string" ? phone : CONTACT_INFO.phone;
+  const normalizedEmail = typeof email === "string" ? email : CONTACT_INFO.email;
+  const normalizedAddress = address ?? CONTACT_INFO.address;
+  const normalizedHours = Array.isArray(hours) && hours.length ? hours : CONTACT_INFO.hours;
+  const normalizedSocial = Array.isArray(social) && social.length ? social : CONTACT_INFO.social;
   const mapsHref = `https://maps.google.com/?q=${encodeURIComponent(
-    `${address.street}, ${address.city}, ${address.state} ${address.zip}`,
+    `${normalizedAddress?.street ?? ""}, ${normalizedAddress?.city ?? ""}, ${normalizedAddress?.state ?? ""} ${normalizedAddress?.zip ?? ""}`,
   )}`;
 
   return (
@@ -26,38 +31,44 @@ export function ContactInfoPanel() {
           {/* Phone */}
           <InfoRow Icon={Phone} label="Support phone">
             <a
-              href={`tel:${phone.replace(/\s|\(|\)|-/g, "")}`}
-              className="text-primary font-medium hover:underline"
+              href={`tel:${normalizedPhone.replace(/\s|\(|\)|-/g, "")}`}
+              aria-disabled={disabled}
+              tabIndex={disabled ? -1 : undefined}
+              className="text-primary font-medium hover:underline aria-disabled:pointer-events-none aria-disabled:opacity-50"
             >
-              {phone}
+              {normalizedPhone}
             </a>
           </InfoRow>
 
           {/* Email */}
           <InfoRow Icon={Mail} label="Support email">
             <a
-              href={`mailto:${email}`}
-              className="text-primary font-medium break-all hover:underline"
+              href={`mailto:${normalizedEmail}`}
+              aria-disabled={disabled}
+              tabIndex={disabled ? -1 : undefined}
+              className="text-primary font-medium break-all hover:underline aria-disabled:pointer-events-none aria-disabled:opacity-50"
             >
-              {email}
+              {normalizedEmail}
             </a>
           </InfoRow>
 
           {/* Address */}
           <InfoRow Icon={MapPin} label="Office address">
             <address className="text-on-surface leading-relaxed not-italic">
-              {address.street}
-              {address.suite && <>, {address.suite}</>}
+              {normalizedAddress.street}
+              {normalizedAddress.suite && <>, {normalizedAddress.suite}</>}
               <br />
-              {address.city}, {address.state} {address.zip}
+              {normalizedAddress.city}, {normalizedAddress.state} {normalizedAddress.zip}
               <br />
-              {address.country}
+              {normalizedAddress.country}
             </address>
             <a
               href={mapsHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-primary mt-1.5 inline-flex items-center gap-1 text-xs font-semibold hover:underline"
+              aria-disabled={disabled}
+              tabIndex={disabled ? -1 : undefined}
+              className="text-primary mt-1.5 inline-flex items-center gap-1 text-xs font-semibold hover:underline aria-disabled:pointer-events-none aria-disabled:opacity-50"
             >
               View on map
               <ArrowRight className="h-3 w-3" aria-hidden />
@@ -76,7 +87,7 @@ export function ContactInfoPanel() {
         </header>
 
         <ul className="divide-outline-variant/60 divide-y px-5">
-          {hours.map(({ days, time }) => {
+          {normalizedHours.map(({ days, time }) => {
             const isClosed = time === "Closed";
             return (
               <li key={days} className="flex items-center justify-between gap-4 py-3 text-sm">
@@ -114,13 +125,15 @@ export function ContactInfoPanel() {
         </header>
 
         <ul className="space-y-1.5 p-4">
-          {social.map(({ id, label, handle, href, Icon }) => (
+          {normalizedSocial.map(({ id, label, handle, href, Icon }) => (
             <li key={id}>
               <a
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group border-outline-variant bg-surface-container hover:border-primary/40 hover:bg-primary/8 focus-visible:ring-primary/60 flex items-center gap-3 rounded-lg border px-3.5 py-2.5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                aria-disabled={disabled}
+                tabIndex={disabled ? -1 : undefined}
+                className="group border-outline-variant bg-surface-container hover:border-primary/40 hover:bg-primary/8 focus-visible:ring-primary/60 flex items-center gap-3 rounded-lg border px-3.5 py-2.5 transition-colors focus-visible:ring-2 focus-visible:outline-none aria-disabled:pointer-events-none aria-disabled:opacity-50"
                 aria-label={`${label} — ${handle}`}
               >
                 <span className="border-outline-variant bg-surface-container-high text-on-surface-variant group-hover:border-primary/30 group-hover:text-primary flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors">

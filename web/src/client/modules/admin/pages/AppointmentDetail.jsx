@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import {
   Activity,
   ArrowLeft,
@@ -22,14 +21,14 @@ import {
   StickyNote,
   User,
 } from "lucide-react";
+import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
-import { getAdminAppointmentById } from "@/client/modules/admin/data/appointmentDetailData.js";
-import { useHydrated } from "@/client/modules/shared/hooks/useHydrated.js";
+import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
+import { mapAdminAppointmentDetail } from "@/client/modules/admin/helpers/adminMappers.js";
 import StatusBadge from "@/client/modules/shared/components/ui/StatusBadge";
-import { APPOINTMENT_STATUSES } from "@/modules/admin/constants/admin.js";
+import { APPOINTMENT_STATUSES } from "@/client/modules/admin/constants/adminConstants.js";
 import { formatWhen } from "@/client/modules/admin/components/Appointments/AppointmentTableRow.jsx";
 import ModificationHistorySection from "@/client/modules/admin/components/Appointments/ModificationHistorySection.jsx";
-import { Toast } from "@/client/modules/shared/components/common/settings/TinyPrimitives.jsx";
 import {
   fullDateTime,
   SectionCard,
@@ -45,27 +44,23 @@ import {
  * @param {{ id: string }} props
  */
 export default function AppointmentDetail({ id }) {
-  const hydrated = useHydrated();
-  const seed = useMemo(() => getAdminAppointmentById(id), [id]);
+  const {
+    data,
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = adminHook.Appointments.useAppointment(id);
 
-  if (!seed) notFound();
+  useEffect(() => {
+    if (isError) {
+      toast.error(error?.message || "Could not load appointment.");
+    }
+  }, [isError, error]);
 
-  const [appt] = useState(seed);
-  const [toast, setToast] = useState(null);
+  const appt = useMemo(() => (data ? mapAdminAppointmentDetail(data) : null), [data]);
 
-  const { date, time } = formatWhen(appt.startAt);
-  const booked = fullDateTime(appt.createdAt);
-
-  const showToast = (message, type = "success") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
-
-  function handleAdminNote() {
-    showToast("Admin note saved (demo). Monitoring view is read-only.", "info");
-  }
-
-  if (!hydrated) {
+  if (isPending) {
     return (
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="text-on-surface-variant flex items-center gap-2 text-sm">
@@ -76,6 +71,34 @@ export default function AppointmentDetail({ id }) {
       </div>
     );
   }
+
+  if (isError || !appt) {
+    return (
+      <div className="text-on-surface mx-auto max-w-6xl py-16 text-center">
+        <p className="font-medium">Could not load appointment.</p>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => refetch()}
+            disabled={isPending}
+            className="text-primary text-sm font-semibold hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Try again
+          </button>
+          <Link
+            href={routes.admin.appointments}
+            className="border-outline-variant text-on-surface-variant hover:text-on-surface inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            Back to appointments
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const { date, time } = formatWhen(appt.startAt);
+  const booked = fullDateTime(appt.createdAt);
 
   const customerProfileHref = appt.customer.userId
     ? routes.admin.usersDetail(appt.customer.userId)
@@ -114,7 +137,6 @@ export default function AppointmentDetail({ id }) {
         </Link>
       </header>
 
-      {/* Appointment summary */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           {
@@ -217,7 +239,7 @@ export default function AppointmentDetail({ id }) {
             <SectionCard
               title="Barber details"
               description="Assigned professional"
-              className="h-full"
+               className="h-full"
             >
               <DetailRow label="Barber name" value={appt.barber.name} icon={User} />
               <DetailRow label="Shop" value={appt.barber.shop} icon={Building2} />
@@ -329,14 +351,6 @@ export default function AppointmentDetail({ id }) {
               apps — admins observe only.
             </p>
             <div className="mt-4 space-y-2">
-              <button
-                type="button"
-                onClick={handleAdminNote}
-                className="border-outline-variant bg-surface-container text-on-surface hover:bg-surface-container-high flex w-full items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-xs font-semibold transition-colors"
-              >
-                <StickyNote className="h-4 w-4" aria-hidden />
-                Add admin note
-              </button>
               <Link
                 href={routes.admin.appointments}
                 className="border-outline-variant text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface flex w-full items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-xs font-semibold transition-colors"
@@ -348,8 +362,6 @@ export default function AppointmentDetail({ id }) {
           </div>
         </aside>
       </div>
-
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

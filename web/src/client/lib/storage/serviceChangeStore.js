@@ -40,8 +40,7 @@ function emit() {
 }
 
 function setState(updater) {
-  memoryState =
-    typeof updater === "function" ? updater(memoryState) : updater;
+  memoryState = typeof updater === "function" ? updater(memoryState) : updater;
   persist();
   emit();
 }
@@ -78,9 +77,7 @@ export function useServiceChangeStore() {
 }
 
 export function getPendingRequestForAppointment(appointmentId, state = memoryState) {
-  return state.requests.find(
-    (r) => r.appointmentId === appointmentId && r.status === "pending",
-  );
+  return state.requests.find((r) => r.appointmentId === appointmentId && r.status === "pending");
 }
 
 export function getLatestRequestForAppointment(appointmentId, state = memoryState) {
@@ -135,15 +132,12 @@ export function acceptServiceChangeRequest(requestId) {
   if (!request || request.status !== "pending") return { ok: false };
 
   const estimatedPrice = sumServicePrice(request.requestedServices);
-  const previous =
-    request.previousServices ?? request.snapshot?.services ?? [];
+  const previous = request.previousServices ?? request.snapshot?.services ?? [];
 
   setState((prev) => ({
     ...prev,
     requests: prev.requests.map((r) =>
-      r.id === requestId
-        ? { ...r, status: "accepted", resolvedAt: new Date().toISOString() }
-        : r,
+      r.id === requestId ? { ...r, status: "accepted", resolvedAt: new Date().toISOString() } : r,
     ),
     overrides: {
       ...prev.overrides,
@@ -158,8 +152,7 @@ export function acceptServiceChangeRequest(requestId) {
       ...prev.notifications,
       [request.appointmentId]: {
         type: "accepted",
-        message:
-          "Your service change was approved. Estimated total has been updated.",
+        message: "Your service change was approved. Estimated total has been updated.",
         at: new Date().toISOString(),
       },
     },
@@ -175,16 +168,13 @@ export function rejectServiceChangeRequest(requestId) {
   setState((prev) => ({
     ...prev,
     requests: prev.requests.map((r) =>
-      r.id === requestId
-        ? { ...r, status: "rejected", resolvedAt: new Date().toISOString() }
-        : r,
+      r.id === requestId ? { ...r, status: "rejected", resolvedAt: new Date().toISOString() } : r,
     ),
     notifications: {
       ...prev.notifications,
       [request.appointmentId]: {
         type: "rejected",
-        message:
-          "Your service change request was declined. Original services are unchanged.",
+        message: "Your service change request was declined. Original services are unchanged.",
         at: new Date().toISOString(),
       },
     },
@@ -229,18 +219,13 @@ export function mergeBarberAppointmentWithStore(baseAppt, state = memoryState) {
     duration,
     pendingChangeRequest: pendingRequest ?? null,
     latestChangeRequest: latestRequest ?? null,
-    changeRequestHistory: state.requests.filter(
-      (r) => r.appointmentId === appointmentId,
-    ),
+    changeRequestHistory: state.requests.filter((r) => r.appointmentId === appointmentId),
   };
 }
 
 export function useMergedBarberAppointment(baseAppt) {
   const state = useServiceChangeStore();
-  return useMemo(
-    () => mergeBarberAppointmentWithStore(baseAppt, state),
-    [baseAppt, state],
-  );
+  return useMemo(() => mergeBarberAppointmentWithStore(baseAppt, state), [baseAppt, state]);
 }
 
 export function mergeAppointmentWithStore(baseAppt, state = memoryState) {
@@ -257,8 +242,7 @@ export function mergeAppointmentWithStore(baseAppt, state = memoryState) {
     ...baseAppt,
     ...(override ?? {}),
     services: override?.services ?? baseAppt.services,
-    estimatedPrice:
-      override?.estimatedPrice ?? baseAppt.estimatedPrice,
+    estimatedPrice: override?.estimatedPrice ?? baseAppt.estimatedPrice,
     pendingChangeRequest: pendingRequest ?? null,
     latestChangeRequest: latestRequest ?? null,
     customerNotification: notification,
@@ -267,8 +251,5 @@ export function mergeAppointmentWithStore(baseAppt, state = memoryState) {
 
 export function useMergedAppointment(baseAppt) {
   const state = useServiceChangeStore();
-  return useMemo(
-    () => mergeAppointmentWithStore(baseAppt, state),
-    [baseAppt, state],
-  );
+  return useMemo(() => mergeAppointmentWithStore(baseAppt, state), [baseAppt, state]);
 }

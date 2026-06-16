@@ -1,16 +1,17 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
-import { User, Scissors, Calendar, ClipboardList, ChevronLeft } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
+import { toast } from "sonner";
 import BookingStep1Barber from "@/client/modules/customer/components/Booking/BookingStep1Barber.jsx";
 import BookingStep2Services from "@/client/modules/customer/components/Booking/BookingStep2Services.jsx";
 import BookingStep3DateTime from "@/client/modules/customer/components/Booking/BookingStep3DateTime.jsx";
 import BookingStep4Summary from "@/client/modules/customer/components/Booking/BookingStep4Summary.jsx";
 import BookingConfirmed from "@/client/modules/customer/components/Booking/BookingConfirmed.jsx";
-import customerServices from "@/client/modules/customer/services/customerServices.jsx";
+import { customerHook } from "@/client/modules/customer/hooks/customerQuery.jsx";
 import { buildStartAt } from "@/client/modules/shared/helpers/buildStartAt";
-import { STEPS } from "@/client/modules/customer/constants/BookAppointment.js";
+import { STEPS } from "@/client/modules/customer/constants/BookAppointmentConstants.js";
 
 const INITIAL_BOOKING = {
   barber: null,
@@ -33,7 +34,7 @@ function canAdvance(step, booking) {
   }
 }
 
-function StepIndicator({ currentStep, totalSteps }) {
+function StepIndicator({ currentStep, totalSteps, disabled = false }) {
   return (
     <>
       <div className="hidden items-center justify-between sm:flex">
@@ -51,7 +52,7 @@ function StepIndicator({ currentStep, totalSteps }) {
                       : active
                         ? "border-primary bg-primary/10 text-primary"
                         : "border-outline-variant bg-surface-container text-on-surface-variant"
-                  }`}
+                  } ${disabled ? "opacity-50" : ""}`}
                 >
                   {done ? (
                     <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
@@ -105,28 +106,24 @@ function StepIndicator({ currentStep, totalSteps }) {
 
 export default function BookAppointment() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [step, setStep] = useState(0);
   const [booking, setBooking] = useState(INITIAL_BOOKING);
-  const [confirming, setConfirming] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
-  const [confirmError, setConfirmError] = useState(null);
+
+  const { data: barbersResult, isPending: barbersPending } =
+    customerHook.Booking.useListBookingBarbers({ limit: 50 });
+  const confirmMutation = customerHook.Booking.useConfirmBooking();
+
+  const busy = barbersPending || confirmMutation.isPending;
 
   useEffect(() => {
     const barberId = searchParams.get("barber");
-    if (!barberId) return;
-    let cancelled = false;
-    customerServices
-      .listBookingBarbers({ limit: 50 })
-      .then((result) => {
-        if (cancelled) return;
-        const barber = (result.items ?? []).find((b) => b.id === barberId || b.slug === barberId);
-        if (barber) setBooking({ ...INITIAL_BOOKING, barber });
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [searchParams]);
+    if (!barberId || !barbersResult) return;
+    const items = barbersResult.items ?? [];
+    const barber = items.find((b) => b.id === barberId || b.slug === barberId);
+    if (barber) setBooking({ ...INITIAL_BOOKING, barber });
+  }, [searchParams, barbersResult]);
 
   const patchBooking = useCallback((updates) => {
     setBooking((prev) => ({ ...prev, ...updates }));
@@ -158,33 +155,47 @@ export default function BookAppointment() {
     [patchBooking],
   );
 
-  const handleEditStep = useCallback((stepIndex) => {
-    setStep(stepIndex);
-  }, []);
+  const handleEditStep = useCallback(
+    (stepIndex) => {
+      if (!busy) setStep(stepIndex);
+    },
+    [busy],
+  );
 
   const handleNext = () => {
-    if (canAdvance(step, booking)) setStep((s) => s + 1);
+    if (!busy && canAdvance(step, booking)) setStep((s) => s + 1);
   };
-  const handleBack = () => setStep((s) => Math.max(0, s - 1));
+  const handleBack = () => {
+    if (!busy) setStep((s) => Math.max(0, s - 1));
+  };
 
   const handleConfirm = async () => {
-    if (!booking.barber || !booking.date || !booking.time || booking.services.length === 0) {
+    if (
+      busy ||
+      !booking.barber ||
+      !booking.date ||
+      !booking.time ||
+      booking.services.length === 0
+    ) {
       return;
     }
-    setConfirming(true);
-    setConfirmError(null);
     try {
-      await customerServices.confirmBooking({
-        barberId: booking.barber.slug ?? booking.barber.id,
-        serviceIds: booking.services.map((s) => s.id),
-        startAt: buildStartAt(booking.date, booking.time),
-        notes: booking.notes ?? "",
-      });
+      await toast.promise(
+        confirmMutation.mutateAsync({
+          barberId: booking.barber.slug ?? booking.barber.id,
+          serviceIds: booking.services.map((s) => s.id),
+          startAt: buildStartAt(booking.date, booking.time),
+          notes: booking.notes ?? "",
+        }),
+        {
+          loading: "Confirming your booking…",
+          success: "Appointment booked successfully!",
+          error: "Could not confirm booking. Please try again.",
+        },
+      );
       setConfirmed(true);
-    } catch (err) {
-      setConfirmError(err?.message ?? "Could not confirm booking. Please try again.");
-    } finally {
-      setConfirming(false);
+    } catch {
+      /* toast handles error */
     }
   };
 
@@ -192,6 +203,7 @@ export default function BookAppointment() {
     setBooking(INITIAL_BOOKING);
     setStep(0);
     setConfirmed(false);
+    router.push("/customer/book-appointment");
   };
 
   if (confirmed) {
@@ -218,7 +230,7 @@ export default function BookAppointment() {
       </header>
 
       <div className="border-outline-variant bg-surface-container-low mb-6 rounded-xl border px-5 py-4">
-        <StepIndicator currentStep={step} totalSteps={STEPS.length} />
+        <StepIndicator currentStep={step} totalSteps={STEPS.length} disabled={busy} />
       </div>
 
       <div className="border-outline-variant bg-surface-container-low rounded-xl border">
@@ -237,23 +249,30 @@ export default function BookAppointment() {
         </div>
 
         <div className="p-5">
-          {step === 0 && <BookingStep1Barber booking={booking} onSelect={handleBarberSelect} />}
-          {step === 1 && <BookingStep2Services booking={booking} onToggle={handleServiceToggle} />}
-          {step === 2 && <BookingStep3DateTime booking={booking} onSelect={handleDateTimeSelect} />}
+          {step === 0 && (
+            <BookingStep1Barber booking={booking} onSelect={handleBarberSelect} disabled={busy} />
+          )}
+          {step === 1 && (
+            <BookingStep2Services
+              booking={booking}
+              onToggle={handleServiceToggle}
+              disabled={busy}
+            />
+          )}
+          {step === 2 && (
+            <BookingStep3DateTime
+              booking={booking}
+              onSelect={handleDateTimeSelect}
+              disabled={busy}
+            />
+          )}
           {step === 3 && (
-            <>
-              {confirmError ? (
-                <p className="text-status-cancelled mb-4 text-sm" role="alert">
-                  {confirmError}
-                </p>
-              ) : null}
-              <BookingStep4Summary
-                booking={booking}
-                onEdit={handleEditStep}
-                onConfirm={handleConfirm}
-                confirming={confirming}
-              />
-            </>
+            <BookingStep4Summary
+              booking={booking}
+              onConfirm={handleConfirm}
+              confirming={confirmMutation.isPending}
+              disabled={busy}
+            />
           )}
         </div>
       </div>
@@ -264,7 +283,7 @@ export default function BookAppointment() {
             <button
               type="button"
               onClick={handleBack}
-              disabled={step === 0}
+              disabled={step === 0 || busy}
               className="border-outline-variant text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface inline-flex h-11 items-center gap-2 rounded-lg border px-5 text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-30"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -279,10 +298,9 @@ export default function BookAppointment() {
                 <button
                   type="button"
                   onClick={handleNext}
-                  disabled={!canAdvance(step, booking)}
+                  disabled={busy || !canAdvance(step, booking)}
                   className="bg-primary text-on-primary inline-flex h-11 items-center gap-2 rounded-lg px-6 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {/* {step === 2 ? "Review booking" : "Continue"} */}
                   Continue
                   <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
                     <path
@@ -294,9 +312,7 @@ export default function BookAppointment() {
                     />
                   </svg>
                 </button>
-              ) : (
-                ""
-              )}
+              ) : null}
             </div>
           </div>
         </div>

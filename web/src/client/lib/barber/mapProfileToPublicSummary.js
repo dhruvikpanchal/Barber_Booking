@@ -1,4 +1,4 @@
-import { EXP_TIERS } from "@/modules/barber/constants/barber.js";
+import { EXP_TIERS } from "@/client/modules/barber/constants/barberConstants.js";
 
 /** Map barber panel profile state → public-facing summary card fields. */
 export function mapProfileToPublicSummary(profile, displayName, experienceLabel) {

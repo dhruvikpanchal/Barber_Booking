@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { toast } from "sonner";
 import LandingHero from "@/client/modules/public/components/HomePage/LandingHero.jsx";
 import LandingSearchStrip from "@/client/modules/public/components/HomePage/LandingSearchStrip.jsx";
 import LandingFeaturedShops from "@/client/modules/public/components/HomePage/LandingFeaturedShops.jsx";
@@ -10,27 +11,28 @@ import LandingHowItWorks from "@/client/modules/public/components/HomePage/Landi
 import LandingTestimonials from "@/client/modules/public/components/HomePage/LandingTestimonials.jsx";
 import LandingBarberRegister from "@/client/modules/public/components/HomePage/LandingBarberRegister.jsx";
 import LandingFinalCta from "@/client/modules/public/components/HomePage/LandingFinalCta.jsx";
-import { publicServices } from "@/client/modules/public/services/publicServices.jsx";
+import { publicHook } from "@/client/modules/public/hooks/publicQuery.jsx";
 
-export default function Home() {
-  const [home, setHome] = useState(null);
+export default function Home({ initialData }) {
+  const { data: home, isError, error } = publicHook.Home.useHome({
+    initialData: initialData ?? undefined,
+  });
 
   useEffect(() => {
-    publicServices
-      .getHome()
-      .then(setHome)
-      .catch(() => setHome(null));
-  }, []);
+    if (isError) {
+      toast.error(error?.message || "Could not load home page content.");
+    }
+  }, [isError, error]);
 
   return (
     <>
       <LandingHero />
       <LandingSearchStrip />
-      <LandingFeaturedShops />
+      {/* <LandingFeaturedShops /> */}
       <LandingFeaturedBarbers barbers={home?.barbers ?? []} />
       <LandingServicesShowcase services={home?.services ?? []} />
       <LandingHowItWorks />
-      <LandingTestimonials reviews={home?.testimonials ?? []} />
+      <LandingTestimonials />
       <LandingBarberRegister />
       <LandingFinalCta />
     </>

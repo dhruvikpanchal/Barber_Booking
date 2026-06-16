@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { CalendarRange, X } from "lucide-react";
-import { ANALYTICS_PERIODS } from "@/modules/barber/constants/analytics.js";
+import { ANALYTICS_PERIODS } from "@/client/modules/barber/constants/analyticsConstants.js";
+import { useHydrated } from "@/client/modules/shared/hooks/useHydrated.js";
 
 function defaultCustomRange() {
   const end = new Date();
@@ -23,18 +24,19 @@ export default function AnalyticsPeriodFilter({
   customRange,
   onCustomRangeChange,
 }) {
+  const hydrated = useHydrated();
   const [modalOpen, setModalOpen] = useState(false);
   const [draft, setDraft] = useState(customRange);
 
   function openCustom() {
     setDraft(customRange);
-    onPeriodChange("custom");
     setModalOpen(true);
   }
 
   function applyCustom() {
     if (draft.start && draft.end && draft.start <= draft.end) {
       onCustomRangeChange(draft);
+      onPeriodChange("custom");
       setModalOpen(false);
     }
   }
@@ -61,15 +63,15 @@ export default function AnalyticsPeriodFilter({
             );
           })}
         </div>
-        {period === "custom" && customRange.start && customRange.end ? (
+        {hydrated && period === "custom" && customRange.start && customRange.end ? (
           <p className="text-on-surface-variant inline-flex items-center gap-1.5 text-xs">
             <CalendarRange className="text-primary h-3.5 w-3.5" aria-hidden />
-            {new Date(customRange.start).toLocaleDateString("en-US", {
+            {new Date(`${customRange.start}T12:00:00`).toLocaleDateString("en-US", {
               month: "short",
               day: "numeric",
             })}
             {" – "}
-            {new Date(customRange.end).toLocaleDateString("en-US", {
+            {new Date(`${customRange.end}T12:00:00`).toLocaleDateString("en-US", {
               month: "short",
               day: "numeric",
               year: "numeric",

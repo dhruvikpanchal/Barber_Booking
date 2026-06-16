@@ -1,13 +1,10 @@
 import Link from "next/link";
 import { CalendarClock, ChevronRight } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";
-import { formatDateTime } from "@/modules/customer/data/appointmentsData.js";
+import { formatDateTime } from "@/client/modules/customer/helpers/appointmentsHelpers.js";
 import StatusBadge from "@/client/modules/shared/components/ui/StatusBadge";
-import { CUSTOMER_APPOINTMENT_STATUSES } from "@/client/modules/customer/constants/appointmentStatuses.js";
+import { CUSTOMER_APPOINTMENT_STATUSES } from "@/client/modules/customer/constants/appointmentStatusesConstants.js";
 
-/**
- * @param {{ appointments: typeof import('@/modules/customer/data/appointmentsData.js').MY_APPOINTMENTS }} props
- */
 export default function UpcomingBookingsWidget({ appointments }) {
   return (
     <section
@@ -70,7 +67,11 @@ export default function UpcomingBookingsWidget({ appointments }) {
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-2">
-                    <StatusBadge status={appt.status} config={CUSTOMER_APPOINTMENT_STATUSES} size="sm" />
+                    <StatusBadge
+                      status={appt.status}
+                      config={CUSTOMER_APPOINTMENT_STATUSES}
+                      size="sm"
+                    />
                     <ChevronRight
                       className="text-on-surface-variant h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100"
                       aria-hidden

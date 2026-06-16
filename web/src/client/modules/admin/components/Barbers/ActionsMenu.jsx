@@ -2,7 +2,7 @@
 
 import { MoreHorizontal } from "lucide-react";
 import { useState } from "react";
-import { getBarberActionsMenuItems } from "@/modules/admin/constants/admin.js";
+import { getBarberActionsMenuItems } from "@/client/modules/admin/constants/adminConstants.js";
 
 export default function ActionsMenu({ barber, onAction }) {
   const [open, setOpen] = useState(false);

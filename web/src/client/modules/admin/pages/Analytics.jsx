@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Users,
   Scissors,
@@ -15,113 +15,129 @@ import {
   ArrowUpRight,
   ArrowDownRight,
 } from "lucide-react";
-import { Toast } from "@/client/modules/shared/components/common/settings/TinyPrimitives.jsx";
+import { toast } from "sonner";
 import { SkeletonLoader } from "@/client/modules/admin/components/Analytics/SkeletonLoader.jsx";
-import { QueueOverviewChart } from "@/client/modules/admin/components/Analytics/LineChart.jsx";
-import { RechartsBarChart } from "@/client/modules/admin/components/Analytics/BarChart.jsx";
-import {
-  ANALYTICS_DATA,
-  LIVE_QUEUE_ANALYTICS,
-  QUEUE_OVERVIEW_DATA,
-} from "@/client/modules/admin/data/analyticsData.js";
+import QueueOverviewChart from "@/client/modules/shared/components/charts/QueueOverviewChart.jsx";
+import VerticalBarChart from "@/client/modules/shared/components/charts/VerticalBarChart.jsx";
+import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
+
+function buildTrendChartData(trend) {
+  if (!trend?.labels?.length) {
+    return [{ city: "Platform", waiting: 0, inService: 0, chairsTotal: 0 }];
+  }
+  return trend.labels.map((label, i) => ({
+    city: label,
+    waiting: 0,
+    inService: trend.data?.[i] ?? 0,
+    chairsTotal: trend.data?.[i] ?? 0,
+  }));
+}
 
 export default function AdminAnalytics() {
-  const [filter, setFilter] = useState("month"); // 'today' | 'week' | 'month' | 'year' | 'custom'
+  const [filter, setFilter] = useState("month");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [isCustomApplied, setIsCustomApplied] = useState(false);
 
-  // Auto-dismiss toast
-  const showToast = useCallback((message, type = "success") => {
-    setToast({ message, type });
-  }, []);
+  const shouldFetch = filter !== "custom" || isCustomApplied;
 
-  const handleCloseToast = useCallback(() => {
-    setToast(null);
-  }, []);
+  const queryParams = useMemo(() => {
+    if (filter === "custom" && isCustomApplied) {
+      return { period: "custom", start: startDate, end: endDate };
+    }
+    if (filter !== "custom") {
+      return { period: filter };
+    }
+    return "";
+  }, [filter, startDate, endDate, isCustomApplied]);
 
-  // Handle filter changes (includes simulation loading state)
+  const {
+    data: analytics,
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = adminHook.Analytics.useAnalytics(shouldFetch ? queryParams : "");
+
+  const busy = isPending || exporting;
+
+  useEffect(() => {
+    if (isError) {
+      toast.error(error?.message || "Could not load analytics.");
+    }
+  }, [isError, error]);
+
   const handleFilterChange = (newFilter) => {
     setFilter(newFilter);
     setIsCustomApplied(false);
-
-    if (newFilter !== "custom") {
-      setLoading(true);
-      const timer = setTimeout(() => {
-        setLoading(false);
-      }, 700);
-      return () => clearTimeout(timer);
-    }
   };
 
-  // Apply custom dates
   const handleApplyCustomDates = (e) => {
     e.preventDefault();
     if (!startDate || !endDate) {
-      showToast("Please select both start and end dates.", "error");
+      toast.error("Please select both start and end dates.");
       return;
     }
     if (new Date(startDate) > new Date(endDate)) {
-      showToast("Start date cannot be after end date.", "error");
+      toast.error("Start date cannot be after end date.");
       return;
     }
-
-    setLoading(true);
-    const timer = setTimeout(() => {
-      setLoading(false);
-      setIsCustomApplied(true);
-      showToast("Custom date range filter applied.", "success");
-    }, 850);
-    return () => clearTimeout(timer);
+    setIsCustomApplied(true);
+    toast.success("Custom date range filter applied.");
   };
 
-  // Simulate exporting report
   const handleExportReport = async () => {
     setExporting(true);
-    await new Promise((r) => setTimeout(r, 1200));
+    await new Promise((r) => setTimeout(r, 800));
     setExporting(false);
-    showToast(`Platform report (${filter.toUpperCase()}) exported successfully.`, "success");
+    toast.success(`Platform report (${filter.toUpperCase()}) export queued.`);
   };
 
-  // Generate dataset based on active filter
   const currentData = useMemo(() => {
-    if (filter === "custom") {
-      if (!isCustomApplied) {
-        return null; // Prompt custom dates input
-      }
-      // Simulate custom dataset selection based on duration in days
-      const daysDiff = Math.ceil(
-        Math.abs(new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24),
-      );
+    if (!analytics) return null;
+    return {
+      stats: analytics.stats ?? [],
+      serviceUsage: analytics.serviceUsage ?? { data: [], labels: [] },
+      insights: analytics.insights ?? {},
+      summary: analytics.summary ?? {},
+      appointmentsTrends: analytics.appointmentsTrends ?? { data: [], labels: [] },
+    };
+  }, [analytics]);
 
-      if (daysDiff <= 2) {
-        return ANALYTICS_DATA.today;
-      } else if (daysDiff <= 9) {
-        return ANALYTICS_DATA.week;
-      } else if (daysDiff <= 45) {
-        return ANALYTICS_DATA.month;
-      } else {
-        return ANALYTICS_DATA.year;
-      }
-    }
-    return ANALYTICS_DATA[filter] || ANALYTICS_DATA.month;
-  }, [filter, startDate, endDate, isCustomApplied]);
+  const trendChartData = useMemo(
+    () => buildTrendChartData(currentData?.appointmentsTrends),
+    [currentData],
+  );
 
-  // If search matches "2030" or future (empty state simulation)
-  const isEmptyState = useMemo(() => {
-    if (filter === "custom" && isCustomApplied) {
-      const yearStart = new Date(startDate).getFullYear();
-      if (yearStart >= 2029) return true;
-    }
-    return false;
-  }, [filter, isCustomApplied, startDate]);
+  const isEmptyState =
+    shouldFetch &&
+    !isPending &&
+    !isError &&
+    currentData &&
+    currentData.summary?.totalAppointments === 0 &&
+    currentData.stats.every((s) => s.value === "0" || s.value === 0);
+
+  const showCustomPrompt = filter === "custom" && !isCustomApplied;
+
+  if (isPending && shouldFetch && !currentData) {
+    return (
+      <div className="mx-auto max-w-7xl space-y-8 pb-4">
+        <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="space-y-2">
+            <p className="font-label-caps text-primary">Admin · Monitoring</p>
+            <h1 className="text-on-surface font-serif text-2xl font-bold tracking-tight md:text-3xl">
+              Platform Analytics
+            </h1>
+          </div>
+        </header>
+        <SkeletonLoader />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 pb-4">
-      {/* Page Header */}
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="space-y-2">
           <p className="font-label-caps text-primary">Admin · Monitoring</p>
@@ -140,9 +156,7 @@ export default function AdminAnalytics() {
           <button
             type="button"
             onClick={handleExportReport}
-            disabled={
-              loading || exporting || (filter === "custom" && !isCustomApplied) || isEmptyState
-            }
+            disabled={busy || showCustomPrompt || isEmptyState || isError}
             className="bg-primary text-on-primary inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-bold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {exporting ? (
@@ -156,9 +170,7 @@ export default function AdminAnalytics() {
         </div>
       </header>
 
-      {/* Main Container */}
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 md:px-8 md:py-8">
-        {/* Filters and Search Bar */}
         <div className="border-outline-variant/60 bg-surface-container-low rounded-xl border p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-2">
@@ -172,8 +184,10 @@ export default function AdminAnalytics() {
               {["today", "week", "month", "year", "custom"].map((item) => (
                 <button
                   key={item}
+                  type="button"
+                  disabled={busy}
                   onClick={() => handleFilterChange(item)}
-                  className={`rounded-md px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                  className={`rounded-md px-3.5 py-1.5 text-xs font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
                     filter === item
                       ? "bg-primary text-on-primary shadow-sm"
                       : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
@@ -189,7 +203,6 @@ export default function AdminAnalytics() {
             </div>
           </div>
 
-          {/* Custom Date Form */}
           {filter === "custom" && (
             <form
               onSubmit={handleApplyCustomDates}
@@ -203,7 +216,8 @@ export default function AdminAnalytics() {
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="border-outline-variant bg-surface-container text-on-surface focus:border-primary h-9 w-full rounded-md border px-3 text-xs focus:outline-none"
+                  disabled={busy}
+                  className="border-outline-variant bg-surface-container text-on-surface focus:border-primary h-9 w-full rounded-md border px-3 text-xs focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
               <div className="flex-1 space-y-1">
@@ -214,12 +228,14 @@ export default function AdminAnalytics() {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="border-outline-variant bg-surface-container text-on-surface focus:border-primary h-9 w-full rounded-md border px-3 text-xs focus:outline-none"
+                  disabled={busy}
+                  className="border-outline-variant bg-surface-container text-on-surface focus:border-primary h-9 w-full rounded-md border px-3 text-xs focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                 />
               </div>
               <button
                 type="submit"
-                className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 h-9 shrink-0 rounded-md border px-5 text-xs font-semibold transition-all active:scale-95"
+                disabled={busy}
+                className="bg-primary/10 border-primary/20 text-primary hover:bg-primary/20 h-9 shrink-0 rounded-md border px-5 text-xs font-semibold transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Apply Range
               </button>
@@ -227,11 +243,22 @@ export default function AdminAnalytics() {
           )}
         </div>
 
-        {/* Content States */}
-        {loading ? (
+        {isError ? (
+          <div className="border-outline-variant bg-surface-container-low flex flex-col items-center justify-center rounded-xl border border-dashed p-12 text-center">
+            <AlertCircle className="text-on-surface-variant/40 mb-4 h-12 w-12" />
+            <h3 className="text-on-surface text-base font-bold">Could not load analytics</h3>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              disabled={busy}
+              className="text-primary mt-4 text-sm font-semibold hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Try again
+            </button>
+          </div>
+        ) : isPending ? (
           <SkeletonLoader />
-        ) : filter === "custom" && !isCustomApplied ? (
-          /* Prompt for Custom Date Range input */
+        ) : showCustomPrompt ? (
           <div className="border-outline-variant bg-surface-container-low flex flex-col items-center justify-center rounded-xl border border-dashed p-12 text-center">
             <Filter className="text-primary/40 mb-4 h-12 w-12 animate-bounce" />
             <h3 className="text-on-surface text-base font-bold">Select Custom Date Range</h3>
@@ -241,30 +268,29 @@ export default function AdminAnalytics() {
             </p>
           </div>
         ) : isEmptyState ? (
-          /* Custom Date Filter Empty State */
           <div className="border-outline-variant bg-surface-container-low flex flex-col items-center justify-center rounded-xl border border-dashed p-12 text-center">
             <AlertCircle className="text-on-surface-variant/40 mb-4 h-12 w-12" />
             <h3 className="text-on-surface text-base font-bold">No Platform Data Found</h3>
             <p className="text-on-surface-variant mt-2 max-w-sm text-xs leading-relaxed">
-              There are no platform bookings, customer registrations or ratings recorded between{" "}
-              {startDate} and {endDate}.
+              There are no platform bookings, customer registrations or ratings recorded for the
+              selected period.
             </p>
             <button
+              type="button"
+              disabled={busy}
               onClick={() => {
                 setFilter("month");
                 setIsCustomApplied(false);
                 setStartDate("");
                 setEndDate("");
               }}
-              className="bg-primary text-on-primary mt-5 h-9 rounded-md px-4 text-xs font-semibold transition-all hover:opacity-95 active:scale-95"
+              className="bg-primary text-on-primary mt-5 h-9 rounded-md px-4 text-xs font-semibold transition-all hover:opacity-95 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Reset Filters
             </button>
           </div>
         ) : currentData ? (
-          /* Render Active Dashboards */
           <div className="space-y-8">
-            {/* Top StatTiles grid */}
             <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
               {currentData.stats.map((stat, i) => {
                 let Icon = Users;
@@ -327,39 +353,32 @@ export default function AdminAnalytics() {
               })}
             </section>
 
-            {/* Charts Grid */}
             <section className="grid gap-6 md:grid-cols-2">
-              {/* Customer Growth Line Chart */}
               <div className="border-outline-variant/60 bg-surface-container-low rounded-xl border p-5 shadow-sm">
-                <QueueOverviewChart cities={LIVE_QUEUE_ANALYTICS} />
+                <QueueOverviewChart cities={trendChartData} />
               </div>
 
-              {/* Appointment Trends Line Chart */}
               <div className="border-outline-variant/60 bg-surface-container-low rounded-xl border p-5 shadow-sm">
-                <QueueOverviewChart cities={LIVE_QUEUE_ANALYTICS} />
+                <QueueOverviewChart cities={trendChartData} />
               </div>
 
-              {/* Barber Registration Growth Bar Chart */}
               <div className="border-outline-variant/60 bg-surface-container-low rounded-xl border p-5 shadow-sm">
-                <QueueOverviewChart cities={LIVE_QUEUE_ANALYTICS} />
+                <QueueOverviewChart cities={trendChartData} />
               </div>
 
-              {/* Service Usage Bar Chart */}
               <div className="border-outline-variant/60 bg-surface-container-low rounded-xl border p-5 shadow-sm">
-                <RechartsBarChart
+                <VerticalBarChart
                   data={currentData.serviceUsage.data}
                   labels={currentData.serviceUsage.labels}
                   title="Top 5 Most Demanded Services"
                 />
               </div>
 
-              {/* Rating Trends Line Chart */}
               <div className="border-outline-variant/60 bg-surface-container-low rounded-xl border p-5 shadow-sm md:col-span-2">
-                <QueueOverviewChart cities={QUEUE_OVERVIEW_DATA} />
+                <QueueOverviewChart cities={trendChartData} />
               </div>
             </section>
 
-            {/* Insights Section */}
             <section className="space-y-3">
               <div className="flex items-center gap-2 pl-1">
                 <Sparkles className="text-primary h-4 w-4" />
@@ -426,48 +445,37 @@ export default function AdminAnalytics() {
               </div>
             </section>
 
-            {/* Reports Section Table */}
             <section className="border-outline-variant bg-surface-container-low overflow-hidden rounded-xl border">
               <div className="border-outline-variant/80 bg-surface-container-low border-b px-5 py-4">
                 <h3 className="text-on-surface text-xs font-bold tracking-wider uppercase">
-                  Report Breakdown ({filter.toUpperCase()})
+                  Period Summary ({filter.toUpperCase()})
                 </h3>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-left text-xs">
-                  <thead className="border-outline-variant bg-surface-container-lowest text-on-surface-variant border-b font-semibold">
-                    <tr>
-                      <th className="px-5 py-3">Timeframe</th>
-                      <th className="px-5 py-3 text-right">Barbers Registered</th>
-                      <th className="px-5 py-3 text-right">New Customers</th>
-                      <th className="px-5 py-3 text-right">Total Appointments</th>
-                      <th className="px-5 py-3 text-right">Service Formats</th>
-                      <th className="px-5 py-3 text-right">Avg Rating Audit</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-outline-variant/45 divide-y">
-                    {currentData.reports.map((row, i) => (
-                      <tr key={i} className="hover:bg-surface-container-high transition-colors">
-                        <td className="text-on-surface px-5 py-3 font-semibold">{row.period}</td>
-                        <td className="text-on-surface px-5 py-3 text-right">{row.barbers}</td>
-                        <td className="text-on-surface px-5 py-3 text-right">{row.customers}</td>
-                        <td className="text-on-surface px-5 py-3 text-right">{row.appointments}</td>
-                        <td className="text-on-surface px-5 py-3 text-right">{row.services}</td>
-                        <td className="px-5 py-3 text-right font-medium text-yellow-500">
-                          {row.rating.toFixed(2)} ★
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  { label: "Total appointments", value: currentData.summary.totalAppointments },
+                  { label: "Completed", value: currentData.summary.completedAppointments },
+                  { label: "New customers", value: currentData.summary.totalCustomers },
+                  {
+                    label: "Revenue",
+                    value: `$${Number(currentData.summary.totalRevenue ?? 0).toLocaleString()}`,
+                  },
+                ].map((row) => (
+                  <div
+                    key={row.label}
+                    className="border-outline-variant bg-surface-container rounded-lg border p-4"
+                  >
+                    <p className="text-on-surface-variant text-[10px] font-bold uppercase">
+                      {row.label}
+                    </p>
+                    <p className="text-on-surface mt-2 font-serif text-xl font-bold">{row.value}</p>
+                  </div>
+                ))}
               </div>
             </section>
           </div>
         ) : null}
       </div>
-
-      {/* Success/Error Toast notification */}
-      {toast && <Toast message={toast.message} type={toast.type} onClose={handleCloseToast} />}
     </div>
   );
 }

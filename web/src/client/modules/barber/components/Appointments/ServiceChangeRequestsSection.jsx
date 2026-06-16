@@ -1,13 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowRight, Check, History, RefreshCw, X } from "lucide-react";
+import { ArrowRight, Check, History, X, RefreshCw } from "lucide-react";
 import {
   acceptServiceChangeRequest,
   rejectServiceChangeRequest,
   useServiceChangeStore,
 } from "@/lib/storage/serviceChangeStore.js";
-import { formatMoney } from "@/modules/customer/data/appointmentsData.js";
+import { formatMoney } from "@/client/lib/format/formatMoney.js";
 
 function ServiceChips({ services, label }) {
   return (

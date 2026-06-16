@@ -1,107 +1,105 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { User, Mail, Phone, Camera, Calendar, Sparkles, Briefcase, Save } from "lucide-react";
 import {
-  User,
-  Mail,
-  Phone,
-  Camera,
-  Calendar,
-  Sparkles,
-  AlertCircle,
-  Briefcase,
-  Save,
-} from "lucide-react";
-import { INITIAL_PROFILE, formatMemberSince } from "@/client/modules/admin/data/profileData.js";
+  mapAdminProfile,
+  mapAdminProfileToApi,
+} from "@/client/modules/admin/helpers/adminMappers.js";
+import { formatMemberSince } from "@/client/modules/admin/helpers/profileHelpers.js";
 import {
   Card,
   FieldLabel,
   Input,
   SaveButton,
-  Toast,
-} from "@/client/modules/shared/components/common/settings/TinyPrimitives.jsx";
+} from "@/client/modules/shared/components/settings/TinyPrimitives.jsx";
+import { toast } from "sonner";
+import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
 
 export default function AdminProfile() {
-  const [form, setForm] = useState(INITIAL_PROFILE);
-  const [errors, setErrors] = useState({});
-  const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState(null);
+  const { data: profileData, isPending, isError, error, refetch } = adminHook.Profile.useProfile();
+  const updateMutation = adminHook.Profile.useUpdateProfile();
+  const [profile, setProfile] = useState(null);
 
-  const showToast = useCallback((message, type = "success") => {
-    setToast({ message, type });
-  }, []);
+  const busy = isPending || updateMutation.isPending;
 
-  const handleCloseToast = useCallback(() => {
-    setToast(null);
-  }, []);
-
-  const validate = useCallback(() => {
-    const nextErrors = {};
-    if (!form.fullName.trim()) {
-      nextErrors.fullName = "Full name is required";
-    } else if (form.fullName.trim().length < 2) {
-      nextErrors.fullName = "Full name must be at least 2 characters";
+  useEffect(() => {
+    if (isError) {
+      toast.error(error?.message || "Failed to load profile");
     }
+  }, [isError, error]);
 
-    if (!form.phone.trim()) {
-      nextErrors.phone = "Phone number is required";
-    } else {
-      const cleanPhone = form.phone.replace(/[^0-9]/g, "");
-      if (cleanPhone.length < 8) {
-        nextErrors.phone = "Please enter a valid phone number";
-      }
-    }
+  useEffect(() => {
+    if (profileData) setProfile(mapAdminProfile(profileData));
+  }, [profileData]);
 
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
-  }, [form.fullName, form.phone]);
+  const memberLabel = useMemo(() => formatMemberSince(profile?.createdAt), [profile?.createdAt]);
 
-  const handleAvatarChange = useCallback(
-    (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+  const handleChange = (field) => (e) => {
+    setProfile((prev) => ({
+      ...prev,
+      [field]: e.target.value,
+    }));
+  };
 
-      if (!file.type.startsWith("image/")) {
-        showToast("Only image files are allowed", "error");
-        return;
-      }
+  const handleAvatarChange = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-      if (file.size > 5 * 1024 * 1024) {
-        showToast("Image must be smaller than 5MB", "error");
-        return;
-      }
+    const preview = URL.createObjectURL(file);
 
-      setForm((prev) => {
-        if (prev.photoUrl?.startsWith("blob:")) {
-          URL.revokeObjectURL(prev.photoUrl);
-        }
-        return { ...prev, photoUrl: URL.createObjectURL(file) };
-      });
-
-      showToast("Profile photo selected. Save changes to persist.", "info");
-      e.target.value = "";
-    },
-    [showToast],
-  );
+    setProfile((prev) => ({
+      ...prev,
+      photo: preview,
+      photoUrl: preview,
+    }));
+  }, []);
 
   const handleSave = useCallback(
     async (e) => {
       e.preventDefault();
-      if (!validate()) {
-        showToast("Please correct the errors in the form.", "error");
-        return;
-      }
+      if (busy) return;
 
-      setSaving(true);
-      // Simulate API update call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setSaving(false);
-      showToast("Profile details updated successfully.", "success");
+      try {
+        await toast.promise(updateMutation.mutateAsync(mapAdminProfileToApi(profile)), {
+          loading: "Saving profile…",
+          success: "Profile updated.",
+          error: "Failed to update profile.",
+        });
+        await refetch();
+      } catch {
+        /* toast handles error */
+      }
     },
-    [validate, showToast],
+    [profile, updateMutation, refetch, busy],
   );
 
-  const memberLabel = formatMemberSince(form.joinedAt);
+  if (isPending && !profile) {
+    return (
+      <div className="mx-auto max-w-6xl space-y-6 pb-28">
+        <div className="bg-surface-container h-32 animate-pulse rounded-xl" />
+        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="text-on-surface mx-auto max-w-6xl py-16 text-center">
+        <p>{error?.message ?? "Profile unavailable."}</p>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          disabled={busy}
+          className="text-primary mt-3 text-sm font-semibold hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  const fieldDisabled = busy;
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 pb-4">
@@ -142,10 +140,10 @@ export default function AdminProfile() {
                 <div className="border-outline-variant mb-2 flex flex-col gap-5 border-b pb-6 sm:flex-row sm:items-center">
                   <div className="relative mx-auto shrink-0 sm:mx-0">
                     <div className="border-outline-variant bg-surface-container relative h-20 w-20 overflow-hidden rounded-2xl border shadow-inner">
-                      {form.photoUrl ? (
+                      {profile?.photoUrl ? (
                         <img
-                          src={form.photoUrl}
-                          alt={form.fullName || "Profile avatar"}
+                          src={profile?.photoUrl}
+                          alt={profile?.fullName || "Profile avatar"}
                           className="h-full w-full object-cover"
                         />
                       ) : (
@@ -159,8 +157,9 @@ export default function AdminProfile() {
                       <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp,image/gif"
-                        className="sr-only"
                         onChange={handleAvatarChange}
+                        className="sr-only"
+                        disabled={busy}
                       />
                     </label>
                   </div>
@@ -176,16 +175,17 @@ export default function AdminProfile() {
                         <input
                           type="file"
                           accept="image/jpeg,image/png,image/webp,image/gif"
-                          className="sr-only"
                           onChange={handleAvatarChange}
+                          className="sr-only"
+                          disabled={busy}
                         />
                       </label>
-                      {form.photoUrl && (
+                      {profile?.photoUrl && (
                         <button
                           type="button"
                           onClick={() => {
-                            setForm((prev) => ({ ...prev, photoUrl: "" }));
-                            showToast("Photo removed.", "info");
+                            setProfile((prev) => ({ ...prev, photo: "" }));
+                            toast.success("Photo removed.");
                           }}
                           className="border-outline-variant bg-surface-container-low text-error hover:bg-surface-container inline-flex items-center justify-center rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors"
                         >
@@ -201,35 +201,23 @@ export default function AdminProfile() {
                   <div className="sm:col-span-2">
                     <FieldLabel>FULL NAME</FieldLabel>
                     <Input
+                      value={profile?.fullName}
                       type="text"
                       icon={User}
-                      value={form.fullName}
-                      onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+                      onChange={handleChange("fullName")}
                       placeholder="e.g. Marcus Vance"
                     />
-                    {errors.fullName && (
-                      <p className="text-error mt-1.5 flex items-center gap-1.5 text-[11px] font-medium">
-                        <AlertCircle className="h-3 w-3 shrink-0" aria-hidden />
-                        {errors.fullName}
-                      </p>
-                    )}
                   </div>
 
                   <div className="sm:col-span-2">
                     <FieldLabel>PHONE NUMBER</FieldLabel>
                     <Input
+                      value={profile?.phone}
                       type="tel"
                       icon={Phone}
-                      value={form.phone}
-                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                      onChange={handleChange("phone")}
                       placeholder="e.g. +1 (555) 831-2940"
                     />
-                    {errors.phone && (
-                      <p className="text-error mt-1.5 flex items-center gap-1.5 text-[11px] font-medium">
-                        <AlertCircle className="h-3 w-3 shrink-0" aria-hidden />
-                        {errors.phone}
-                      </p>
-                    )}
                   </div>
 
                   <div>
@@ -237,7 +225,7 @@ export default function AdminProfile() {
                     <Input
                       type="email"
                       icon={Mail}
-                      value={form.email}
+                      value={profile?.email}
                       disabled
                       className="bg-surface-container-low cursor-not-allowed opacity-60"
                     />
@@ -248,7 +236,7 @@ export default function AdminProfile() {
                     <Input
                       type="text"
                       icon={Briefcase}
-                      value={form.role}
+                      value={profile?.role}
                       disabled
                       className="bg-surface-container-low cursor-not-allowed opacity-60"
                     />
@@ -257,7 +245,12 @@ export default function AdminProfile() {
 
                 {/* Submit Action */}
                 <div className="border-outline-variant flex justify-end border-t pt-4">
-                  <SaveButton type="submit" saving={saving} label="SAVE CHANGES" icon={Save} />
+                  <SaveButton
+                    type="submit"
+                    saving={updateMutation.isPending}
+                    label="SAVE CHANGES"
+                    icon={Save}
+                  />
                 </div>
               </form>
             </Card>
@@ -274,10 +267,10 @@ export default function AdminProfile() {
                 <div className="relative h-24 w-24">
                   <div className="from-primary/30 to-primary/5 absolute inset-0 rounded-full bg-gradient-to-br p-[2px]">
                     <div className="border-surface-container bg-surface-container flex h-full w-full items-center justify-center overflow-hidden rounded-full border-2">
-                      {form.photoUrl ? (
+                      {profile.photoUrl ? (
                         <img
-                          src={form.photoUrl}
-                          alt={form.fullName || "Admin"}
+                          src={profile.photoUrl}
+                          alt={profile.fullName || "Admin"}
                           className="h-full w-full object-cover"
                         />
                       ) : (
@@ -286,12 +279,12 @@ export default function AdminProfile() {
                     </div>
                   </div>
                   <span className="font-label-caps border-primary/20 bg-primary/10 text-primary absolute -bottom-1.5 left-1/2 -translate-x-1/2 rounded-full border px-2.5 py-0.5 text-[9px] font-semibold tracking-wider">
-                    {form.role}
+                    {profile.role}
                   </span>
                 </div>
 
                 <h3 className="text-on-surface mt-5 font-serif text-lg font-bold tracking-tight">
-                  {form.fullName?.trim() || "Your Name"}
+                  {profile.fullName?.trim() || "Your Name"}
                 </h3>
                 <p className="text-on-surface-variant mt-1 inline-flex items-center justify-center gap-1 text-[11px] font-medium">
                   <Sparkles className="text-primary/80 h-3 w-3" aria-hidden />
@@ -309,7 +302,7 @@ export default function AdminProfile() {
                     <p className="font-label-caps text-on-surface-variant text-[9px] font-medium tracking-wide">
                       EMAIL
                     </p>
-                    <p className="text-on-surface font-medium break-all">{form.email}</p>
+                    <p className="text-on-surface font-medium break-all">{profile.email}</p>
                   </div>
                 </div>
 
@@ -322,7 +315,7 @@ export default function AdminProfile() {
                       PHONE
                     </p>
                     <p className="text-on-surface font-medium">
-                      {form.phone?.trim() ? form.phone : "—"}
+                      {profile.phone?.trim() ? profile.phone : "—"}
                     </p>
                   </div>
                 </div>
@@ -343,9 +336,6 @@ export default function AdminProfile() {
           </aside>
         </div>
       </div>
-
-      {/* Success/Error Toast notification */}
-      {toast && <Toast message={toast.message} type={toast.type} onClose={handleCloseToast} />}
     </div>
   );
 }

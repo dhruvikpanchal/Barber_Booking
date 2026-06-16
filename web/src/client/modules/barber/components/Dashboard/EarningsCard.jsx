@@ -1,10 +1,16 @@
-import { DollarSign, TrendingUp, Wallet } from "lucide-react";
-import Sparkline from "./Sparkline.jsx";
+"use client";
+
+import { TrendingUp, Wallet } from "lucide-react";
+import dynamic from "next/dynamic";
+
+const SparklineChart = dynamic(
+  () => import("@/client/modules/shared/components/charts/SparklineChart.jsx"),
+  { loading: () => <div className="h-14 w-full" aria-hidden /> },
+);
 
 export default function EarningsCard({ earnings }) {
-  const { today, yesterday, weekToDate, weekTarget, trend, tips } = earnings;
+  const { today, yesterday, weekToDate, trend } = earnings;
   const deltaPct = yesterday ? Math.round(((today - yesterday) / yesterday) * 100) : 0;
-  const goalPct = Math.min(100, Math.round((weekToDate / weekTarget) * 100));
 
   return (
     <section className="border-outline-variant bg-surface-container-low min-w-0 overflow-hidden rounded-xl border">
@@ -17,7 +23,7 @@ export default function EarningsCard({ earnings }) {
             <h2 className="text-on-surface font-serif text-base font-bold sm:text-lg">
               Estimated earnings
             </h2>
-            <p className="text-on-surface-variant text-xs">Tips included · ${tips} today</p>
+            <p className="text-on-surface-variant text-xs">From completed appointments</p>
           </div>
         </div>
         <span
@@ -39,30 +45,13 @@ export default function EarningsCard({ earnings }) {
           <p className="text-on-surface font-serif text-2xl font-bold sm:text-3xl">${today}</p>
           <p className="text-on-surface-variant mt-0.5 text-xs">Yesterday ${yesterday}</p>
           <div className="text-status-confirmed mt-2">
-            <Sparkline data={trend} />
+            <SparklineChart data={trend} />
           </div>
         </div>
-        <div className="border-outline-variant bg-surface-container flex flex-col justify-between rounded-lg border p-3">
-          <div>
-            <p className="font-label-caps text-on-surface-variant">Week to date</p>
-            <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              <p className="text-on-surface font-serif text-xl font-bold sm:text-2xl">
-                ${weekToDate}
-              </p>
-              <p className="text-on-surface-variant text-xs">/ ${weekTarget}</p>
-            </div>
-          </div>
-          <div className="mt-3">
-            <div className="bg-surface-container-high h-2 w-full overflow-hidden rounded-full">
-              <div className="bg-primary h-full rounded-full" style={{ width: `${goalPct}%` }} />
-            </div>
-            <div className="text-on-surface-variant mt-1 flex flex-col gap-1 text-[11px] sm:flex-row sm:items-center sm:justify-between">
-              <span>{goalPct}% of weekly goal</span>
-              <span className="inline-flex items-center gap-1">
-                <DollarSign className="h-3 w-3 shrink-0" aria-hidden />${weekTarget - weekToDate} to
-                go
-              </span>
-            </div>
+        <div className="border-outline-variant bg-surface-container rounded-lg border p-3">
+          <p className="font-label-caps text-on-surface-variant">Week to date</p>
+          <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <p className="text-on-surface font-serif text-xl font-bold sm:text-2xl">${weekToDate}</p>
           </div>
         </div>
       </div>

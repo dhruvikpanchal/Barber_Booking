@@ -8,7 +8,13 @@ import {
   SectionCard,
 } from "@/client/modules/shared/components/forms/FormPrimitives.jsx";
 
-export default function ProfileEditorSection({ profile, onPatch, onAvatarChange }) {
+export default function ProfileEditorSection({
+  profile,
+  photoUrl,
+  onPatch,
+  onAvatarChange,
+  disabled = false,
+}) {
   return (
     <SectionCard
       icon={User}
@@ -19,9 +25,10 @@ export default function ProfileEditorSection({ profile, onPatch, onAvatarChange 
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
           <div className="relative mx-auto shrink-0 sm:mx-0">
             <div className="relative h-[7.5rem] w-[7.5rem] overflow-hidden rounded-2xl border border-outline-variant bg-surface-container shadow-inner">
-              {profile.photoUrl ? (
+              {photoUrl ? (
                 <img
-                  src={profile.photoUrl}
+                  key={photoUrl}
+                  src={photoUrl}
                   alt={profile.fullName || "Profile preview"}
                   className="h-full w-full object-cover"
                 />
@@ -31,13 +38,16 @@ export default function ProfileEditorSection({ profile, onPatch, onAvatarChange 
                 </div>
               )}
             </div>
-            <label className="absolute -bottom-2 -right-2 flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border-2 border-surface-container-low bg-primary text-on-primary shadow-md transition-transform hover:scale-105 active:scale-95">
+            <label
+              className={`absolute -bottom-2 -right-2 flex h-11 w-11 items-center justify-center rounded-full border-2 border-surface-container-low bg-primary text-on-primary shadow-md transition-transform ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:scale-105 active:scale-95"}`}
+            >
               <Camera className="h-4 w-4" aria-hidden />
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/gif"
                 className="sr-only"
                 onChange={onAvatarChange}
+                disabled={disabled}
               />
             </label>
           </div>
@@ -63,6 +73,7 @@ export default function ProfileEditorSection({ profile, onPatch, onAvatarChange 
                 onChange={(e) => onPatch({ fullName: e.target.value })}
                 placeholder="Your full name"
                 autoComplete="name"
+                disabled={disabled}
               />
             </Field>
           </div>
@@ -71,10 +82,11 @@ export default function ProfileEditorSection({ profile, onPatch, onAvatarChange 
             <IconInput
               icon={Phone}
               type="tel"
-              value={profile.phone}
+                value={profile.phone ?? ""}
               onChange={(e) => onPatch({ phone: e.target.value })}
               placeholder="+1 (555) 000-0000"
               autoComplete="tel"
+              disabled={disabled}
             />
           </Field>
 
@@ -99,11 +111,12 @@ export default function ProfileEditorSection({ profile, onPatch, onAvatarChange 
             >
               <IconTextarea
                 icon={MapPin}
-                value={profile.address}
+                value={profile.address ?? ""}
                 onChange={(e) => onPatch({ address: e.target.value })}
                 placeholder="Street, apartment, city, state, ZIP"
                 rows={3}
                 autoComplete="street-address"
+                disabled={disabled}
               />
             </Field>
           </div>

@@ -33,7 +33,7 @@ function startOfMonth(d) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
-export default function BookingStep3DateTime({ booking, onSelect }) {
+export default function BookingStep3DateTime({ booking, onSelect, disabled = false }) {
   const today = useMemo(() => {
     const t = new Date();
     t.setHours(0, 0, 0, 0);
@@ -125,7 +125,8 @@ export default function BookingStep3DateTime({ booking, onSelect }) {
         <div className="mb-4 flex items-center justify-between">
           <button
             type="button"
-            onClick={() => goMonth(-1)}
+            onClick={() => !disabled && goMonth(-1)}
+            disabled={disabled}
             className="border-outline-variant text-on-surface-variant hover:border-outline hover:text-on-surface flex h-8 w-8 items-center justify-center rounded-md border transition-colors"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -135,7 +136,8 @@ export default function BookingStep3DateTime({ booking, onSelect }) {
           </p>
           <button
             type="button"
-            onClick={() => goMonth(1)}
+            onClick={() => !disabled && goMonth(1)}
+            disabled={disabled}
             className="border-outline-variant text-on-surface-variant hover:border-outline hover:text-on-surface flex h-8 w-8 items-center justify-center rounded-md border transition-colors"
           >
             <ChevronRight className="h-4 w-4" />
@@ -166,8 +168,8 @@ export default function BookingStep3DateTime({ booking, onSelect }) {
               <button
                 key={day}
                 type="button"
-                disabled={isPast}
-                onClick={() => pickDate(day)}
+                disabled={isPast || disabled}
+                onClick={() => !disabled && pickDate(day)}
                 className={`relative flex h-9 w-full items-center justify-center rounded-lg text-sm transition-all ${
                   isPast
                     ? "text-on-surface-variant/30 cursor-not-allowed"
@@ -221,10 +223,10 @@ export default function BookingStep3DateTime({ booking, onSelect }) {
                       <button
                         key={slot.id}
                         type="button"
-                        disabled={!slot.available}
-                        onClick={() => pickTime(slot)}
+                        disabled={disabled || !slot.available}
+                        onClick={() => !disabled && pickTime(slot)}
                         className={`rounded-md border py-2 text-xs font-medium transition-all ${
-                          !slot.available
+                          disabled || !slot.available
                             ? "border-outline-variant/40 text-on-surface-variant/30 cursor-not-allowed line-through"
                             : sel
                               ? "border-primary bg-primary text-on-primary shadow-sm"
@@ -251,10 +253,10 @@ export default function BookingStep3DateTime({ booking, onSelect }) {
                       <button
                         key={slot.id}
                         type="button"
-                        disabled={!slot.available}
-                        onClick={() => pickTime(slot)}
+                        disabled={disabled || !slot.available}
+                        onClick={() => !disabled && pickTime(slot)}
                         className={`rounded-md border py-2 text-xs font-medium transition-all ${
-                          !slot.available
+                          disabled || !slot.available
                             ? "border-outline-variant/40 text-on-surface-variant/30 cursor-not-allowed line-through"
                             : sel
                               ? "border-primary bg-primary text-on-primary shadow-sm"

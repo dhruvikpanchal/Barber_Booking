@@ -1,21 +1,52 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, UserPlus } from "lucide-react";
+import { toast } from "sonner";
 import WalkInCard from "@/client/modules/barber/components/WalkIns/WalkInCard";
 import WalkInFormModal from "@/client/modules/barber/components/WalkIns/WalkInFormModal";
 import QueueStats from "@/client/modules/barber/components/WalkIns/QueueStats";
-import { STATUS_ORDER, STATUSES, WALK_IN_TABS } from "@/client/modules/barber/constants/walk_In";
+import {
+  STATUS_ORDER,
+  STATUSES,
+  WALK_IN_TABS,
+} from "@/client/modules/barber/constants/walkInConstants";
 import { EMPTY_WALK_IN_FORM } from "@/client/modules/shared/constants/empty_form.js";
-import { INITIAL } from "@/client/modules/barber/data/walkinsData.js";
-import { createId } from "@/client/modules/shared/helpers/createId.js";
+import { barberHook, useBarberInvalidation } from "@/client/modules/barber/hooks/barberQuery.jsx";
+import { mapWalkIn, mapWalkInToApi, mapServiceFromApi } from "@/client/modules/barber/helpers/barberMappers.js";
 
 export default function WalkIns() {
-  const [entries, setEntries] = useState(INITIAL);
   const [tab, setTab] = useState("active");
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_WALK_IN_FORM);
   const [errors, setErrors] = useState({});
+
+  const listQuery = barberHook.WalkIns.useListWalkIns({
+    status: tab === "all" || tab === "active" ? "all" : tab,
+  });
+  const servicesQuery = barberHook.Services.useListServices(undefined, { enabled: formOpen });
+  const createMutation = barberHook.WalkIns.useCreateWalkIn();
+  const statusMutation = barberHook.WalkIns.useUpdateWalkInStatus();
+  const invalidate = useBarberInvalidation();
+
+  const busy =
+    listQuery.isPending ||
+    (formOpen && servicesQuery.isPending) ||
+    createMutation.isPending ||
+    statusMutation.isPending;
+
+  const barberServices = useMemo(
+    () => (servicesQuery.data?.services ?? []).map(mapServiceFromApi).filter((s) => s.active),
+    [servicesQuery.data?.services],
+  );
+
+  useEffect(() => {
+    if (listQuery.isError) {
+      toast.error(listQuery.error?.message || "Could not load walk-ins.");
+    }
+  }, [listQuery.isError, listQuery.error]);
+
+  const entries = useMemo(() => (listQuery.data ?? []).map(mapWalkIn), [listQuery.data]);
 
   const stats = useMemo(() => {
     const waiting = entries.filter((e) => e.status === "waiting").length;
@@ -53,6 +84,10 @@ export default function WalkIns() {
     return map;
   }, [entries]);
 
+  async function refetch() {
+    await listQuery.refetch();
+  }
+
   function patchForm(patch) {
     setForm((prev) => ({ ...prev, ...patch }));
     setErrors((prev) => {
@@ -63,6 +98,7 @@ export default function WalkIns() {
   }
 
   function openAdd() {
+    if (busy) return;
     setForm(EMPTY_WALK_IN_FORM);
     setErrors({});
     setFormOpen(true);
@@ -71,7 +107,8 @@ export default function WalkIns() {
   function validate() {
     const next = {};
     if (!form.name.trim()) next.name = "Customer name is required.";
-    if (!form.service) next.service = "Pick a service.";
+    if (!barberServices.length) next.service = "No services available. Please add a service first.";
+    else if (!form.service) next.service = "Pick a service.";
     const d = Number(form.duration);
     if (!form.duration || Number.isNaN(d) || d < 5)
       next.duration = "Duration must be at least 5 minutes.";
@@ -79,45 +116,54 @@ export default function WalkIns() {
     return Object.keys(next).length === 0;
   }
 
-  function submit() {
-    if (!validate()) return;
-    setEntries((prev) => [
-      ...prev,
-      {
-        id: createId(),
-        name: form.name.trim(),
-        phone: form.phone.trim(),
-        service: form.service,
-        duration: Number(form.duration),
-        notes: form.notes.trim(),
-        status: "waiting",
-        addedAt: Date.now(),
-      },
-    ]);
-    setFormOpen(false);
-    setForm(EMPTY_WALK_IN_FORM);
+  async function submit() {
+    if (!validate() || busy) return;
+    try {
+      await toast.promise(createMutation.mutateAsync(mapWalkInToApi(form)), {
+        loading: "Adding walk-in…",
+        success: "Walk-in added to queue",
+        error: "Could not add walk-in",
+      });
+      await refetch();
+      await invalidate.workflow();
+      setFormOpen(false);
+      setForm(EMPTY_WALK_IN_FORM);
+    } catch {
+      /* toast handles error */
+    }
+  }
+
+  async function advanceStatus(id, nextStatus) {
+    if (busy) return;
+    try {
+      await statusMutation.mutateAsync({
+        id,
+        status: nextStatus.toUpperCase().replace("-", "_"),
+      });
+      await refetch();
+      await invalidate.workflow();
+    } catch {
+      toast.error("Could not update walk-in status.");
+    }
   }
 
   function advance(id) {
-    setEntries((prev) =>
-      prev.map((e) => {
-        if (e.id !== id) return e;
-        if (e.status === "waiting") return { ...e, status: "in-service" };
-        if (e.status === "in-service") return { ...e, status: "done" };
-        return e;
-      }),
+    const entry = entries.find((e) => e.id === id);
+    if (!entry) return;
+    if (entry.status === "waiting") advanceStatus(id, "in-service");
+    else if (entry.status === "in-service") advanceStatus(id, "done");
+  }
+
+  const cancel = (id) => advanceStatus(id, "cancelled");
+  const reopen = (id) => advanceStatus(id, "waiting");
+
+  if (listQuery.isPending && entries.length === 0) {
+    return (
+      <div className="mx-auto max-w-6xl space-y-8 pb-4">
+        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
+        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
+      </div>
     );
-  }
-  function cancel(id) {
-    setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, status: "cancelled" } : e)));
-  }
-  function reopen(id) {
-    setEntries((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, status: "waiting", addedAt: Date.now() } : e)),
-    );
-  }
-  function remove(id) {
-    setEntries((prev) => prev.filter((e) => e.id !== id));
   }
 
   return (
@@ -135,7 +181,8 @@ export default function WalkIns() {
         <button
           type="button"
           onClick={openAdd}
-          className="bg-primary text-on-primary inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
+          disabled={busy}
+          className="bg-primary text-on-primary inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Plus className="h-4 w-4" aria-hidden />
           Add walk-in
@@ -158,38 +205,21 @@ export default function WalkIns() {
             </div>
           </div>
           <div className="scrollbar-thin border-outline-variant -mx-1 flex gap-1 overflow-x-auto rounded-lg border p-0.5">
-            {WALK_IN_TABS.map((t) => {
-              const active = tab === t.key;
-              const count =
-                t.key === "active"
-                  ? stats.waiting + stats.inService
-                  : t.key === "all"
-                    ? entries.length
-                    : entries.filter((e) => e.status === t.key).length;
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => setTab(t.key)}
-                  className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                    active
-                      ? "bg-primary text-on-primary"
-                      : "text-on-surface-variant hover:text-on-surface"
-                  }`}
-                >
-                  {t.label}
-                  <span
-                    className={`rounded-full px-1.5 text-[10px] font-bold ${
-                      active
-                        ? "bg-on-primary/20 text-on-primary"
-                        : "bg-surface-container text-on-surface-variant"
-                    }`}
-                  >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
+            {WALK_IN_TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => !busy && setTab(t.key)}
+                disabled={busy}
+                className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  tab === t.key
+                    ? "bg-primary text-on-primary"
+                    : "text-on-surface-variant hover:text-on-surface"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -203,7 +233,8 @@ export default function WalkIns() {
                 onAdvance={advance}
                 onCancel={cancel}
                 onReopen={reopen}
-                onRemove={remove}
+                onRemove={cancel}
+                disabled={busy}
               />
             ))
           ) : (
@@ -223,9 +254,11 @@ export default function WalkIns() {
         open={formOpen}
         form={form}
         errors={errors}
+        services={barberServices}
         onChange={patchForm}
         onClose={() => setFormOpen(false)}
         onSubmit={submit}
+        disabled={busy}
       />
     </div>
   );

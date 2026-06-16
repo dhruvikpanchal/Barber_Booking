@@ -1,19 +1,53 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Scissors } from "lucide-react";
-import {
-  ServiceCard,
-  formatMoney,
-} from "@/client/modules/barber/components/Services/ServiceCard.jsx";
+import { toast } from "sonner";
+import { ServiceCard } from "@/client/modules/barber/components/Services/ServiceCard.jsx";
 import DeleteConfirmModal from "@/client/modules/barber/components/Services/DeleteConfirmModal.jsx";
 import ServiceFormModal from "@/client/modules/barber/components/Services/ServiceFormModal.jsx";
 import { EMPTY_SERVICE_FORM } from "@/client/modules/shared/constants/empty_form.js";
-import { INITIAL_SERVICES } from "@/client/modules/barber/data/servicesData.js";
-import { createId } from "@/client/modules/shared/helpers/createId.js";
+import { formatMoney } from "@/client/lib/format/formatMoney.js";
+import { useQueryClient } from "@tanstack/react-query";
+import { barberHook } from "@/client/modules/barber/hooks/barberQuery.jsx";
+import { mapServiceFromApi, mapServiceToApi } from "@/client/modules/barber/helpers/barberMappers.js";
+
+function recomputeServiceStats(services) {
+  const active = services.filter((s) => s.isActive);
+  const prices = active.map((s) => s.price);
+  const durations = active.map((s) => s.duration);
+  return {
+    total: services.length,
+    active: active.length,
+    minPrice: prices.length ? Math.min(...prices) : 0,
+    maxPrice: prices.length ? Math.max(...prices) : 0,
+    avgDuration: durations.length
+      ? Math.round(durations.reduce((sum, value) => sum + value, 0) / durations.length)
+      : 0,
+  };
+}
+
+function patchServicesCache(queryClient, editingId, updated) {
+  queryClient.setQueryData(["barberListServices"], (current) => {
+    if (!current?.services) return current;
+    const services = editingId
+      ? current.services.map((service) => (service.id === editingId ? updated : service))
+      : [...current.services, updated];
+    return {
+      ...current,
+      services,
+      stats: recomputeServiceStats(services),
+    };
+  });
+}
 
 export default function BarberServices() {
-  const [services, setServices] = useState(INITIAL_SERVICES);
+  const queryClient = useQueryClient();
+  const { data, isPending, isError, error, refetch } = barberHook.Services.useListServices();
+  const createMutation = barberHook.Services.useCreateService();
+  const updateMutation = barberHook.Services.useUpdateService();
+  const deleteMutation = barberHook.Services.useDeleteService();
+
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_SERVICE_FORM);
@@ -22,20 +56,27 @@ export default function BarberServices() {
   const [saved, setSaved] = useState(false);
   const [filter, setFilter] = useState("all");
 
-  const stats = useMemo(() => {
-    const active = services.filter((s) => s.active);
-    const prices = active.map((s) => s.price);
-    const durations = active.map((s) => s.duration);
-    return {
-      total: services.length,
-      active: active.length,
-      minPrice: prices.length ? Math.min(...prices) : 0,
-      maxPrice: prices.length ? Math.max(...prices) : 0,
-      avgDuration: durations.length
-        ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
-        : 0,
-    };
-  }, [services]);
+  const busy =
+    isPending || createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
+
+  useEffect(() => {
+    if (isError) {
+      toast.error(error?.message || "Could not load services.");
+    }
+  }, [isError, error]);
+
+  const services = useMemo(
+    () => (data?.services ?? []).map(mapServiceFromApi),
+    [data],
+  );
+
+  const stats = data?.stats ?? {
+    total: services.length,
+    active: services.filter((s) => s.active).length,
+    minPrice: 0,
+    maxPrice: 0,
+    avgDuration: 0,
+  };
 
   const filtered = useMemo(() => {
     if (filter === "active") return services.filter((s) => s.active);
@@ -43,16 +84,16 @@ export default function BarberServices() {
     return services;
   }, [services, filter]);
 
-  function patchForm(patch) {
+  const patchForm = useCallback((patch) => {
     setForm((prev) => ({ ...prev, ...patch }));
     setErrors((prev) => {
       const next = { ...prev };
       for (const key of Object.keys(patch)) delete next[key];
       return next;
     });
-  }
+  }, []);
 
-  function validate() {
+  const validate = useCallback(() => {
     const next = {};
     if (!form.name.trim()) next.name = "Name is required.";
     const price = Number(form.price);
@@ -65,72 +106,125 @@ export default function BarberServices() {
     }
     setErrors(next);
     return Object.keys(next).length === 0;
-  }
+  }, [form]);
 
-  function openAdd() {
+  const openAdd = useCallback(() => {
+    if (busy) return;
     setEditingId(null);
     setForm(EMPTY_SERVICE_FORM);
     setErrors({});
     setFormOpen(true);
-  }
+  }, [busy]);
 
-  function openEdit(service) {
-    setEditingId(service.id);
-    setForm({
-      name: service.name,
-      description: service.description,
-      price: String(service.price),
-      duration: String(service.duration),
-      active: service.active,
-    });
-    setErrors({});
-    setFormOpen(true);
-    setServiceToDelete(null);
-  }
+  const openEdit = useCallback(
+    (service) => {
+      if (busy) return;
+      setEditingId(service.id);
+      setForm({
+        name: service.name,
+        description: service.description,
+        price: String(service.price),
+        duration: String(service.duration),
+        active: service.active,
+      });
+      setErrors({});
+      setFormOpen(true);
+      setServiceToDelete(null);
+    },
+    [busy],
+  );
 
-  function closeForm() {
+  const closeForm = useCallback(() => {
     setFormOpen(false);
     setEditingId(null);
     setForm(EMPTY_SERVICE_FORM);
     setErrors({});
-  }
+  }, []);
 
-  function handleSubmit() {
-    if (!validate()) return;
+  const handleSubmit = useCallback(async () => {
+    if (!validate() || busy) return;
+    const payload = mapServiceToApi(form);
+    const isEdit = Boolean(editingId);
 
-    const payload = {
-      name: form.name.trim(),
-      description: form.description.trim(),
-      price: Number(form.price),
-      duration: Number(form.duration),
-      active: form.active,
-    };
+    try {
+      const updated = isEdit
+        ? await updateMutation.mutateAsync({ id: editingId, ...payload })
+        : await createMutation.mutateAsync(payload);
 
-    if (editingId) {
-      setServices((prev) => prev.map((s) => (s.id === editingId ? { ...s, ...payload } : s)));
-    } else {
-      setServices((prev) => [...prev, { id: createId(), ...payload }]);
+      patchServicesCache(queryClient, isEdit ? editingId : null, updated);
+      await queryClient.refetchQueries({ queryKey: ["barberListServices"] });
+
+      toast.success(isEdit ? "Service updated" : "Service added");
+      closeForm();
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 2400);
+    } catch {
+      toast.error(isEdit ? "Could not save service" : "Could not add service");
     }
+  }, [
+    validate,
+    busy,
+    form,
+    editingId,
+    updateMutation,
+    createMutation,
+    queryClient,
+    closeForm,
+  ]);
 
-    closeForm();
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2400);
-  }
+  const requestDelete = useCallback(
+    (service) => {
+      if (!busy) setServiceToDelete(service);
+    },
+    [busy],
+  );
 
-  function requestDelete(service) {
-    setServiceToDelete(service);
-  }
-
-  function confirmDelete() {
-    if (!serviceToDelete) return;
+  const confirmDelete = useCallback(async () => {
+    if (!serviceToDelete || busy) return;
     const { id } = serviceToDelete;
-    setServices((prev) => prev.filter((s) => s.id !== id));
-    setServiceToDelete(null);
-    if (editingId === id) closeForm();
+    try {
+      await deleteMutation.mutateAsync(id);
+      queryClient.setQueryData(["barberListServices"], (current) => {
+        if (!current?.services) return current;
+        const services = current.services.filter((service) => service.id !== id);
+        return {
+          ...current,
+          services,
+          stats: recomputeServiceStats(services),
+        };
+      });
+      await queryClient.refetchQueries({ queryKey: ["barberListServices"] });
+      toast.success("Service deleted");
+      setServiceToDelete(null);
+      if (editingId === id) closeForm();
+    } catch {
+      toast.error("Could not delete service");
+    }
+  }, [serviceToDelete, busy, deleteMutation, queryClient, editingId, closeForm]);
+
+  if (isPending && services.length === 0) {
+    return (
+      <div className="mx-auto max-w-6xl space-y-8 pb-4">
+        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
+        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
+      </div>
+    );
   }
 
-  function cancelDelete() {
-    setServiceToDelete(null);
+  if (isError && services.length === 0) {
+    return (
+      <div className="text-on-surface mx-auto max-w-6xl py-16 text-center">
+        <p className="font-medium">Could not load services.</p>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          disabled={busy}
+          className="text-primary mt-3 text-sm font-semibold hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Try again
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -149,7 +243,8 @@ export default function BarberServices() {
         <button
           type="button"
           onClick={openAdd}
-          className="bg-primary text-on-primary inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
+          disabled={busy}
+          className="bg-primary text-on-primary inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-md px-5 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Plus className="h-4 w-4" aria-hidden />
           Add service
@@ -159,10 +254,7 @@ export default function BarberServices() {
       <div className="grid gap-3 sm:grid-cols-3">
         {[
           { label: "Total services", value: stats.total },
-          {
-            label: "Active for booking",
-            value: stats.active,
-          },
+          { label: "Active for booking", value: stats.active },
           {
             label: "Avg. duration",
             value: stats.avgDuration ? `${stats.avgDuration} min` : "—",
@@ -202,8 +294,9 @@ export default function BarberServices() {
               <button
                 key={tab.key}
                 type="button"
-                onClick={() => setFilter(tab.key)}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                onClick={() => !busy && setFilter(tab.key)}
+                disabled={busy}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                   filter === tab.key
                     ? "bg-primary text-on-primary"
                     : "text-on-surface-variant hover:text-on-surface"
@@ -223,6 +316,7 @@ export default function BarberServices() {
                 service={service}
                 onEdit={openEdit}
                 onDeleteRequest={requestDelete}
+                disabled={busy}
               />
             ))
           ) : (
@@ -236,7 +330,7 @@ export default function BarberServices() {
       </section>
 
       <p className="text-on-surface-variant text-center text-xs">
-        {saved ? "Services updated." : "Changes are local until your shop backend is connected."}
+        {saved ? "Services updated." : "Changes are saved to your account."}
       </p>
 
       <ServiceFormModal
@@ -248,12 +342,14 @@ export default function BarberServices() {
         onClose={closeForm}
         onSubmit={handleSubmit}
         submitLabel={editingId ? "Save changes" : "Add service"}
+        disabled={busy}
       />
 
       <DeleteConfirmModal
         service={serviceToDelete}
         onConfirm={confirmDelete}
-        onCancel={cancelDelete}
+        onCancel={() => setServiceToDelete(null)}
+        disabled={busy}
       />
     </div>
   );

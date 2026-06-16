@@ -1,6 +1,7 @@
 import { Star } from "lucide-react";
+import { reviews } from "@/client/modules/public/constants/reviewsConstants.js";
 
-export default function LandingTestimonials({ reviews = [] }) {
+export default function LandingTestimonials() {
   return (
     <section className="px-4 py-24 md:px-16">
       <div className="mx-auto max-w-6xl">

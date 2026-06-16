@@ -1,4 +1,7 @@
-import { TYPE_META, APPOINTMENT_TYPES } from "@/modules/customer/constants/notifications.js";
+import {
+  TYPE_META,
+  APPOINTMENT_TYPES,
+} from "@/client/modules/customer/constants/notificationsConstants.js";
 
 const STAT_GROUPS = [
   { key: "appointments", types: APPOINTMENT_TYPES, metaKey: "booking_confirmed" },

@@ -4,7 +4,7 @@ import {
   fullTimestamp,
   TypeBadge,
 } from "@/modules/admin/components/Notifications/Primitives.jsx";
-import { NOTIFICATION_VARIANT_CONFIG } from "@/modules/admin/constants/admin.js";
+import { NOTIFICATION_VARIANT_CONFIG } from "@/client/modules/admin/constants/adminConstants.js";
 
 export function NotificationCard({ notification, onMarkRead, onDelete }) {
   const cfg =

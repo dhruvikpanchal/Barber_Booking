@@ -9,18 +9,21 @@ import {
   getProfileHref,
   getSettingsHref,
 } from "@/config/routes/profileRoutes.js";
+import { useHeaderProfile } from "@/client/modules/shared/hooks/useHeaderProfile.js";
+import { barberHook } from "@/client/modules/barber/hooks/barberQuery.jsx";
 
 export default function DashboardTopbar({ role = "customer", actions }) {
   const notificationsHref = getNotificationsHref(role);
   const ProfileHref = getProfileHref(role);
   const SettingsHref = getSettingsHref(role);
+  const profile = useHeaderProfile(role);
+  const { data: barberUnread } = barberHook.Notifications.useUnreadNotificationCount({
+    enabled: role === "barber",
+    refetchInterval: 60_000,
+  });
 
-  const profile =
-    role === "admin"
-      ? { name: "Admin", initials: "A", email: "admin@ironandoak.app" }
-      : role === "barber"
-        ? { name: "Marco D.", initials: "M", email: "marco@ironandoak.app" }
-        : { name: "Alex K.", initials: "A", email: "alex@ironandoak.app" };
+  const notificationCount =
+    role === "barber" ? (barberUnread?.count ?? 0) : role === "customer" ? undefined : 0;
 
   const placeholder =
     role === "admin"
@@ -49,7 +52,7 @@ export default function DashboardTopbar({ role = "customer", actions }) {
 
       <div className="ml-auto flex items-center gap-1 md:gap-2">
         {actions}
-        <NotificationBell count={3} href={notificationsHref} />
+        <NotificationBell count={notificationCount ?? 0} href={notificationsHref} />
         <UserMenu
           {...profile}
           profileHref={ProfileHref}

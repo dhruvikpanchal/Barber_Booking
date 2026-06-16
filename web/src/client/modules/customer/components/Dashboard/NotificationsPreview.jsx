@@ -2,11 +2,8 @@ import Link from "next/link";
 import { Bell, ChevronRight } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";
 import { getNotificationDeepLink } from "@/config/routes/notificationRoutes";
-import { TYPE_META } from "@/modules/customer/constants/notifications.js";
+import { TYPE_META } from "@/client/modules/customer/constants/notificationsConstants.js";
 
-/**
- * @param {{ notifications: typeof import('@/modules/customer/data/notificationsData.js').INITIAL_NOTIFICATIONS, unreadCount: number }} props
- */
 export default function NotificationsPreview({ notifications, unreadCount }) {
   return (
     <section

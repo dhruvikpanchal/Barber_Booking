@@ -1,4 +1,5 @@
-import api, { clearAuthTokens, getRefreshToken, setAuthTokens } from "@/lib/axios";
+import api, { getRefreshToken, setAuthTokens } from "@/lib/axios";
+import { clearAuthSession } from "@/client/lib/auth/session.js";
 
 /**
  * Generic POST helper
@@ -56,6 +57,9 @@ export const authServices = {
   // Verify reset token (OTP step)
   verifyResetToken: (data) => post("/auth/verify-reset-token", data),
 
+  // Validate password-reset flow token (guards verify step)
+  validateResetFlow: (data) => post("/auth/validate-reset-flow", data),
+
   // Reset Password
   resetPassword: (data) => post("/auth/reset-password", data),
 
@@ -66,7 +70,7 @@ export const authServices = {
     } catch (error) {
       console.error("Logout failed:", error);
     } finally {
-      clearAuthTokens();
+      clearAuthSession();
     }
   },
 };

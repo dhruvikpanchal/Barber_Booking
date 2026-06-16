@@ -14,8 +14,12 @@ import SidebarShell from "./SidebarShell";
 import SidebarSection from "./SidebarSection";
 import SidebarItem from "./SidebarItem";
 import { routes } from "@/config/routes/routes.js";
+import { customerHook } from "@/client/modules/customer/hooks/customerQuery.jsx";
 
 export default function CustomerSidebar() {
+  const { data: unreadData } = customerHook.Notifications.useGetUnreadNotificationCount();
+  const unreadCount = unreadData?.count ?? 0;
+
   return (
     <SidebarShell>
       <SidebarSection label="Main">
@@ -33,7 +37,6 @@ export default function CustomerSidebar() {
           href={routes.customer.myAppointments}
           icon={CalendarDays}
           label="My appointments"
-          badge="2"
         />
         <SidebarItem
           href={routes.customer.favorites}
@@ -46,6 +49,7 @@ export default function CustomerSidebar() {
           href={routes.customer.notifications}
           icon={Bell}
           label="Notifications"
+          badge={unreadCount > 0 ? (unreadCount > 9 ? "9+" : String(unreadCount)) : undefined}
         />
         <SidebarItem
           href={routes.customer.reviews}

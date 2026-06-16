@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -14,15 +14,17 @@ import {
   User,
   Lock,
 } from "lucide-react";
+import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
-import { buildHistory } from "@/client/modules/barber/data/reviewsData.js";
-import { saveBarberReply, useMergedReview } from "@/client/lib/storage/barberReviewRepliesStore.js";
+import { enrich } from "@/client/modules/barber/helpers/reviewsHelpers.js";
+import { mapReview } from "@/client/modules/barber/helpers/barberMappers.js";
 import { formatDateLabel } from "@/client/lib/format/formatDateTime.js";
 import { ReplyModal } from "@/client/modules/barber/components/Reviews/ReplyModal.jsx";
 import { formatShortDate } from "@/client/lib/format/formatDateTime.js";
 import { StarRow } from "@/client/modules/shared/components/ui/StarRow.jsx";
 import RatingBreakdown from "@/client/modules/barber/components/Reviews/RatingBreakdown.jsx";
 import ReviewHistory from "@/client/modules/barber/components/Reviews/ReviewHistory.jsx";
+import { barberHook } from "@/client/modules/barber/hooks/barberQuery.jsx";
 
 function InfoLine({ icon: Icon, label, value }) {
   if (!value) return null;
@@ -37,31 +39,79 @@ function InfoLine({ icon: Icon, label, value }) {
   );
 }
 
-/**
- * @param {{ review: import('@/client/modules/barber/data/reviewsData.js').INITIAL_REVIEWS[number] }} props
- */
-export default function ReviewDetail({ review: initialReview }) {
-  const review = useMergedReview(initialReview);
+export default function ReviewDetail({ reviewId }) {
+  const {
+    data: reviewFromQuery,
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = barberHook.Reviews.useGetReview(reviewId);
+  const replyMutation = barberHook.Reviews.useReplyToReview();
+
   const [replyOpen, setReplyOpen] = useState(false);
-  const [toast, setToast] = useState(null);
 
-  const history = buildHistory(review);
-  const canReply = !review.hasReply && !review.reply;
+  const busy = isPending || replyMutation.isPending;
 
-  const showToast = useCallback((message, type = "success") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
-  }, []);
+  const review = useMemo(() => {
+    if (!reviewFromQuery) return null;
+    return enrich(mapReview(reviewFromQuery));
+  }, [reviewFromQuery]);
 
-  const handleSubmitReply = (id, text) => {
-    const result = saveBarberReply(id, text);
-    if (!result.ok) {
-      showToast(result.error ?? "Could not save reply.", "info");
-      return;
+  const history = review?.history ?? [];
+  const canReply = review ? !review.hasReply && !review.reply : false;
+
+  useEffect(() => {
+    if (isError) {
+      toast.error(error?.message || "Could not load review.");
     }
-    setReplyOpen(false);
-    showToast("Reply posted. It cannot be edited or removed.");
-  };
+  }, [isError, error]);
+
+  const handleSubmitReply = useCallback(
+    async (id, text) => {
+      if (busy) return;
+      if (review?.reply) {
+        toast.error("This review already has a reply.");
+        setReplyOpen(false);
+        return;
+      }
+      try {
+        await toast.promise(replyMutation.mutateAsync({ id, reply: text }), {
+          loading: "Posting reply…",
+          success: "Reply posted. It cannot be edited or removed.",
+          error: "Could not save reply.",
+        });
+        await refetch();
+        setReplyOpen(false);
+      } catch {
+        /* toast handles error */
+      }
+    },
+    [busy, review?.reply, replyMutation, refetch],
+  );
+
+  if (isPending && !review) {
+    return (
+      <div className="text-on-surface mx-auto w-full max-w-6xl min-w-0 space-y-6 pb-28 md:pb-8">
+        <div className="bg-surface-container h-32 animate-pulse rounded-xl" />
+        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
+      </div>
+    );
+  }
+
+  if (!review) {
+    return (
+      <div className="text-on-surface mx-auto max-w-6xl py-16 text-center">
+        <p>{error?.message ?? "Review not found."}</p>
+        <Link
+          href={routes.barber.reviews}
+          className="text-primary mt-3 inline-block text-sm font-semibold hover:underline"
+        >
+          Back to reviews
+        </Link>
+      </div>
+    );
+  }
 
   const memberSince = review.customer.memberSince
     ? formatDateLabel(review.customer.memberSince, {
@@ -109,7 +159,8 @@ export default function ReviewDetail({ review: initialReview }) {
             <button
               type="button"
               onClick={() => setReplyOpen(true)}
-              className="bg-primary text-on-primary hover:bg-primary/90 inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-bold transition-colors"
+              disabled={busy}
+              className="bg-primary text-on-primary hover:bg-primary/90 inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-bold transition-colors disabled:opacity-50"
             >
               <Reply className="h-4 w-4" aria-hidden />
               Add reply
@@ -195,7 +246,8 @@ export default function ReviewDetail({ review: initialReview }) {
                 <button
                   type="button"
                   onClick={() => setReplyOpen(true)}
-                  className="bg-primary text-on-primary mt-4 inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-bold hover:opacity-90"
+                  disabled={busy}
+                  className="bg-primary text-on-primary mt-4 inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-bold hover:opacity-90 disabled:opacity-50"
                 >
                   <Reply className="h-4 w-4" aria-hidden />
                   Add reply
@@ -276,19 +328,6 @@ export default function ReviewDetail({ review: initialReview }) {
           onClose={() => setReplyOpen(false)}
           onSubmit={handleSubmitReply}
         />
-      ) : null}
-
-      {toast ? (
-        <div
-          role="status"
-          className={`fixed bottom-24 left-1/2 z-50 max-w-sm -translate-x-1/2 rounded-lg border px-4 py-3 text-sm font-medium shadow-lg md:bottom-8 ${
-            toast.type === "info"
-              ? "border-outline-variant bg-surface-container-highest text-on-surface"
-              : "border-status-confirmed/30 bg-surface-container-highest text-on-surface"
-          }`}
-        >
-          {toast.message}
-        </div>
       ) : null}
     </div>
   );

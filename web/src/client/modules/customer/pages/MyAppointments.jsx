@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarClock } from "lucide-react";
-import customerServices from "@/client/modules/customer/services/customerServices.jsx";
+import { toast } from "sonner";
+import { customerHook } from "@/client/modules/customer/hooks/customerQuery.jsx";
 import AppointmentTabs from "@/client/modules/customer/components/MyAppointments/AppointmentTabs.jsx";
 import AppointmentCard from "@/client/modules/customer/components/MyAppointments/AppointmentCard.jsx";
 import AppointmentTableRow from "@/client/modules/customer/components/MyAppointments/AppointmentTableRow.jsx";
@@ -15,54 +16,45 @@ import {
   LoadingSkeleton,
   ErrorState,
 } from "@/client/modules/customer/components/MyAppointments/ApptStates.jsx";
-import { TABLE_HEADERS } from "@/client/modules/customer/constants/myAppointments.js";
-
-const TABS = ["upcoming", "past", "cancelled"];
+import { TABLE_HEADERS } from "@/client/modules/customer/constants/myAppointmentsConstants.js";
 
 export default function MyAppointments() {
   const router = useRouter();
 
-  const [grouped, setGrouped] = useState({ upcoming: [], past: [], cancelled: [] });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const upcomingQuery = customerHook.Appointments.useListAppointments({
+    tab: "upcoming",
+    limit: 100,
+  });
+  const pastQuery = customerHook.Appointments.useListAppointments({ tab: "past", limit: 100 });
+  const cancelledQuery = customerHook.Appointments.useListAppointments({
+    tab: "cancelled",
+    limit: 100,
+  });
+
+  const cancelMutation = customerHook.Appointments.useCancelAppointment();
+  const reviewMutation = customerHook.Appointments.useCreateReviewForAppointment();
 
   const [activeTab, setActiveTab] = useState("upcoming");
   const [cancelTarget, setCancelTarget] = useState(null);
   const [reviewTarget, setReviewTarget] = useState(null);
-  const [cancelling, setCancelling] = useState(false);
-  const [reviewing, setReviewing] = useState(false);
-  const [toast, setToast] = useState(null);
 
-  function showToast(message, type = "success") {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  }
+  const isPending =
+    upcomingQuery.isPending ||
+    pastQuery.isPending ||
+    cancelledQuery.isPending ||
+    cancelMutation.isPending ||
+    reviewMutation.isPending;
 
-  const loadAppointments = useCallback(() => {
-    setLoading(true);
-    setError(false);
-    Promise.all(
-      TABS.map((tab) =>
-        customerServices.listAppointments({ tab, limit: 100 }).then((r) => ({
-          tab,
-          items: r.items ?? [],
-        })),
-      ),
-    )
-      .then((results) => {
-        const next = { upcoming: [], past: [], cancelled: [] };
-        for (const { tab, items } of results) {
-          next[tab] = items;
-        }
-        setGrouped(next);
-      })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-  }, []);
+  const isError = upcomingQuery.isError || pastQuery.isError || cancelledQuery.isError;
 
-  useEffect(() => {
-    loadAppointments();
-  }, [loadAppointments]);
+  const grouped = useMemo(
+    () => ({
+      upcoming: upcomingQuery.data?.items ?? [],
+      past: pastQuery.data?.items ?? [],
+      cancelled: cancelledQuery.data?.items ?? [],
+    }),
+    [upcomingQuery.data, pastQuery.data, cancelledQuery.data],
+  );
 
   const counts = useMemo(
     () => ({
@@ -75,41 +67,47 @@ export default function MyAppointments() {
 
   const visible = grouped[activeTab] ?? [];
 
+  async function refetchAll() {
+    await Promise.all([upcomingQuery.refetch(), pastQuery.refetch(), cancelledQuery.refetch()]);
+  }
+
   async function handleCancelConfirm() {
-    if (!cancelTarget) return;
-    setCancelling(true);
+    if (!cancelTarget || cancelMutation.isPending) return;
     try {
-      await customerServices.cancelAppointment(cancelTarget.id, { reason: "" });
-      loadAppointments();
+      await toast.promise(cancelMutation.mutateAsync({ id: cancelTarget.id, reason: "" }), {
+        loading: "Cancelling booking…",
+        success: "Booking cancelled successfully.",
+        error: "Could not cancel booking.",
+      });
+      await refetchAll();
       setCancelTarget(null);
-      showToast("Booking cancelled successfully.", "info");
-    } catch (err) {
-      showToast(err?.message ?? "Could not cancel booking.", "info");
-    } finally {
-      setCancelling(false);
+    } catch {
+      /* toast handles error */
     }
   }
 
   async function handleReviewSubmit({ rating, comment }) {
-    if (!reviewTarget) return;
-    setReviewing(true);
+    if (!reviewTarget || reviewMutation.isPending) return;
     try {
-      await customerServices.createReviewForAppointment(reviewTarget.id, { rating, comment });
-      loadAppointments();
+      await toast.promise(reviewMutation.mutateAsync({ id: reviewTarget.id, rating, comment }), {
+        loading: "Submitting review…",
+        success: `Review submitted — ${rating} stars. Thanks!`,
+        error: "Could not submit review.",
+      });
+      await refetchAll();
       setReviewTarget(null);
-      showToast(`Review submitted — ${rating} stars. Thanks!`, "success");
-    } catch (err) {
-      showToast(err?.message ?? "Could not submit review.", "info");
-    } finally {
-      setReviewing(false);
+    } catch {
+      /* toast handles error */
     }
   }
 
   function handleView(appt) {
+    if (isPending) return;
     router.push(routes.customer.appointmentsDetail(appt.id));
   }
 
   function handleRebook() {
+    if (isPending) return;
     router.push(routes.customer.bookAppointment);
   }
 
@@ -134,18 +132,15 @@ export default function MyAppointments() {
         <AppointmentTabs
           activeTab={activeTab}
           counts={counts}
-          onTabChange={(t) => setActiveTab(t)}
+          onTabChange={(t) => !isPending && setActiveTab(t)}
+          disabled={isPending}
         />
       </div>
 
-      {loading ? (
+      {isPending && visible.length === 0 ? (
         <LoadingSkeleton />
-      ) : error ? (
-        <ErrorState
-          onRetry={() => {
-            loadAppointments();
-          }}
-        />
+      ) : isError ? (
+        <ErrorState onRetry={() => refetchAll()} />
       ) : visible.length === 0 ? (
         <EmptyState tab={activeTab} />
       ) : (
@@ -159,6 +154,7 @@ export default function MyAppointments() {
                 onCancel={setCancelTarget}
                 onRebook={handleRebook}
                 onReview={setReviewTarget}
+                disabled={isPending}
               />
             ))}
           </div>
@@ -187,6 +183,7 @@ export default function MyAppointments() {
                       onCancel={setCancelTarget}
                       onRebook={handleRebook}
                       onReview={setReviewTarget}
+                      disabled={isPending}
                     />
                   ))}
                 </tbody>
@@ -208,7 +205,7 @@ export default function MyAppointments() {
           appt={cancelTarget}
           onConfirm={handleCancelConfirm}
           onClose={() => setCancelTarget(null)}
-          cancelling={cancelling}
+          cancelling={cancelMutation.isPending}
         />
       )}
 
@@ -217,28 +214,8 @@ export default function MyAppointments() {
           appt={reviewTarget}
           onSubmit={handleReviewSubmit}
           onClose={() => setReviewTarget(null)}
-          submitting={reviewing}
+          submitting={reviewMutation.isPending}
         />
-      )}
-
-      {toast && (
-        <div
-          className={`fixed right-6 bottom-6 z-50 flex items-center gap-3 rounded-xl border px-4 py-3 shadow-2xl backdrop-blur-sm ${
-            toast.type === "success"
-              ? "border-status-confirmed/30 bg-status-confirmed/10 text-status-confirmed"
-              : toast.type === "info"
-                ? "border-primary/30 bg-primary/10 text-primary"
-                : "border-status-cancelled/30 bg-status-cancelled/10 text-status-cancelled"
-          }`}
-        >
-          <span className="text-on-surface text-sm font-medium">{toast.message}</span>
-          <button
-            onClick={() => setToast(null)}
-            className="text-on-surface-variant hover:text-on-surface ml-2 transition-colors"
-          >
-            ✕
-          </button>
-        </div>
       )}
     </div>
   );

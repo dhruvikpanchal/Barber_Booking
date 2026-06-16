@@ -1,25 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useState } from "react";
-import { Eye, EyeOff, CheckCircle, Circle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { Eye, EyeOff, CheckCircle, Circle, Loader2 } from "lucide-react";
 import {
   PASSWORD_STRENGTH,
   getPasswordStrength,
   getPasswordChecks,
 } from "@/client/modules/shared/constants/password.js";
 import { authHook } from "@/client/modules/auth/hooks/authQuery.jsx";
+import {
+  canAccessResetStep,
+  clearPasswordResetFlow,
+  getVerifiedResetToken,
+} from "@/client/lib/auth/passwordResetFlow.js";
 import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
-import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
 
 export default function ResetPassword() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const resetPasswordMutation = authHook.ResetPassword.useResetPassword();
-  const token = searchParams.get("token") ?? "";
+  const [ready, setReady] = useState(false);
+  const [token, setToken] = useState("");
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -29,11 +32,22 @@ export default function ResetPassword() {
   const passwordChecks = getPasswordChecks(password);
   const strength = getPasswordStrength(password);
 
+  useEffect(() => {
+    if (!canAccessResetStep()) {
+      router.replace(routes.auth.forgotPassword);
+      return;
+    }
+
+    setToken(getVerifiedResetToken());
+    setReady(true);
+  }, [router]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!token) {
-      toast.error("Reset token is missing.");
+    if (!ready || !token) {
+      toast.error("Reset session expired. Please start again.");
+      router.replace(routes.auth.forgotPassword);
       return;
     }
 
@@ -43,28 +57,30 @@ export default function ResetPassword() {
     }
 
     try {
-      await toast.promise(
-        resetPasswordMutation.mutateAsync({
-          token,
-          password,
-          confirmPassword,
-        }),
-        {
-          loading: "Resetting password...",
-          success: "Password reset successfully",
-          error: (err) => err?.message || "Failed to reset password.",
-        },
-      );
+      await resetPasswordMutation.mutateAsync({
+        token,
+        password,
+        confirmPassword,
+      });
+      toast.success("Password reset successfully");
+      clearPasswordResetFlow();
       router.push(routes.auth.login);
     } catch (error) {
       toast.error(error?.message || "Failed to reset password.");
     }
   };
 
+  if (!ready) {
+    return (
+      <section className="flex min-h-screen items-center justify-center bg-[#131313] px-4 text-[#e4e2e1]">
+        <Loader2 className="h-8 w-8 animate-spin text-[#ffb68c]" aria-label="Loading" />
+      </section>
+    );
+  }
+
   return (
     <section className="flex min-h-screen items-center justify-center bg-[#131313] px-4 text-[#e4e2e1]">
       <div className="w-full max-w-md">
-        {/* Logo */}
         <Link
           href={routes.public.home}
           className="mb-12 block text-3xl font-black tracking-tight text-[#e4e2e1] transition-colors hover:text-[#ffb68c]"
@@ -84,7 +100,6 @@ export default function ResetPassword() {
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* New Password */}
             <div>
               <label className="mb-2 block text-xs tracking-[0.1em] text-[#d8c2b7]">
                 NEW PASSWORD
@@ -111,7 +126,6 @@ export default function ResetPassword() {
                 </button>
               </div>
 
-              {/* Strength Bars */}
               <div className="mt-2 flex gap-1">
                 {[0, 1, 2, 3].map((item) => (
                   <div
@@ -128,7 +142,6 @@ export default function ResetPassword() {
               </p>
             </div>
 
-            {/* Confirm Password */}
             <div>
               <label className="mb-2 block text-xs tracking-[0.1em] text-[#d8c2b7]">
                 CONFIRM NEW PASSWORD
@@ -162,7 +175,6 @@ export default function ResetPassword() {
               )}
             </div>
 
-            {/* Requirements */}
             <div className="space-y-3 border border-[#53443c] bg-[#1f2020] p-4">
               <p className="text-[10px] tracking-[0.1em] text-[#a08d83]">PASSWORD REQUIREMENTS</p>
 
@@ -194,7 +206,6 @@ export default function ResetPassword() {
               </div>
             </div>
 
-            {/* Button */}
             <button
               type="submit"
               disabled={resetPasswordMutation.isPending}

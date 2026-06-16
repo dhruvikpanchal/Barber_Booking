@@ -1,13 +1,10 @@
 import Link from "next/link";
 import { Calendar, Clock, MapPin, ChevronRight } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";
-import { formatDateTime } from "@/modules/customer/data/appointmentsData.js";
+import { formatDateTime } from "@/client/modules/customer/helpers/appointmentsHelpers.js";
 import StatusBadge from "@/client/modules/shared/components/ui/StatusBadge";
-import { CUSTOMER_APPOINTMENT_STATUSES } from "@/client/modules/customer/constants/appointmentStatuses.js";
+import { CUSTOMER_APPOINTMENT_STATUSES } from "@/client/modules/customer/constants/appointmentStatusesConstants.js";
 
-/**
- * @param {{ appointment: import('@/modules/customer/data/appointmentsData.js').MY_APPOINTMENTS[number] | null }} props
- */
 export default function NextAppointmentCard({ appointment }) {
   if (!appointment) {
     return (
@@ -36,7 +33,11 @@ export default function NextAppointmentCard({ appointment }) {
       <div className="border-outline-variant bg-surface-container border-b px-4 py-3 sm:px-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="font-label-caps text-primary">Next appointment</p>
-          <StatusBadge status={appointment.status} config={CUSTOMER_APPOINTMENT_STATUSES} size="sm" />
+          <StatusBadge
+            status={appointment.status}
+            config={CUSTOMER_APPOINTMENT_STATUSES}
+            size="sm"
+          />
         </div>
       </div>
 

@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
 import { Search, UserCheck } from "lucide-react";
 import RequestStats from "@/client/modules/admin/components/BarberRequests/RequestStats.jsx";
@@ -11,76 +12,117 @@ import {
 } from "@/client/modules/admin/components/BarberRequests/RequestTableRow.jsx";
 import RequestDetailDrawer from "@/client/modules/admin/components/BarberRequests/RequestDetailDrawer.jsx";
 import RejectModal from "@/client/modules/admin/components/BarberRequests/RejectModal.jsx";
-import { INITIAL_BARBER_REQUESTS } from "@/client/modules/admin/data/barberRequestsData.js";
-import { Toast } from "@/client/modules/shared/components/common/settings/TinyPrimitives.jsx";
-import { BARBER_REQUEST_TABS } from "@/client/modules/admin/constants/admin.js";
+import { BARBER_REQUEST_TABS } from "@/client/modules/admin/constants/adminConstants.js";
+import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
 
 export default function BarberRequests() {
   const router = useRouter();
-  const [requests, setRequests] = useState(INITIAL_BARBER_REQUESTS);
   const [tab, setTab] = useState("pending");
   const [query, setQuery] = useState("");
   const [detailFor, setDetailFor] = useState(null);
   const [rejectFor, setRejectFor] = useState(null);
-  const [toast, setToast] = useState(null);
 
-  const showToast = (message, type = "success") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
-
-  const stats = useMemo(
+  const listParams = useMemo(
     () => ({
-      pending: requests.filter((r) => r.status === "pending").length,
-      approved: requests.filter((r) => r.status === "approved").length,
-      rejected: requests.filter((r) => r.status === "rejected").length,
+      tab,
+      q: query.trim() || undefined,
+      page: 1,
+      limit: 100,
     }),
+    [tab, query],
+  );
+
+  const statsQuery = adminHook.BarberRequests.useBarberRequestStats();
+  const listQuery = adminHook.BarberRequests.useListBarberRequests(listParams);
+  const approveMutation = adminHook.BarberRequests.useApproveBarberRequest();
+  const rejectMutation = adminHook.BarberRequests.useRejectBarberRequest();
+
+  const busy =
+    statsQuery.isPending ||
+    listQuery.isPending ||
+    approveMutation.isPending ||
+    rejectMutation.isPending;
+
+  useEffect(() => {
+    if (listQuery.isError) {
+      toast.error(listQuery.error?.message || "Could not load barber requests.");
+    }
+  }, [listQuery.isError, listQuery.error]);
+
+  useEffect(() => {
+    if (statsQuery.isError) {
+      toast.error(statsQuery.error?.message || "Could not load request stats.");
+    }
+  }, [statsQuery.isError, statsQuery.error]);
+
+  const requests = useMemo(() => listQuery.data?.items ?? [], [listQuery.data]);
+
+  const stats = useMemo(() => {
+    const pending = statsQuery.data?.pending ?? 0;
+    const approved = statsQuery.data?.approved ?? 0;
+    const rejected = statsQuery.data?.rejected ?? 0;
+    return { pending, approved, rejected };
+  }, [statsQuery.data]);
+
+  const tabCounts = useMemo(
+    () => ({
+      all: stats.pending + stats.approved + stats.rejected,
+      pending: stats.pending,
+      approved: stats.approved,
+      rejected: stats.rejected,
+    }),
+    [stats],
+  );
+
+  const filtered = useMemo(
+    () => [...requests].sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt)),
     [requests],
   );
 
-  const filtered = useMemo(() => {
-    let list = requests;
-    if (tab !== "all") {
-      list = list.filter((r) => r.status === tab);
-    }
-    if (query.trim()) {
-      const q = query.trim().toLowerCase();
-      list = list.filter(
-        (r) =>
-          r.shopName.toLowerCase().includes(q) ||
-          r.ownerName.toLowerCase().includes(q) ||
-          r.city.toLowerCase().includes(q) ||
-          r.id.toLowerCase().includes(q),
-      );
-    }
-    return [...list].sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
-  }, [requests, tab, query]);
-
-  function approve(id) {
-    setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status: "approved" } : r)));
-    setDetailFor((cur) => (cur?.id === id ? { ...cur, status: "approved" } : cur));
-    setRejectFor(null);
-    showToast("Application approved. Barber will receive onboarding email.");
+  async function refetch() {
+    await Promise.all([listQuery.refetch(), statsQuery.refetch()]);
   }
 
-  function reject(id, note = "") {
-    setRequests((prev) =>
-      prev.map((r) =>
-        r.id === id
-          ? {
-              ...r,
-              status: "rejected",
-              rejectionNote: note || "Application did not meet requirements.",
-            }
-          : r,
-      ),
-    );
-    setDetailFor(null);
-    setRejectFor(null);
-    showToast("Application rejected.", "info");
+  async function approve(id) {
+    if (busy) return;
+    try {
+      await toast.promise(approveMutation.mutateAsync({ id }), {
+        loading: "Approving application…",
+        success: "Application approved. Barber will receive onboarding email.",
+        error: "Could not approve application.",
+      });
+      setDetailFor((cur) => (cur?.id === id ? { ...cur, status: "approved" } : cur));
+      setRejectFor(null);
+      await refetch();
+    } catch {
+      /* toast handles error */
+    }
+  }
+
+  async function reject(id, note = "") {
+    if (busy) return;
+    try {
+      await toast.promise(
+        rejectMutation.mutateAsync({
+          id,
+          rejectionNote: note || "Application did not meet requirements.",
+        }),
+        {
+          loading: "Rejecting application…",
+          success: "Application rejected.",
+          error: "Could not reject application.",
+        },
+      );
+      setDetailFor(null);
+      setRejectFor(null);
+      await refetch();
+    } catch {
+      /* toast handles error */
+    }
   }
 
   function handleView(request) {
+    if (busy) return;
     router.push(routes.admin.barberRequestsDetail(request.id));
   }
 
@@ -89,6 +131,31 @@ export default function BarberRequests() {
     onReject: (req) => setRejectFor(req),
     onView: handleView,
   };
+
+  if (listQuery.isPending && requests.length === 0) {
+    return (
+      <div className="mx-auto max-w-7xl space-y-8 pb-4">
+        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
+        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
+      </div>
+    );
+  }
+
+  if (listQuery.isError && requests.length === 0) {
+    return (
+      <div className="text-on-surface mx-auto max-w-7xl py-16 text-center">
+        <p className="font-medium">Could not load barber requests.</p>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          disabled={busy}
+          className="text-primary mt-3 text-sm font-semibold hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 pb-4">
@@ -125,7 +192,8 @@ export default function BarberRequests() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search shop, owner, city…"
-              className="border-outline-variant bg-surface-container text-on-surface placeholder:text-on-surface-variant/70 focus:border-primary h-10 w-full rounded-md border py-2 pr-3 pl-9 text-sm focus:outline-none"
+              disabled={busy}
+              className="border-outline-variant bg-surface-container text-on-surface placeholder:text-on-surface-variant/70 focus:border-primary h-10 w-full rounded-md border py-2 pr-3 pl-9 text-sm focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             />
           </label>
         </div>
@@ -133,14 +201,14 @@ export default function BarberRequests() {
         <div className="scrollbar-thin border-outline-variant flex gap-1 overflow-x-auto border-b px-4 py-2 md:px-6">
           {BARBER_REQUEST_TABS.map((t) => {
             const active = tab === t.key;
-            const count =
-              t.key === "all" ? requests.length : requests.filter((r) => r.status === t.key).length;
+            const count = tabCounts[t.key] ?? 0;
             return (
               <button
                 key={t.key}
                 type="button"
                 onClick={() => setTab(t.key)}
-                className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                disabled={busy}
+                className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                   active
                     ? "bg-primary text-on-primary"
                     : "text-on-surface-variant hover:text-on-surface"
@@ -215,7 +283,6 @@ export default function BarberRequests() {
         }}
       />
       <RejectModal request={rejectFor} onClose={() => setRejectFor(null)} onConfirm={reject} />
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

@@ -2,20 +2,20 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { login } from "@/client/config/assets/ImagePath.js";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { login } from "@/client/assets/ImagePath.js";
 import { routes } from "@/client/config/routes/routes.js";
 import { authHook } from "@/client/modules/auth/hooks/authQuery.jsx";
+import { authServices } from "@/client/modules/auth/services/authServices.jsx";
 import RoleSelector from "@/client/modules/shared/components/forms/auth/RoleSelector.jsx";
 import LoginForm from "@/client/modules/shared/components/forms/auth/LoginForm.jsx";
 import GoogleButton from "@/client/modules/shared/components/forms/auth/GoogleButton.jsx";
-import { clearAuthTokens } from "@/lib/axios";
+import { clearAuthSession, persistAuthSession } from "@/client/lib/auth/session.js";
 import { toast } from "sonner";
 import {
   ROLE_CONFIG,
   REMEMBER_KEY,
-  USER_KEY,
   API_ROLE_TO_PORTAL,
 } from "@/client/modules/auth/constants/authConstants.js";
 
@@ -40,10 +40,11 @@ function validateLogin({ email, password }) {
 
 export default function Login() {
   const loginMutation = authHook.Login.useLogin();
-  const googleLoginMutation = authHook.GoogleLogin.useGoogleLogin();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [role, setRole] = useState("customer");
   const [fieldErrors, setFieldErrors] = useState({});
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [rememberDefaults, setRememberDefaults] = useState({
     email: "",
     remember: false,
@@ -82,13 +83,20 @@ export default function Login() {
 
   async function completeSignIn(targetRole, email, remember, user) {
     await persistRemember(email, remember);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("io.auth.role", targetRole);
-      if (user) {
-        localStorage.setItem(USER_KEY, JSON.stringify(user));
-      }
-    }
-    router.push(ROLE_CONFIG[targetRole].redirect);
+    persistAuthSession({ portalRole: targetRole, user });
+
+    const nextPath = searchParams.get("next");
+    const fallback = ROLE_CONFIG[targetRole].redirect;
+    const isSafeNext =
+      nextPath &&
+      nextPath.startsWith("/") &&
+      !nextPath.startsWith("//") &&
+      ((targetRole === "admin" && nextPath.startsWith("/admin")) ||
+        (targetRole === "barber" && nextPath.startsWith("/barber")) ||
+        (targetRole === "customer" && nextPath.startsWith("/customer")));
+    const destination = isSafeNext ? nextPath : fallback;
+
+    router.replace(destination);
   }
 
   async function handleSubmit({ email, password, remember, turnstileToken }) {
@@ -104,13 +112,13 @@ export default function Login() {
       const portalRole = apiRoleToPortal(result?.user?.role);
 
       if (!portalRole) {
-        clearAuthTokens();
+        clearAuthSession();
         setFieldErrors({ form: "Unable to sign in with this account." });
         return;
       }
 
       if (portalRole !== role) {
-        clearAuthTokens();
+        clearAuthSession();
         setFieldErrors({
           form: `This account belongs to the ${ROLE_CONFIG[portalRole].portalLabel}. Switch portals and try again.`,
         });
@@ -132,42 +140,45 @@ export default function Login() {
     }
   }
 
-  async function handleGoogle() {
-    if (role !== "customer") return;
-    setFieldErrors({});
-    try {
-      const result = await googleLoginMutation.mutateAsync();
-      if (!result?.user?.email) {
-        const message = "Invalid Google login response. Please try again.";
+  const handleGoogleCredential = useCallback(
+    async (idToken) => {
+      if (role !== "customer") return;
+      setFieldErrors({});
+      setGoogleLoading(true);
+      try {
+        const result = await authServices.googleLogin({ idToken });
+        if (!result?.user?.email) {
+          const message = "Invalid Google login response. Please try again.";
+          setFieldErrors({ form: message });
+          toast.error(message);
+          return;
+        }
 
-        setFieldErrors({
-          form: message,
-        });
-
+        toast.success("Signed in with Google successfully");
+        await completeSignIn("customer", result.user.email, false, result.user);
+      } catch (error) {
+        const message = error.message || "Google sign-in failed. Please try again.";
+        setFieldErrors({ form: message });
         toast.error(message);
-
-        return;
+      } finally {
+        setGoogleLoading(false);
       }
+    },
+    [role],
+  );
 
-      toast.success("Signed in with Google successfully");
-      await completeSignIn("customer", result.user.email, false, result.user);
-    } catch (error) {
-      const message = error.message || "Google sign-in failed. Please try again.";
-
-      setFieldErrors({
-        form: message,
-      });
-
-      toast.error(message);
-    }
-  }
+  const handleGoogleError = useCallback((error) => {
+    const message = error.message || "Google sign-in failed. Please try again.";
+    setFieldErrors({ form: message });
+    toast.error(message);
+  }, []);
 
   function handleRoleChange(next) {
     setRole(next);
     setFieldErrors({});
   }
 
-  const busy = loginMutation.isPending || googleLoginMutation.isPending;
+  const busy = loginMutation.isPending || googleLoading;
 
   return (
     <section className="flex min-h-screen bg-[#131313] text-[#e4e2e1]">
@@ -237,8 +248,9 @@ export default function Login() {
               </div>
 
               <GoogleButton
-                onClick={handleGoogle}
-                loading={googleLoginMutation.isPending}
+                onCredential={handleGoogleCredential}
+                onError={handleGoogleError}
+                loading={googleLoading}
                 disabled={busy}
               />
             </>

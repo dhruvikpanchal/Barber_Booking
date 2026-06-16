@@ -1,21 +1,19 @@
-const steps = [
-  { n: "01", t: "Pick your shop", d: "Browse multi-shop locations and find the chair closest to you." },
-  { n: "02", t: "Choose your barber", d: "See ratings, specialties and live availability — book the cut you want." },
-  { n: "03", t: "Show up. Get sharp.", d: "Track your queue position. Pay in person at the shop, no online checkout." },
-];
+import { HOW_IT_WORKS_STEPS } from "@/client/modules/public/constants/howItWorksStepsConstants.js";
 
 export default function LandingHowItWorks() {
   return (
-    <section className="border-y border-outline-variant bg-surface-container-low px-4 py-24 md:px-16">
+    <section className="border-outline-variant bg-surface-container-low border-y px-4 py-24 md:px-16">
       <div className="mx-auto max-w-6xl">
-        <div className="font-label-caps mb-3 text-primary">How it works</div>
-        <h2 className="font-serif text-4xl font-bold text-on-surface md:text-5xl">Three steps. One sharp cut.</h2>
-        <div className="mt-14 grid gap-px bg-outline-variant md:grid-cols-3">
-          {steps.map((s) => (
+        <div className="font-label-caps text-primary mb-3">How it works</div>
+        <h2 className="text-on-surface font-serif text-4xl font-bold md:text-5xl">
+          Three steps. One sharp cut.
+        </h2>
+        <div className="bg-outline-variant mt-14 grid gap-px md:grid-cols-3">
+          {HOW_IT_WORKS_STEPS.map((s) => (
             <div key={s.n} className="bg-surface-container-low p-8">
-              <div className="font-serif text-5xl font-bold text-primary">{s.n}</div>
-              <div className="font-serif mt-4 text-xl font-semibold text-on-surface">{s.t}</div>
-              <p className="mt-3 text-sm text-on-surface-variant">{s.d}</p>
+              <div className="text-primary font-serif text-5xl font-bold">{s.n}</div>
+              <div className="text-on-surface mt-4 font-serif text-xl font-semibold">{s.t}</div>
+              <p className="text-on-surface-variant mt-3 text-sm">{s.d}</p>
             </div>
           ))}
         </div>

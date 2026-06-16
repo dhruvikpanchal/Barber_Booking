@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { Clock, CheckCircle, Flame } from "lucide-react";
 import customerServices from "@/client/modules/customer/services/customerServices.jsx";
-import { formatMoney } from "@/client/modules/customer/helpers/booking.js";
+import { formatMoney } from "@/client/lib/format/formatMoney.js";
 
-export default function BookingStep2Services({ booking, onToggle }) {
+export default function BookingStep2Services({ booking, onToggle, disabled = false }) {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -21,7 +21,8 @@ export default function BookingStep2Services({ booking, onToggle }) {
     customerServices
       .listBookingServices(slug)
       .then((items) => {
-        if (!cancelled) setServices(Array.isArray(items) ? items.filter((s) => s.active !== false) : []);
+        if (!cancelled)
+          setServices(Array.isArray(items) ? items.filter((s) => s.active !== false) : []);
       })
       .catch(() => {
         if (!cancelled) setServices([]);
@@ -40,7 +41,9 @@ export default function BookingStep2Services({ booking, onToggle }) {
 
   if (!booking.barber) {
     return (
-      <p className="text-on-surface-variant text-sm">Select a barber first to see available services.</p>
+      <p className="text-on-surface-variant text-sm">
+        Select a barber first to see available services.
+      </p>
     );
   }
 
@@ -73,8 +76,9 @@ export default function BookingStep2Services({ booking, onToggle }) {
             <button
               key={service.id}
               type="button"
-              onClick={() => onToggle(service)}
-              className={`group relative rounded-xl border p-4 text-left transition-all duration-200 ${
+              onClick={() => !disabled && onToggle(service)}
+              disabled={disabled}
+              className={`group relative rounded-xl border p-4 text-left transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${
                 selected
                   ? "border-primary bg-primary/5 shadow-primary/10 shadow-sm"
                   : "border-outline-variant bg-surface-container-low hover:border-outline hover:bg-surface-container"

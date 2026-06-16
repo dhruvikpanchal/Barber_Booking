@@ -1,10 +1,10 @@
 import { Clock } from "lucide-react";
-import { TYPE_META } from "@/modules/customer/constants/notifications.js";
+import { TYPE_META } from "@/client/modules/customer/constants/notificationsConstants.js";
 import { getNotificationDeepLink } from "@/config/routes/notificationRoutes";
 import { BarberAvatar, CardActions, ViewLink } from "./helpers.jsx";
 
 export default function AppointmentNotificationCard({ notif, onRead, onDelete }) {
-  const meta = TYPE_META[notif.type];
+  const meta = TYPE_META[notif.type] ?? TYPE_META.booking_confirmed;
   const Icon = meta.icon;
   const href = getNotificationDeepLink(notif);
 

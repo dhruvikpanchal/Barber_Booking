@@ -17,7 +17,7 @@ export const routes = {
     barberRegister: "/barber-register", // Done
     barberRegisterRules: "/barber-register-rules", // Done
     forgotPassword: "/forgot-password", // Done
-    verifyOtp: "/verify-reset-otp", // Done
+    verifyOtp: "/verify-otp",
     resetPassword: "/reset-password", // Done
   },
 
@@ -42,15 +42,15 @@ export const routes = {
 
   barber: {
     dashboard: "/barber/dashboard", //Done
-    schedule: "/barber/schedule", // Done
-    services: "/barber/services", // Done
-    walkIns: "/barber/walk-ins", // Done
+    schedule: "/barber/schedule",
+    services: "/barber/services",
+    walkIns: "/barber/walk-ins",
     profile: "/barber/profile", // Done
     settings: "/barber/settings", // Done
-    notifications: "/barber/notifications", // Done
-    queue: "/barber/queue", // Done
-    appointments: "/barber/appointments", // Done
-    appointmentsDetail: (id) => `/barber/appointments/${id}`, // Done
+    notifications: "/barber/notifications",
+    queue: "/barber/queue",
+    appointments: "/barber/appointments",
+    appointmentsDetail: (id) => `/barber/appointments/${id}`,
     reviews: "/barber/reviews", // Done
     reviewsDetail: (id) => `/barber/reviews/${id}`, // Done
     analytics: "/barber/analytics", // Done

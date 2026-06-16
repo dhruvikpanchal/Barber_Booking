@@ -1,4 +1,4 @@
-import { DAYS } from "../../constants/schedule.js";
+import { DAYS } from "@/client/modules/barber/constants/scheduleConstants.js";
 import { formatDateLabel } from "@/lib/format/formatDateTime.js";
 
 export function createInitialDays() {
@@ -41,15 +41,16 @@ export function TimeInput({ value, onChange, disabled, label }) {
   );
 }
 
-export function DayToggle({ enabled, onChange, label, short }) {
+export function DayToggle({ enabled, onChange, label, short, disabled = false }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={enabled}
       aria-label={`${label} ${enabled ? "on" : "off"}`}
+      disabled={disabled}
       onClick={() => onChange(!enabled)}
-      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors ${
+      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
         enabled ? "border-primary bg-primary" : "border-outline-variant bg-surface-container"
       }`}
     >

@@ -1,13 +1,13 @@
 "use client";
 
 import {
+  Bell,
   CalendarDays,
   CalendarPlus,
   Heart,
   Home,
   User,
   MoreHorizontal,
-  Bell,
   Star,
   Settings,
 } from "lucide-react";
@@ -22,11 +22,12 @@ const items = [
     icon: CalendarDays,
     href: routes.customer.myAppointments,
   },
-  { label: "favorites", icon: Heart, href: routes.customer.favorites },
+  { label: "Alerts", icon: Bell, href: routes.customer.notifications },
   { label: "More", icon: MoreHorizontal, more: true },
 ];
 
 const drawer = [
+  { label: "Favorites", icon: Heart, href: routes.customer.favorites },
   { label: "Reviews", icon: Star, href: routes.customer.reviews },
   { label: "Profile", icon: User, href: routes.customer.profile },
   { label: "Settings", icon: Settings, href: routes.customer.settings },

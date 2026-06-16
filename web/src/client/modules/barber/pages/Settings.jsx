@@ -1,20 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Scissors } from "lucide-react";
-import DangerSection from "@/client/modules/shared/components/common/settings/DangerSection.jsx";
-import PasswordSection from "@/client/modules/shared/components/common/settings/PasswordSection.jsx";
-import { Toast } from "@/client/modules/shared/components/common/settings/TinyPrimitives.jsx";
+import { routes } from "@/client/config/routes/routes.js";
+import { clearAuthSession } from "@/client/lib/auth/session.js";
+import DangerSection from "@/client/modules/shared/components/settings/DangerSection.jsx";
+import PasswordSection from "@/client/modules/shared/components/settings/PasswordSection.jsx";
+import { Toast } from "@/client/modules/shared/components/settings/TinyPrimitives.jsx";
 import { TABS } from "@/client/modules/shared/constants/settings.js";
+import { barberHook } from "@/client/modules/barber/hooks/barberQuery.jsx";
 
 export default function Settings() {
+  const router = useRouter();
   const [active, setActive] = useState("password");
   const [toast, setToast] = useState(null);
+
+  const passwordMutation = barberHook.Settings.useUpdatePassword();
+  const deleteMutation = barberHook.Settings.useDeleteAccount();
+  const busy = passwordMutation.isPending || deleteMutation.isPending;
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 4000);
   };
+
+  const handleUpdatePassword = useCallback(
+    (data) => passwordMutation.mutateAsync(data),
+    [passwordMutation],
+  );
+
+  const handleDeleteAccount = useCallback(async () => {
+    await deleteMutation.mutateAsync();
+    clearAuthSession();
+    router.push(routes.auth.login);
+  }, [deleteMutation, router]);
 
   return (
     <div className="bg-background text-on-surface mx-auto max-w-6xl space-y-8 pb-4">
@@ -47,7 +67,8 @@ export default function Settings() {
                   <button
                     key={id}
                     type="button"
-                    onClick={() => setActive(id)}
+                    onClick={() => !busy && setActive(id)}
+                    disabled={busy}
                     className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-left text-sm font-medium whitespace-nowrap transition-all ${
                       active === id
                         ? isDanger
@@ -69,8 +90,20 @@ export default function Settings() {
 
           {/* ── Right: Content ── */}
           <div className="min-w-0 flex-1">
-            {active === "password" && <PasswordSection onToast={showToast} />}
-            {active === "danger" && <DangerSection onToast={showToast} />}
+            {active === "password" && (
+              <PasswordSection
+                onToast={showToast}
+                onSubmit={handleUpdatePassword}
+                loading={passwordMutation.isPending}
+              />
+            )}
+            {active === "danger" && (
+              <DangerSection
+                onToast={showToast}
+                onDelete={handleDeleteAccount}
+                deleting={deleteMutation.isPending || busy}
+              />
+            )}
           </div>
         </div>
       </div>

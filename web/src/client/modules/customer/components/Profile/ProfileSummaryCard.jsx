@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { Calendar, Mail, Phone, Sparkles, User } from "lucide-react";
-import { formatMemberSince } from "../../data/profileData.js";
+import { formatMemberSince } from "@/client/modules/customer/helpers/profileHelpers.js";
 
 export default function ProfileSummaryCard({ fullName, email, phone, photoUrl, joinedAt }) {
   const displayName = fullName?.trim() || "Your name";
@@ -22,6 +22,7 @@ export default function ProfileSummaryCard({ fullName, email, phone, photoUrl, j
               {photoUrl ? (
                 isRemoteImage ? (
                   <Image
+                    key={photoUrl}
                     src={photoUrl}
                     alt={displayName}
                     width={112}
@@ -29,7 +30,12 @@ export default function ProfileSummaryCard({ fullName, email, phone, photoUrl, j
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <img src={photoUrl} alt={displayName} className="h-full w-full object-cover" />
+                  <img
+                    key={photoUrl}
+                    src={photoUrl}
+                    alt={displayName}
+                    className="h-full w-full object-cover"
+                  />
                 )
               ) : (
                 <User className="text-on-surface-variant/50 h-12 w-12" aria-hidden />

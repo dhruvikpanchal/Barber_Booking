@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import {
   Activity,
   ArrowLeft,
@@ -24,16 +23,20 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
+import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
-import { getAdminBarberById } from "@/client/modules/admin/data/barberDetailData.js";
-import { useHydrated } from "@/client/modules/shared/hooks/useHydrated.js";
+import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
+import {
+  mapAdminBarberDetail,
+  toBarberStatusApi,
+} from "@/client/modules/admin/helpers/adminMappers.js";
 import { StarRow } from "@/client/modules/shared/components/ui/StarRow.jsx";
 import { formatShortDate } from "@/client/lib/format/formatDateTime.js";
-import { Toast } from "@/client/modules/shared/components/common/settings/TinyPrimitives.jsx";
+import { Toast } from "@/client/modules/shared/components/settings/TinyPrimitives.jsx";
 import {
   ACCOUNT_STATUS_CONFIG,
   ACTIVITY_ICONS,
-} from "@/client/modules/admin/data/barberDetailsData.js";
+} from "@/client/modules/admin/constants/barberDetailConstants.js";
 import {
   fullDateTime,
   AccountStatusBadge,
@@ -50,59 +53,47 @@ import {
  * @param {{ id: string }} props
  */
 export default function BarberDetail({ id }) {
-  const hydrated = useHydrated();
-  const seed = useMemo(() => getAdminBarberById(id), [id]);
+  const { data, isPending, isError, error, refetch } = adminHook.Barbers.useBarber(id);
+  const statusMutation = adminHook.Barbers.useUpdateBarberStatus();
 
-  if (!seed) notFound();
+  const busy = isPending || statusMutation.isPending;
 
-  const [barber, setBarber] = useState(seed);
   const [editOpen, setEditOpen] = useState(false);
-  const [toast, setToast] = useState(null);
+  const [localToast, setLocalToast] = useState(null);
 
-  const statusCfg = ACCOUNT_STATUS_CONFIG[barber.accountStatus] ?? ACCOUNT_STATUS_CONFIG.inactive;
+  useEffect(() => {
+    if (isError) {
+      toast.error(error?.message || "Could not load barber profile.");
+    }
+  }, [isError, error]);
 
-  const showToast = (message, type = "success") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
+  const barber = useMemo(() => (data ? mapAdminBarberDetail(data) : null), [data]);
+
+  const showLocalToast = (message, type = "success") => {
+    setLocalToast({ message, type });
+    setTimeout(() => setLocalToast(null), 4000);
   };
 
-  function handleStatusChange(next) {
-    setBarber((prev) => ({
-      ...prev,
-      accountStatus: next,
-      activity: [
-        {
-          id: `${prev.id}-status-${Date.now()}`,
-          type: "status",
-          title: `Status set to ${ACCOUNT_STATUS_CONFIG[next].label}`,
-          description: "Account status updated by admin.",
-          at: new Date().toISOString(),
-        },
-        ...prev.activity,
-      ],
-    }));
-    showToast(`Barber status updated to ${ACCOUNT_STATUS_CONFIG[next].label}.`);
+  async function handleStatusChange(next) {
+    if (busy) return;
+    try {
+      await toast.promise(statusMutation.mutateAsync({ id, status: toBarberStatusApi(next) }), {
+        loading: "Updating barber status…",
+        success: `Barber status updated to ${ACCOUNT_STATUS_CONFIG[next].label}.`,
+        error: "Could not update barber status.",
+      });
+      await refetch();
+    } catch {
+      /* toast handles error */
+    }
   }
 
-  function handleEditSave(updates) {
-    setBarber((prev) => ({
-      ...prev,
-      ...updates,
-      activity: [
-        {
-          id: `${prev.id}-profile-${Date.now()}`,
-          type: "profile",
-          title: "Profile updated",
-          description: "Contact details and bio edited by admin.",
-          at: new Date().toISOString(),
-        },
-        ...prev.activity,
-      ],
-    }));
-    showToast("Barber profile updated.");
+  function handleEditSave() {
+    showLocalToast("Profile edits are not yet supported via API.", "info");
+    setEditOpen(false);
   }
 
-  if (!hydrated) {
+  if (isPending) {
     return (
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="text-on-surface-variant flex items-center gap-2 text-sm">
@@ -114,6 +105,32 @@ export default function BarberDetail({ id }) {
     );
   }
 
+  if (isError || !barber) {
+    return (
+      <div className="text-on-surface mx-auto max-w-6xl py-16 text-center">
+        <p className="font-medium">Could not load barber profile.</p>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => refetch()}
+            disabled={busy}
+            className="text-primary text-sm font-semibold hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Try again
+          </button>
+          <Link
+            href={routes.admin.barbers}
+            className="border-outline-variant text-on-surface-variant hover:text-on-surface inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            Back to barbers
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const statusCfg = ACCOUNT_STATUS_CONFIG[barber.accountStatus] ?? ACCOUNT_STATUS_CONFIG.inactive;
   const { stats } = barber;
 
   return (
@@ -148,8 +165,9 @@ export default function BarberDetail({ id }) {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
+            disabled={busy}
             onClick={() => setEditOpen(true)}
-            className="border-outline-variant bg-surface-container text-on-surface hover:bg-surface-container-high inline-flex items-center gap-2 rounded-md border px-4 py-2.5 text-xs font-semibold transition-colors"
+            className="border-outline-variant bg-surface-container text-on-surface hover:bg-surface-container-high inline-flex items-center gap-2 rounded-md border px-4 py-2.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Edit3 className="h-4 w-4" aria-hidden />
             Edit barber
@@ -164,7 +182,6 @@ export default function BarberDetail({ id }) {
         </div>
       </header>
 
-      {/* Performance overview */}
       <section aria-labelledby="performance-heading">
         <h2 id="performance-heading" className="font-label-caps text-on-surface-variant mb-3">
           Performance overview
@@ -192,7 +209,7 @@ export default function BarberDetail({ id }) {
           <StatCard
             label="Est. revenue"
             value={`$${stats.revenue.toLocaleString()}`}
-            sub="Lifetime (mock)"
+            sub="Lifetime"
             icon={DollarSign}
             accent="bg-primary/15 text-primary"
           />
@@ -207,7 +224,7 @@ export default function BarberDetail({ id }) {
           <StatCard
             label="Profile views"
             value={stats.profileViews.toLocaleString()}
-            sub="Last 90 days (mock)"
+            sub="Last 90 days"
             icon={Eye}
           />
           <StatCard label="Services offered" value={barber.services.length} icon={Scissors} />
@@ -417,8 +434,9 @@ export default function BarberDetail({ id }) {
                   <button
                     key={key}
                     type="button"
+                    disabled={busy}
                     onClick={() => handleStatusChange(key)}
-                    className={`flex w-full items-center gap-2 rounded-md border px-3 py-2.5 text-left text-xs font-semibold transition-colors ${
+                    className={`flex w-full items-center gap-2 rounded-md border px-3 py-2.5 text-left text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                       selected
                         ? "border-primary bg-primary/10 text-primary"
                         : "border-outline-variant text-on-surface-variant hover:bg-surface-container"
@@ -472,7 +490,13 @@ export default function BarberDetail({ id }) {
         />
       )}
 
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      {localToast && (
+        <Toast
+          message={localToast.message}
+          type={localToast.type}
+          onClose={() => setLocalToast(null)}
+        />
+      )}
     </div>
   );
 }

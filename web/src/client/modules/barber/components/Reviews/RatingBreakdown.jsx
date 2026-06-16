@@ -1,5 +1,5 @@
 import { Star } from "lucide-react";
-import { CATEGORY_LABELS } from "@/modules/barber/data/reviewsData.js";
+import { CATEGORY_LABELS } from "@/client/modules/barber/constants/reviewsConstants.js";
 import { StarRow } from "@/client/modules/shared/components/ui/StarRow.jsx";
 
 /**

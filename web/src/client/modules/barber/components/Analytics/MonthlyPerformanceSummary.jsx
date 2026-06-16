@@ -1,4 +1,4 @@
-import { formatRevenue } from "@/modules/barber/data/analyticsData.js";
+import { formatRevenue, formatRating } from "@/client/modules/barber/helpers/analyticsHelpers.js";
 
 /**
  * @param {{ rows: Array<{ month: string, revenue: number, appointments: number, completed: number, rating: number }>, periodLabel: string }} props
@@ -35,7 +35,7 @@ export default function MonthlyPerformanceSummary({ rows = [], periodLabel }) {
                 <td className="text-on-surface px-4 py-3">{row.appointments}</td>
                 <td className="text-on-surface px-4 py-3">{row.completed}</td>
                 <td className="px-4 py-3">
-                  <span className="text-primary font-semibold">{row.rating.toFixed(1)}</span>
+                  <span className="text-primary font-semibold">{formatRating(row.rating)}</span>
                 </td>
               </tr>
             ))}
@@ -62,7 +62,7 @@ export default function MonthlyPerformanceSummary({ rows = [], periodLabel }) {
               </div>
               <div>
                 <dt className="text-on-surface-variant">Rating</dt>
-                <dd className="text-primary font-medium">{row.rating.toFixed(1)}</dd>
+                <dd className="text-primary font-medium">{formatRating(row.rating)}</dd>
               </div>
             </dl>
           </li>

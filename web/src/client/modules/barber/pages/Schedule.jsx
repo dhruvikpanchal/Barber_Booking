@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarOff, CalendarPlus, Clock, Coffee, Copy, Plus, Save, Trash2 } from "lucide-react";
-import { DAYS } from "@/client/modules/barber/constants/schedule.js";
+import { toast } from "sonner";
+import { DAYS } from "@/client/modules/barber/constants/scheduleConstants.js";
 import {
-  createInitialDays,
   formatDisplayDate,
   TimeInput,
   DayToggle,
@@ -12,20 +12,49 @@ import {
 import SectionCard from "@/client/modules/shared/components/ui/SectionCard";
 import { useHydrated } from "@/client/modules/shared/hooks/useHydrated.js";
 import { createId } from "@/client/modules/shared/helpers/createId.js";
+import { barberHook } from "@/client/modules/barber/hooks/barberQuery.jsx";
+import { mapScheduleFromApi, mapScheduleToApi } from "@/client/modules/barber/helpers/barberMappers.js";
 
 export default function BarberSchedule() {
   const hydrated = useHydrated();
-  const [days, setDays] = useState(createInitialDays);
+  const { data, isPending, isError, error, refetch } = barberHook.Schedule.useGetSchedule();
+  const saveMutation = barberHook.Schedule.useSaveSchedule();
+  const addUnavailableMutation = barberHook.Schedule.useAddUnavailableDate();
+  const removeUnavailableMutation = barberHook.Schedule.useRemoveUnavailableDate();
+
+  const [days, setDays] = useState(null);
   const [defaultOpen, setDefaultOpen] = useState("09:00");
   const [defaultClose, setDefaultClose] = useState("18:00");
-  const [breaks, setBreaks] = useState([
-    { id: "break-1", label: "Lunch", start: "13:00", end: "14:00" },
-  ]);
+  const [breaks, setBreaks] = useState([]);
   const [unavailableDates, setUnavailableDates] = useState([]);
   const [newDate, setNewDate] = useState("");
   const [saved, setSaved] = useState(false);
 
-  const workingCount = useMemo(() => Object.values(days).filter((d) => d.enabled).length, [days]);
+  const busy =
+    isPending ||
+    saveMutation.isPending ||
+    addUnavailableMutation.isPending ||
+    removeUnavailableMutation.isPending;
+
+  useEffect(() => {
+    if (isError) {
+      toast.error(error?.message || "Could not load schedule.");
+    }
+  }, [isError, error]);
+
+  useEffect(() => {
+    if (data) {
+      const mapped = mapScheduleFromApi(data);
+      setDays(mapped.days);
+      setBreaks(mapped.breaks);
+      setUnavailableDates(mapped.unavailableDates);
+    }
+  }, [data]);
+
+  const workingCount = useMemo(
+    () => (days ? Object.values(days).filter((d) => d.enabled).length : 0),
+    [days],
+  );
 
   const sortedUnavailable = useMemo(
     () => [...unavailableDates].sort((a, b) => a.localeCompare(b)),
@@ -37,12 +66,14 @@ export default function BarberSchedule() {
     [hydrated],
   );
 
-  function updateDay(key, patch) {
-    setDays((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
-  }
+  const updateDay = useCallback((key, patch) => {
+    setDays((prev) => (prev ? { ...prev, [key]: { ...prev[key], ...patch } } : prev));
+  }, []);
 
-  function applyDefaultHours() {
+  const applyDefaultHours = useCallback(() => {
+    if (busy) return;
     setDays((prev) => {
+      if (!prev) return prev;
       const next = { ...prev };
       for (const { key } of DAYS) {
         if (next[key].enabled) {
@@ -51,38 +82,105 @@ export default function BarberSchedule() {
       }
       return next;
     });
-  }
+  }, [busy, defaultOpen, defaultClose]);
 
-  function addBreak() {
+  const addBreak = useCallback(() => {
+    if (busy) return;
     setBreaks((prev) => [
       ...prev,
       { id: createId(), label: "Break", start: "13:00", end: "13:30" },
     ]);
-  }
+  }, [busy]);
 
-  function updateBreak(id, patch) {
+  const updateBreak = useCallback((id, patch) => {
     setBreaks((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
-  }
+  }, []);
 
-  function removeBreak(id) {
+  const removeBreak = useCallback((id) => {
+    if (busy) return;
     setBreaks((prev) => prev.filter((b) => b.id !== id));
-  }
+  }, [busy]);
 
-  function addUnavailableDate() {
+  const addUnavailableDate = useCallback(async () => {
     const value = newDate.trim();
-    if (!value || unavailableDates.includes(value)) return;
-    setUnavailableDates((prev) => [...prev, value]);
-    setNewDate("");
+    if (!value || unavailableDates.includes(value) || busy) return;
+    try {
+      await toast.promise(addUnavailableMutation.mutateAsync({ date: value }), {
+        loading: "Adding date…",
+        success: "Date blocked",
+        error: "Could not block date",
+      });
+      setUnavailableDates((prev) => [...prev, value]);
+      setNewDate("");
+      await refetch();
+    } catch {
+      /* toast handles error */
+    }
+  }, [newDate, unavailableDates, busy, addUnavailableMutation, refetch]);
+
+  const removeUnavailableDate = useCallback(
+    async (iso) => {
+      if (busy) return;
+      try {
+        await toast.promise(removeUnavailableMutation.mutateAsync(iso), {
+          loading: "Removing date…",
+          success: "Date unblocked",
+          error: "Could not remove date",
+        });
+        setUnavailableDates((prev) => prev.filter((d) => d !== iso));
+        await refetch();
+      } catch {
+        /* toast handles error */
+      }
+    },
+    [busy, removeUnavailableMutation, refetch],
+  );
+
+  const handleSave = useCallback(async () => {
+    if (!days || busy) return;
+    try {
+      await toast.promise(
+        saveMutation.mutateAsync(mapScheduleToApi({ days, breaks })),
+        {
+          loading: "Saving schedule…",
+          success: "Schedule saved",
+          error: "Could not save schedule",
+        },
+      );
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 2400);
+      await refetch();
+    } catch {
+      /* toast handles error */
+    }
+  }, [days, breaks, busy, saveMutation, refetch]);
+
+  if (isPending && !days) {
+    return (
+      <div className="mx-auto max-w-6xl space-y-8 pb-4">
+        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
+        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
+      </div>
+    );
   }
 
-  function removeUnavailableDate(iso) {
-    setUnavailableDates((prev) => prev.filter((d) => d !== iso));
+  if (!days) {
+    return (
+      <div className="text-on-surface mx-auto max-w-6xl py-16 text-center">
+        <p>{error?.message ?? "Schedule unavailable."}</p>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          disabled={busy}
+          className="text-primary mt-3 text-sm font-semibold hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Try again
+        </button>
+      </div>
+    );
   }
 
-  function handleSave() {
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2400);
-  }
+  const fieldDisabled = busy;
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 pb-4">
@@ -108,13 +206,24 @@ export default function BarberSchedule() {
             <p className="font-label-caps text-on-surface-variant">Default hours</p>
             <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-end">
               <div className="grid flex-1 grid-cols-2 gap-3">
-                <TimeInput label="Opens" value={defaultOpen} onChange={setDefaultOpen} />
-                <TimeInput label="Closes" value={defaultClose} onChange={setDefaultClose} />
+                <TimeInput
+                  label="Opens"
+                  value={defaultOpen}
+                  onChange={setDefaultOpen}
+                  disabled={fieldDisabled}
+                />
+                <TimeInput
+                  label="Closes"
+                  value={defaultClose}
+                  onChange={setDefaultClose}
+                  disabled={fieldDisabled}
+                />
               </div>
               <button
                 type="button"
                 onClick={applyDefaultHours}
-                className="border-outline-variant text-on-surface hover:border-primary hover:text-primary inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md border px-4 text-sm font-medium transition-colors"
+                disabled={fieldDisabled}
+                className="border-outline-variant text-on-surface hover:border-primary hover:text-primary inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md border px-4 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Copy className="h-4 w-4" aria-hidden />
                 Apply to working days
@@ -138,6 +247,7 @@ export default function BarberSchedule() {
                       onChange={(enabled) => updateDay(key, { enabled })}
                       label={label}
                       short={short}
+                      disabled={fieldDisabled}
                     />
                     <div>
                       <p className="text-on-surface font-medium">{label}</p>
@@ -150,13 +260,13 @@ export default function BarberSchedule() {
                     <TimeInput
                       label="Open"
                       value={day.open}
-                      disabled={!day.enabled}
+                      disabled={!day.enabled || fieldDisabled}
                       onChange={(open) => updateDay(key, { open })}
                     />
                     <TimeInput
                       label="Close"
                       value={day.close}
-                      disabled={!day.enabled}
+                      disabled={!day.enabled || fieldDisabled}
                       onChange={(close) => updateDay(key, { close })}
                     />
                   </div>
@@ -184,14 +294,16 @@ export default function BarberSchedule() {
                     value={brk.label}
                     onChange={(e) => updateBreak(brk.id, { label: e.target.value })}
                     placeholder="Break name"
-                    className="text-on-surface placeholder:text-on-surface-variant/50 min-w-0 flex-1 bg-transparent font-medium focus:outline-none"
+                    disabled={fieldDisabled}
+                    className="text-on-surface placeholder:text-on-surface-variant/50 min-w-0 flex-1 bg-transparent font-medium focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                   />
                   {breaks.length > 1 ? (
                     <button
                       type="button"
                       onClick={() => removeBreak(brk.id)}
+                      disabled={fieldDisabled}
                       aria-label={`Remove break ${index + 1}`}
-                      className="text-on-surface-variant hover:bg-surface-container-high hover:text-error inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors"
+                      className="text-on-surface-variant hover:bg-surface-container-high hover:text-error inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -202,11 +314,13 @@ export default function BarberSchedule() {
                     label="From"
                     value={brk.start}
                     onChange={(start) => updateBreak(brk.id, { start })}
+                    disabled={fieldDisabled}
                   />
                   <TimeInput
                     label="To"
                     value={brk.end}
                     onChange={(end) => updateBreak(brk.id, { end })}
+                    disabled={fieldDisabled}
                   />
                 </div>
               </li>
@@ -215,7 +329,8 @@ export default function BarberSchedule() {
           <button
             type="button"
             onClick={addBreak}
-            className="border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md border border-dashed py-2.5 text-sm transition-colors"
+            disabled={fieldDisabled}
+            className="border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md border border-dashed py-2.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus className="h-4 w-4" aria-hidden />
             Add break
@@ -238,13 +353,14 @@ export default function BarberSchedule() {
               min={todayIso}
               value={newDate}
               onChange={(e) => setNewDate(e.target.value)}
-              className="border-outline-variant bg-surface-container text-on-surface focus:border-primary h-10 w-full rounded-md border px-3 text-sm focus:outline-none"
+              disabled={fieldDisabled}
+              className="border-outline-variant bg-surface-container text-on-surface focus:border-primary h-10 w-full rounded-md border px-3 text-sm focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             />
           </label>
           <button
             type="button"
             onClick={addUnavailableDate}
-            disabled={!newDate}
+            disabled={!newDate || fieldDisabled}
             className="bg-primary text-on-primary inline-flex h-10 items-center justify-center gap-2 rounded-md px-5 text-sm font-medium transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <CalendarPlus className="h-4 w-4" aria-hidden />
@@ -262,8 +378,9 @@ export default function BarberSchedule() {
                   <button
                     type="button"
                     onClick={() => removeUnavailableDate(iso)}
+                    disabled={fieldDisabled}
                     aria-label={`Remove ${formatDisplayDate(iso)}`}
-                    className="text-on-surface-variant hover:bg-surface-container-high hover:text-error ml-0.5 rounded-full p-0.5 transition-colors"
+                    className="text-on-surface-variant hover:bg-surface-container-high hover:text-error ml-0.5 rounded-full p-0.5 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -280,12 +397,13 @@ export default function BarberSchedule() {
 
       <div className="border-outline-variant flex flex-col-reverse items-stretch justify-between gap-4 border-t pt-6 sm:flex-row sm:items-center">
         <p className="text-on-surface-variant text-xs">
-          Changes are stored locally until your shop backend is connected.
+          {saved ? "Schedule saved to your account." : "Save changes to update your availability."}
         </p>
         <button
           type="button"
           onClick={handleSave}
-          className="bg-primary text-on-primary inline-flex h-11 items-center justify-center gap-2 rounded-md px-8 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
+          disabled={fieldDisabled}
+          className="bg-primary text-on-primary inline-flex h-11 items-center justify-center gap-2 rounded-md px-8 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Save className="h-4 w-4" aria-hidden />
           {saved ? "Schedule saved" : "Save schedule"}

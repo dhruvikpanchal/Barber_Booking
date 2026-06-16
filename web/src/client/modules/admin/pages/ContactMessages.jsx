@@ -1,107 +1,102 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { MessageSquare, Search } from "lucide-react";
 import MessageStats from "@/client/modules/admin/components/ContactMessages/MessageStats.jsx";
 import {
   MessageCard,
   MessageTableRow,
 } from "@/client/modules/admin/components/ContactMessages/MessageTableRow.jsx";
-import { INITIAL_CONTACT_MESSAGES } from "@/client/modules/admin/data/contactMessagesData.js";
-import { Toast } from "@/client/modules/shared/components/common/settings/TinyPrimitives.jsx";
-import { CONTACT_MESSAGE_TABS } from "@/client/modules/admin/constants/admin.js";
+import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
+import { mapContactMessageListItem } from "@/client/modules/admin/helpers/adminMappers.js";
+import { CONTACT_MESSAGE_TABS } from "@/client/modules/admin/constants/adminConstants.js";
 import { routes } from "@/client/config/routes/routes.js";
 
 export default function ContactMessages() {
   const router = useRouter();
 
-  const [messages, setMessages] = useState(INITIAL_CONTACT_MESSAGES);
   const [tab, setTab] = useState("all");
   const [query, setQuery] = useState("");
-  const [toast, setToast] = useState(null);
 
-  const showToast = (message, type = "success") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
+  const listParams = useMemo(
+    () => ({
+      tab: tab === "all" ? undefined : tab,
+      q: query.trim() || undefined,
+      page: 1,
+      limit: 100,
+    }),
+    [tab, query],
+  );
+
+  const statsQuery = adminHook.ContactMessages.useContactMessageStats();
+  const listQuery = adminHook.ContactMessages.useListContactMessages(listParams);
+  const updateMutation = adminHook.ContactMessages.useUpdateContactMessage();
+
+  const busy = statsQuery.isPending || listQuery.isPending || updateMutation.isPending;
+
+  useEffect(() => {
+    if (listQuery.isError) {
+      toast.error(listQuery.error?.message || "Could not load contact messages.");
+    }
+  }, [listQuery.isError, listQuery.error]);
+
+  useEffect(() => {
+    if (statsQuery.isError) {
+      toast.error(statsQuery.error?.message || "Could not load message stats.");
+    }
+  }, [statsQuery.isError, statsQuery.error]);
+
+  const messages = useMemo(
+    () => (listQuery.data?.items ?? []).map(mapContactMessageListItem),
+    [listQuery.data],
+  );
 
   const stats = useMemo(
     () => ({
-      total: messages.length,
-      unread: messages.filter((m) => !m.isRead).length,
-      unreplied: messages.filter((m) => m.replyStatus === "unreplied").length,
+      total: statsQuery.data?.total ?? messages.length,
+      unread: statsQuery.data?.unread ?? 0,
+      unreplied: statsQuery.data?.unreplied ?? 0,
     }),
+    [statsQuery.data, messages.length],
+  );
+
+  const filtered = useMemo(
+    () => [...messages].sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt)),
     [messages],
   );
 
-  const filtered = useMemo(() => {
-    let list = messages;
+  async function refetch() {
+    await Promise.all([listQuery.refetch(), statsQuery.refetch()]);
+  }
 
-    // Tab filtering
-    if (tab === "unread") {
-      list = list.filter((m) => !m.isRead);
-    } else if (tab === "unreplied") {
-      list = list.filter((m) => m.replyStatus === "unreplied");
-    } else if (tab === "replied") {
-      list = list.filter((m) => m.replyStatus === "replied");
-    }
+  async function toggleRead(id) {
+    if (busy) return;
+    const target = messages.find((m) => m.id === id);
+    if (!target) return;
 
-    // Search query filtering
-    if (query.trim()) {
-      const q = query.trim().toLowerCase();
-      list = list.filter(
-        (m) =>
-          m.name.toLowerCase().includes(q) ||
-          m.email.toLowerCase().includes(q) ||
-          m.subject.toLowerCase().includes(q) ||
-          m.message.toLowerCase().includes(q) ||
-          m.id.toLowerCase().includes(q),
+    try {
+      await toast.promise(
+        updateMutation.mutateAsync({ id, isRead: !target.isRead }),
+        {
+          loading: "Updating message…",
+          success: target.isRead ? "Message marked as unread" : "Message marked as read",
+          error: "Could not update message.",
+        },
       );
+      await refetch();
+    } catch {
+      /* toast handles error */
     }
-
-    // Sort by date submitted desc
-    return [...list].sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
-  }, [messages, tab, query]);
-
-  function toggleRead(id) {
-    let wasRead = false;
-    setMessages((prev) =>
-      prev.map((m) => {
-        if (m.id === id) {
-          wasRead = !m.isRead;
-          return { ...m, isRead: !m.isRead };
-        }
-        return m;
-      }),
-    );
-
-    showToast(wasRead ? "Message marked as read" : "Message marked as unread", "success");
   }
 
-  function reply(id, text) {
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === id
-          ? {
-              ...m,
-              replyStatus: "replied",
-              replyText: text,
-              isRead: true, // Auto mark read on reply
-            }
-          : m,
-      ),
-    );
-
-    showToast("Reply sent successfully. Email delivery simulated.", "success");
-  }
-
-  function deleteMessage(id) {
-    setMessages((prev) => prev.filter((m) => m.id !== id));
-    showToast("Message deleted.", "info");
+  function deleteMessage() {
+    toast.info("Message deletion is not available via API.");
   }
 
   function handleView(message) {
+    if (busy) return;
     router.push(routes.admin.contactMessagesDetail(message.id));
   }
 
@@ -110,6 +105,31 @@ export default function ContactMessages() {
     onToggleRead: toggleRead,
     onDelete: deleteMessage,
   };
+
+  if (listQuery.isPending && messages.length === 0) {
+    return (
+      <div className="mx-auto max-w-7xl space-y-8 pb-4">
+        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
+        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
+      </div>
+    );
+  }
+
+  if (listQuery.isError && messages.length === 0) {
+    return (
+      <div className="text-on-surface mx-auto max-w-7xl py-16 text-center">
+        <p className="font-medium">Could not load contact messages.</p>
+        <button
+          type="button"
+          onClick={() => listQuery.refetch()}
+          disabled={busy}
+          className="text-primary mt-3 text-sm font-semibold hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 pb-4">
@@ -148,7 +168,8 @@ export default function ContactMessages() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search sender, email, subject…"
-              className="border-outline-variant bg-surface-container text-on-surface placeholder:text-on-surface-variant/70 focus:border-primary h-10 w-full rounded-md border py-2 pr-3 pl-9 text-sm focus:outline-none"
+              disabled={busy}
+              className="border-outline-variant bg-surface-container text-on-surface placeholder:text-on-surface-variant/70 focus:border-primary h-10 w-full rounded-md border py-2 pr-3 pl-9 text-sm focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             />
           </label>
         </div>
@@ -156,7 +177,7 @@ export default function ContactMessages() {
         <div className="scrollbar-thin border-outline-variant flex gap-1 overflow-x-auto border-b px-4 py-2 md:px-6">
           {CONTACT_MESSAGE_TABS.map((t) => {
             const active = tab === t.key;
-            let count = messages.length;
+            let count = stats.total;
             if (t.key === "unread") {
               count = stats.unread;
             } else if (t.key === "unreplied") {
@@ -168,8 +189,9 @@ export default function ContactMessages() {
               <button
                 key={t.key}
                 type="button"
+                disabled={busy}
                 onClick={() => setTab(t.key)}
-                className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                className={`flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                   active
                     ? "bg-primary text-on-primary"
                     : "text-on-surface-variant hover:text-on-surface"
@@ -226,8 +248,6 @@ export default function ContactMessages() {
           </>
         )}
       </section>
-
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

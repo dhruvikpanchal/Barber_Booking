@@ -34,9 +34,6 @@ const TYPE_META = {
   },
 };
 
-/**
- * @param {{ items: ReturnType<import('@/modules/customer/data/dashboardData.js').buildRecentActivity> }} props
- */
 export default function RecentActivity({ items }) {
   return (
     <section

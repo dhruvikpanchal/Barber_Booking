@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import { Star, Clock, Scissors, CheckCircle, Search, MapPin } from "lucide-react";
 import customerServices from "@/client/modules/customer/services/customerServices.jsx";
 
-export default function BookingStep1Barber({ booking, onSelect }) {
+export default function BookingStep1Barber({ booking, onSelect, disabled = false }) {
   const [query, setQuery] = useState("");
   const [serviceFilter, setServiceFilter] = useState("");
   const [barbers, setBarbers] = useState([]);
@@ -84,14 +84,16 @@ export default function BookingStep1Barber({ booking, onSelect }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by barber name, specialty, or location…"
-            className="border-outline-variant bg-surface-container text-on-surface placeholder:text-on-surface-variant/60 focus:border-primary h-11 w-full rounded-lg border py-2 pr-3 pl-10 text-sm focus:outline-none"
+            disabled={disabled}
+            className="border-outline-variant bg-surface-container text-on-surface placeholder:text-on-surface-variant/60 focus:border-primary h-11 w-full rounded-lg border py-2 pr-3 pl-10 text-sm focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           />
         </label>
         <label className="block sm:w-52">
           <select
             value={serviceFilter}
             onChange={(e) => setServiceFilter(e.target.value)}
-            className="border-outline-variant bg-surface-container text-on-surface focus:border-primary h-11 w-full rounded-lg border px-3 text-sm focus:outline-none"
+            disabled={disabled}
+            className="border-outline-variant bg-surface-container text-on-surface focus:border-primary h-11 w-full rounded-lg border px-3 text-sm focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           >
             <option value="">All services</option>
             {serviceNames.map((name) => (
@@ -118,8 +120,8 @@ export default function BookingStep1Barber({ booking, onSelect }) {
               <button
                 key={barber.id}
                 type="button"
-                disabled={!barber.available}
-                onClick={() => barber.available && onSelect(barber)}
+                disabled={disabled || !barber.available}
+                onClick={() => !disabled && barber.available && onSelect(barber)}
                 className={`group relative w-full overflow-hidden rounded-xl border text-left transition-all duration-200 ${
                   !barber.available
                     ? "border-outline-variant/50 bg-surface-container/50 cursor-not-allowed opacity-55"

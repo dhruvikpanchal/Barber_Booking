@@ -1,6 +1,6 @@
 import { createMutation } from "@/client/modules/shared/hooks/useTanstack.js";
 import { authServices } from "@/client/modules/auth/services/authServices.jsx";
-import { signIn } from "next-auth/react";
+import { requestGoogleIdToken } from "@/client/lib/google/googleSignIn.js";
 
 export const authHook = {
   Register: {
@@ -17,11 +17,10 @@ export const authHook = {
 
   GoogleLogin: {
     useGoogleLogin: () =>
-      createMutation("googleLogin", async () =>
-        signIn("google", {
-          redirect: false,
-        }),
-      ),
+      createMutation("googleLogin", async () => {
+        const idToken = await requestGoogleIdToken();
+        return authServices.googleLogin({ idToken });
+      }),
   },
 
   Refresh: {

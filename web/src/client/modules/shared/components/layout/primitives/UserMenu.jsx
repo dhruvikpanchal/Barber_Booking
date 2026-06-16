@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, LogOut, Settings, User } from "lucide-react";
+import { UserAvatar } from "@/client/modules/shared/components/ui/UserAvatar.jsx";
 import { authServices } from "@/client/modules/auth/services/authServices";
 import { useRouter } from "next/navigation";
 import { routes } from "@/client/config/routes/routes";
@@ -11,7 +12,7 @@ import { Loader2 } from "lucide-react";
 export default function UserMenu({
   name = "Guest User",
   email = "guest@ironandoak.app",
-  initials = "G",
+  photoUrl = null,
   profileHref,
   settingsHref,
 }) {
@@ -33,7 +34,7 @@ export default function UserMenu({
     await authServices.logout();
     setOpen(false);
     setLoading(false);
-    router.push(routes.auth.login);
+    router.replace(routes.auth.login);
   };
 
   return (
@@ -45,9 +46,7 @@ export default function UserMenu({
         aria-expanded={open}
         className="bg-surface-container-low text-on-surface hover:bg-surface-container-high flex items-center gap-2 rounded-full p-1 pr-3 text-sm transition-colors"
       >
-        <span className="bg-primary text-on-primary flex h-8 w-8 items-center justify-center rounded-full font-semibold">
-          {initials}
-        </span>
+        <UserAvatar photoUrl={photoUrl} name={name} size="sm" />
         <span className="hidden sm:inline">{name}</span>
         <ChevronDown className="text-on-surface-variant h-4 w-4" />
       </button>

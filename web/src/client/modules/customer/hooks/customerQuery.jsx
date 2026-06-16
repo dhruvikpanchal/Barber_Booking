@@ -1,15 +1,15 @@
 import { createQuery, createMutation } from "@/client/modules/shared/hooks/useTanstack.js";
+
 import { customerServices } from "@/client/modules/customer/services/customerServices.jsx";
 
 export const customerHook = {
   Profile: {
     useGetProfile: () => createQuery("getProfile", customerServices.getProfile),
 
-    useUpdateProfile: (data) =>
-      createMutation("updateProfile", customerServices.updateProfile, data),
+    useUpdateProfile: () => createMutation("updateProfile", customerServices.updateProfile),
 
-    useUploadProfilePhoto: (file) =>
-      createMutation("uploadProfilePhoto", customerServices.uploadProfilePhoto, file),
+    useUploadProfilePhoto: () =>
+      createMutation("uploadProfilePhoto", customerServices.uploadProfilePhoto),
   },
 
   Dashboard: {
@@ -22,18 +22,19 @@ export const customerHook = {
 
     useGetAppointment: (id) => createQuery("getAppointment", customerServices.getAppointment, id),
 
-    useCancelAppointment: (id, body = {}) =>
-      createMutation("cancelAppointment", customerServices.cancelAppointment, id, body),
+    useCancelAppointment: () =>
+      createMutation("cancelAppointment", ({ id, ...body }) =>
+        customerServices.cancelAppointment(id, body),
+      ),
 
-    useRequestServiceChange: (id, body) =>
-      createMutation("requestServiceChange", customerServices.requestServiceChange, id, body),
+    useRequestServiceChange: () =>
+      createMutation("requestServiceChange", ({ id, ...body }) =>
+        customerServices.requestServiceChange(id, body),
+      ),
 
-    useCreateReviewForAppointment: (id, body) =>
-      createMutation(
-        "createReviewForAppointment",
-        customerServices.createReviewForAppointment,
-        id,
-        body,
+    useCreateReviewForAppointment: () =>
+      createMutation("createReviewForAppointment", ({ id, ...body }) =>
+        customerServices.createReviewForAppointment(id, body),
       ),
   },
 
@@ -47,28 +48,28 @@ export const customerHook = {
     useGetAvailableSlots: (slug, params) =>
       createQuery("getAvailableSlots", customerServices.getAvailableSlots, slug, params),
 
-    useConfirmBooking: (body) =>
-      createMutation("confirmBooking", customerServices.confirmBooking, body),
+    useConfirmBooking: () => createMutation("confirmBooking", customerServices.confirmBooking),
   },
 
   Favorites: {
     useListFavorites: (params) =>
       createQuery("listFavorites", customerServices.listFavorites, params),
 
-    useAddFavorite: (barberId) =>
-      createMutation("addFavorite", customerServices.addFavorite, barberId),
+    useAddFavorite: () =>
+      createMutation("addFavorite", (barberId) => customerServices.addFavorite(barberId)),
 
-    useRemoveFavorite: (barberId) =>
-      createMutation("removeFavorite", customerServices.removeFavorite, barberId),
+    useRemoveFavorite: () =>
+      createMutation("removeFavorite", (barberId) => customerServices.removeFavorite(barberId)),
   },
 
   Reviews: {
     useListReviews: (params) => createQuery("listReviews", customerServices.listReviews, params),
 
-    useUpdateReview: (id, body) =>
-      createMutation("updateReview", customerServices.updateReview, id, body),
+    useUpdateReview: () =>
+      createMutation("updateReview", ({ id, ...body }) => customerServices.updateReview(id, body)),
 
-    useDeleteReview: (id) => createMutation("deleteReview", customerServices.deleteReview, id),
+    useDeleteReview: () =>
+      createMutation("deleteReview", (id) => customerServices.deleteReview(id)),
   },
 
   Notifications: {
@@ -78,13 +79,21 @@ export const customerHook = {
     useGetUnreadNotificationCount: () =>
       createQuery("getUnreadNotificationCount", customerServices.getUnreadNotificationCount),
 
-    useMarkNotificationRead: (id) =>
-      createMutation("markNotificationRead", customerServices.markNotificationRead, id),
+    useMarkNotificationRead: () =>
+      createMutation("markNotificationRead", (id) => customerServices.markNotificationRead(id)),
 
     useMarkAllNotificationsRead: () =>
       createMutation("markAllNotificationsRead", customerServices.markAllNotificationsRead),
 
-    useDeleteNotification: (id) =>
-      createMutation("deleteNotification", customerServices.deleteNotification, id),
+    useDeleteNotification: () =>
+      createMutation("deleteNotification", (id) => customerServices.deleteNotification(id)),
+  },
+
+  Settings: {
+    useUpdatePassword: () =>
+      createMutation("customerUpdatePassword", customerServices.updatePassword),
+
+    useDeleteAccount: () =>
+      createMutation("customerDeleteAccount", customerServices.deleteAccount),
   },
 };

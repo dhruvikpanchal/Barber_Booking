@@ -1,9 +1,9 @@
-import { Sparkles, CheckCheck, Trash2 } from "lucide-react";
-import { TYPE_META } from "../../constants/notifications.js";
+import { CheckCheck, Trash2 } from "lucide-react";
+import { TYPE_META } from "../../constants/notificationsConstants.js";
 import { InitialsAvatar } from "@/client/modules/shared/components/ui/InitialsAvatar.jsx";
-import { Badge } from "./helpers.jsx";
+import { Badge, ViewDetailsLink } from "./helpers.jsx";
 
-export default function CancellationCard({ notif, onRead, onDelete }) {
+export default function CancellationCard({ notif, onNavigate, onRead, onDelete, disabled }) {
   const meta = TYPE_META.cancellation;
   const Icon = meta.icon;
   return (
@@ -56,25 +56,26 @@ export default function CancellationCard({ notif, onRead, onDelete }) {
               <span className="text-on-surface-variant text-[10px] italic">"{notif.reason}"</span>
             </div>
           )}
-          {/* Slot hint */}
-          <div className="text-primary mt-2 flex w-fit cursor-pointer items-center gap-1.5 text-[11px] font-medium transition hover:opacity-70">
-            <Sparkles className="h-3 w-3" /> Slot is now open — fill it?
-          </div>
         </div>
 
-        <div className="mt-3 ml-11 flex justify-end">
+        <div className="mt-3 ml-11 flex flex-wrap items-center justify-between gap-2">
+          <ViewDetailsLink notif={notif} onNavigate={onNavigate} disabled={disabled} />
           <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
             {!notif.read && (
               <button
+                type="button"
                 onClick={() => onRead(notif.id)}
                 className="text-on-surface-variant hover:text-primary hover:bg-surface-container-high rounded p-1.5 transition-colors"
+                title="Mark as read"
               >
                 <CheckCheck className="h-3.5 w-3.5" />
               </button>
             )}
             <button
+              type="button"
               onClick={() => onDelete(notif.id)}
               className="text-on-surface-variant hover:text-error hover:bg-surface-container-high rounded p-1.5 transition-colors"
+              title="Dismiss"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>

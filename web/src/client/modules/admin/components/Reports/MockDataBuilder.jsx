@@ -1,4 +1,7 @@
-import { REPORT_DATE_RANGES, REPORT_RANGE_MULTIPLIER } from "@/modules/admin/constants/admin.js";
+import {
+  REPORT_DATE_RANGES,
+  REPORT_RANGE_MULTIPLIER,
+} from "@/client/modules/admin/constants/adminConstants.js";
 
 export function scale(base, rangeKey) {
   return Math.round(base * (REPORT_RANGE_MULTIPLIER[rangeKey] ?? 1));

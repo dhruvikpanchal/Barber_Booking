@@ -15,6 +15,17 @@ export default function ChairBoard({
   onPauseToggle,
   onClear,
 }) {
+  if (!chairs.length) {
+    return (
+      <div className="border-outline-variant bg-surface-container-low rounded-xl border border-dashed px-4 py-10 text-center">
+        <p className="text-on-surface font-serif text-base font-bold">No chairs configured</p>
+        <p className="text-on-surface-variant mt-1 text-sm">
+          Chairs are created automatically when the queue loads. Refresh if this message persists.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {chairs.map((chair) => {

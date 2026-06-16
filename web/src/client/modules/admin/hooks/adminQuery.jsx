@@ -1,20 +1,20 @@
 import { createQuery, createMutation } from "@/client/modules/shared/hooks/useTanstack.js";
-import { adminServices } from "@/client/modules/admin/service/adminServices.jsx";
+
+import { adminServices } from "@/client/modules/admin/services/adminServices.jsx";
 
 export const adminHook = {
   Dashboard: {
-    useDashboard: () => createQuery("dashboard", adminServices.getDashboard),
+    useDashboard: (params) => createQuery("dashboard", adminServices.getDashboard, params),
   },
 
   Analytics: {
-    useAnalytics: () => createQuery("analytics", adminServices.getAnalytics),
+    useAnalytics: (params) => createQuery("analytics", adminServices.getAnalytics, params),
   },
 
   Reports: {
     useListReports: (params) => createQuery("reports", adminServices.listReports, params),
 
-    useGenerateReport: (data) =>
-      createMutation("generateReport", adminServices.generateReport, data),
+    useGenerateReport: () => createMutation("generateReport", adminServices.generateReport),
   },
 
   Appointments: {
@@ -25,8 +25,10 @@ export const adminHook = {
 
     useAppointment: (id) => createQuery("appointment", adminServices.getAppointment, id),
 
-    useUpdateAppointmentStatus: (id, data) =>
-      createMutation("updateAppointmentStatus", adminServices.updateAppointmentStatus, id, data),
+    useUpdateAppointmentStatus: () =>
+      createMutation("updateAppointmentStatus", ({ id, ...data }) =>
+        adminServices.updateAppointmentStatus(id, data),
+      ),
   },
 
   BarberRequests: {
@@ -38,11 +40,15 @@ export const adminHook = {
 
     useBarberRequest: (id) => createQuery("barberRequest", adminServices.getBarberRequest, id),
 
-    useApproveBarberRequest: (id, data) =>
-      createMutation("approveBarberRequest", adminServices.approveBarberRequest, id, data),
+    useApproveBarberRequest: () =>
+      createMutation("approveBarberRequest", ({ id, ...data }) =>
+        adminServices.approveBarberRequest(id, data),
+      ),
 
-    useRejectBarberRequest: (id, data) =>
-      createMutation("rejectBarberRequest", adminServices.rejectBarberRequest, id, data),
+    useRejectBarberRequest: () =>
+      createMutation("rejectBarberRequest", ({ id, ...data }) =>
+        adminServices.rejectBarberRequest(id, data),
+      ),
   },
 
   Barbers: {
@@ -50,10 +56,12 @@ export const adminHook = {
 
     useBarber: (id) => createQuery("barber", adminServices.getBarber, id),
 
-    useUpdateBarberStatus: (id, data) =>
-      createMutation("updateBarberStatus", adminServices.updateBarberStatus, id, data),
+    useUpdateBarberStatus: () =>
+      createMutation("updateBarberStatus", ({ id, ...data }) =>
+        adminServices.updateBarberStatus(id, data),
+      ),
 
-    useDeleteBarber: (id) => createMutation("deleteBarber", adminServices.deleteBarber, id),
+    useDeleteBarber: () => createMutation("deleteBarber", (id) => adminServices.deleteBarber(id)),
   },
 
   Users: {
@@ -61,10 +69,12 @@ export const adminHook = {
 
     useUser: (id) => createQuery("user", adminServices.getUser, id),
 
-    useUpdateUserStatus: (id, data) =>
-      createMutation("updateUserStatus", adminServices.updateUserStatus, id, data),
+    useUpdateUserStatus: () =>
+      createMutation("updateUserStatus", ({ id, ...data }) =>
+        adminServices.updateUserStatus(id, data),
+      ),
 
-    useDeleteUser: (id) => createMutation("deleteUser", adminServices.deleteUser, id),
+    useDeleteUser: () => createMutation("deleteUser", (id) => adminServices.deleteUser(id)),
   },
 
   ContactMessages: {
@@ -76,11 +86,15 @@ export const adminHook = {
 
     useContactMessage: (id) => createQuery("contactMessage", adminServices.getContactMessage, id),
 
-    useReplyContactMessage: (id, data) =>
-      createMutation("replyContactMessage", adminServices.replyContactMessage, id, data),
+    useReplyContactMessage: () =>
+      createMutation("replyContactMessage", ({ id, ...data }) =>
+        adminServices.replyContactMessage(id, data),
+      ),
 
-    useUpdateContactMessage: (id, data) =>
-      createMutation("updateContactMessage", adminServices.updateContactMessage, id, data),
+    useUpdateContactMessage: () =>
+      createMutation("updateContactMessage", ({ id, ...data }) =>
+        adminServices.updateContactMessage(id, data),
+      ),
   },
 
   Notifications: {
@@ -90,8 +104,10 @@ export const adminHook = {
     useUnreadNotificationCount: () =>
       createQuery("unreadNotificationCount", adminServices.getUnreadNotificationCount),
 
-    useMarkNotificationRead: (id, data) =>
-      createMutation("markNotificationRead", adminServices.markNotificationRead, id, data),
+    useMarkNotificationRead: () =>
+      createMutation("markNotificationRead", ({ id, ...data }) =>
+        adminServices.markNotificationRead(id, data),
+      ),
 
     useMarkAllNotificationsRead: () =>
       createMutation("markAllNotificationsRead", adminServices.markAllNotificationsRead),
@@ -100,19 +116,18 @@ export const adminHook = {
   Profile: {
     useProfile: () => createQuery("profile", adminServices.getProfile),
 
-    useUpdateProfile: (data) => createMutation("updateProfile", adminServices.updateProfile, data),
+    useUpdateProfile: () => createMutation("updateProfile", adminServices.updateProfile),
   },
 
   Settings: {
     useSettings: () => createQuery("settings", adminServices.getSettings),
 
-    useUpdateMaintenanceSettings: (data) =>
-      createMutation("updateMaintenanceSettings", adminServices.updateMaintenanceSettings, data),
+    useUpdateMaintenanceSettings: () =>
+      createMutation("updateMaintenanceSettings", adminServices.updateMaintenanceSettings),
 
-    useUpdatePassword: (data) =>
-      createMutation("updatePassword", adminServices.updatePassword, data),
+    useUpdatePassword: () => createMutation("updatePassword", adminServices.updatePassword),
 
-    useUpdateAlertPreferences: (data) =>
-      createMutation("updateAlertPreferences", adminServices.updateAlertPreferences, data),
+    useUpdateAlertPreferences: () =>
+      createMutation("updateAlertPreferences", adminServices.updateAlertPreferences),
   },
 };

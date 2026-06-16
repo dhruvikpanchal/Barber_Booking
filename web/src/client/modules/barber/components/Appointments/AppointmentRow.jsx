@@ -1,23 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import {
-  Check,
-  X,
-  CalendarClock,
-  CheckCircle2,
-  Eye,
-  Scissors,
-  Clock,
-  Phone,
-} from "lucide-react";
-import { routes } from "@/config/routes/routes.js";
-import {
-  formatDateLabel,
-  formatTimeLabel,
-} from "@/lib/format/formatDateTime.js";
+import { Check, X, CalendarClock, Eye, Scissors, Clock, Phone } from "lucide-react";
+import { routes } from "@/client/config/routes/routes.js";
+import { formatDateLabel, formatTimeLabel } from "@/client/lib/format/formatDateTime.js";
 import StatusBadge from "@/client/modules/shared/components/ui/StatusBadge";
-import { STATUSES } from "@/modules/barber/constants/status.js";
+import { STATUSES } from "@/client/modules/barber/constants/statusConstants.js";
 
 function initials(name) {
   return name
@@ -48,7 +36,6 @@ function Actions({
   onAccept,
   onReject,
   onReschedule,
-  onComplete,
   onView,
 }) {
   const isPending = appt.status === "pending";
@@ -58,7 +45,7 @@ function Actions({
     <Link
       href={routes.barber.appointmentsDetail(appt.id)}
       onClick={() => onView?.(appt)}
-      className={`${BTN} ${iconOnly ? "h-8 w-8" : "h-8 px-2.5"} border border-outline-variant text-on-surface-variant hover:bg-surface-container hover:text-on-surface`}
+      className={`${BTN} ${iconOnly ? "h-8 w-8" : "h-8 px-2.5"} border-outline-variant text-on-surface-variant hover:bg-surface-container hover:text-on-surface border`}
       aria-label="View details"
       title="View details"
     >
@@ -74,7 +61,7 @@ function Actions({
           <button
             type="button"
             onClick={() => onAccept(appt.id)}
-            className={`${BTN} h-9 bg-primary text-on-primary hover:opacity-90`}
+            className={`${BTN} bg-primary text-on-primary h-9 hover:opacity-90`}
           >
             <Check className="h-3.5 w-3.5" aria-hidden />
             Accept
@@ -82,7 +69,7 @@ function Actions({
           <button
             type="button"
             onClick={() => onReject(appt.id)}
-            className={`${BTN} h-9 border border-outline-variant text-on-surface-variant hover:border-status-cancelled/50 hover:text-status-cancelled`}
+            className={`${BTN} border-outline-variant text-on-surface-variant hover:border-status-cancelled/50 hover:text-status-cancelled h-9 border`}
           >
             <X className="h-3.5 w-3.5" aria-hidden />
             Reject
@@ -92,7 +79,7 @@ function Actions({
           <button
             type="button"
             onClick={() => onReschedule(appt)}
-            className={`${BTN} h-8 border border-outline-variant px-2.5 text-on-surface-variant hover:bg-surface-container`}
+            className={`${BTN} border-outline-variant text-on-surface-variant hover:bg-surface-container h-8 border px-2.5`}
             title="Reschedule"
           >
             <CalendarClock className="h-3.5 w-3.5" aria-hidden />
@@ -111,7 +98,7 @@ function Actions({
           <button
             type="button"
             onClick={() => onAccept(appt.id)}
-            className={`${BTN} h-8 bg-primary px-2.5 text-on-primary hover:opacity-90`}
+            className={`${BTN} bg-primary text-on-primary h-8 px-2.5 hover:opacity-90`}
           >
             <Check className="h-3.5 w-3.5" aria-hidden />
             Accept
@@ -119,7 +106,7 @@ function Actions({
           <button
             type="button"
             onClick={() => onReject(appt.id)}
-            className={`${BTN} h-8 border border-outline-variant px-2.5 text-on-surface-variant hover:border-status-cancelled/50 hover:text-status-cancelled`}
+            className={`${BTN} border-outline-variant text-on-surface-variant hover:border-status-cancelled/50 hover:text-status-cancelled h-8 border px-2.5`}
           >
             <X className="h-3.5 w-3.5" aria-hidden />
             Reject
@@ -127,22 +114,17 @@ function Actions({
         </>
       )}
       {appt.status === "confirmed" && (
-        <button
-          type="button"
-          onClick={() => onComplete(appt.id)}
-          className={`${BTN} h-8 bg-status-confirmed px-2.5 text-background hover:opacity-90`}
-        >
-          <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
-          Complete
-        </button>
+        <p className="text-on-surface-variant text-[11px] italic">
+          Manage this visit from the Queue page.
+        </p>
       )}
-      {(appt.status === "pending"
-        || appt.status === "confirmed"
-        || appt.status === "rescheduled") && (
+      {(appt.status === "pending" ||
+        appt.status === "confirmed" ||
+        appt.status === "rescheduled") && (
         <button
           type="button"
           onClick={() => onReschedule(appt)}
-          className={`${BTN} h-8 border border-outline-variant px-2.5 text-on-surface-variant hover:bg-surface-container`}
+          className={`${BTN} border-outline-variant text-on-surface-variant hover:bg-surface-container h-8 border px-2.5`}
           title="Reschedule"
         >
           <CalendarClock className="h-3.5 w-3.5" aria-hidden />
@@ -158,10 +140,10 @@ function WhenBlock({ startAt, className = "" }) {
   const { date, time } = formatWhen(startAt);
   return (
     <p
-      className={`inline-flex flex-wrap items-center gap-x-1.5 text-on-surface-variant ${className}`}
+      className={`text-on-surface-variant inline-flex flex-wrap items-center gap-x-1.5 ${className}`}
     >
       <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
-      <span className="font-medium text-on-surface">{date}</span>
+      <span className="text-on-surface font-medium">{date}</span>
       <span aria-hidden>·</span>
       <span>{time}</span>
     </p>
@@ -182,40 +164,33 @@ export function AppointmentTableRow({ appt, ...handlers }) {
 
   return (
     <tr
-      className={`border-t border-outline-variant transition-colors hover:bg-surface-container/40 ${
+      className={`border-outline-variant hover:bg-surface-container/40 border-t transition-colors ${
         isPending ? "bg-status-pending/5" : ""
       }`}
     >
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15 font-serif text-xs font-bold text-primary">
+          <span className="bg-primary/15 text-primary flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-serif text-xs font-bold">
             {initials(appt.customer.name)}
           </span>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-on-surface">
-              {appt.customer.name}
-            </p>
-            <p className="truncate text-xs text-on-surface-variant">
-              {appt.customer.phone}
-            </p>
+            <p className="text-on-surface truncate text-sm font-semibold">{appt.customer.name}</p>
+            <p className="text-on-surface-variant truncate text-xs">{appt.customer.phone}</p>
           </div>
         </div>
       </td>
       <td className="px-4 py-3">
-        <p className="flex items-center gap-1.5 truncate text-sm text-on-surface">
-          <Scissors
-            className="h-3.5 w-3.5 shrink-0 text-on-surface-variant"
-            aria-hidden
-          />
+        <p className="text-on-surface flex items-center gap-1.5 truncate text-sm">
+          <Scissors className="text-on-surface-variant h-3.5 w-3.5 shrink-0" aria-hidden />
           {appt.service}
         </p>
-        <p className="mt-0.5 text-xs text-on-surface-variant">
+        <p className="text-on-surface-variant mt-0.5 text-xs">
           ${appt.price} · {appt.duration} min
         </p>
       </td>
       <td className="px-4 py-3">
-        <p className="text-sm font-medium text-on-surface">{date}</p>
-        <p className="text-xs text-on-surface-variant">{time}</p>
+        <p className="text-on-surface text-sm font-medium">{date}</p>
+        <p className="text-on-surface-variant text-xs">{time}</p>
       </td>
       <td className="px-4 py-3">
         <StatusBadge status={appt.status} config={STATUSES} />
@@ -232,20 +207,18 @@ export function AppointmentCard({ appt, ...handlers }) {
   const isPending = appt.status === "pending";
 
   return (
-    <article
-      className={`rounded-lg border p-3 transition-colors ${cardSurfaceClass(appt.status)}`}
-    >
+    <article className={`rounded-lg border p-3 transition-colors ${cardSurfaceClass(appt.status)}`}>
       <div className="flex gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 font-serif text-xs font-bold text-primary">
+        <span className="bg-primary/15 text-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-serif text-xs font-bold">
           {initials(appt.customer.name)}
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <h3 className="truncate text-sm font-semibold text-on-surface">
+              <h3 className="text-on-surface truncate text-sm font-semibold">
                 {appt.customer.name}
               </h3>
-              <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-on-surface-variant">
+              <p className="text-on-surface-variant mt-0.5 flex items-center gap-1 truncate text-xs">
                 <Phone className="h-3 w-3 shrink-0" aria-hidden />
                 {appt.customer.phone}
               </p>
@@ -253,17 +226,14 @@ export function AppointmentCard({ appt, ...handlers }) {
             <StatusBadge status={appt.status} config={STATUSES} />
           </div>
 
-          <div className="mt-2 rounded-md border border-outline-variant/60 bg-surface-container px-2.5 py-2">
-            <p className="flex items-center gap-1.5 truncate text-xs font-semibold text-on-surface">
-              <Scissors
-                className="h-3.5 w-3.5 shrink-0 text-primary/80"
-                aria-hidden
-              />
+          <div className="border-outline-variant/60 bg-surface-container mt-2 rounded-md border px-2.5 py-2">
+            <p className="text-on-surface flex items-center gap-1.5 truncate text-xs font-semibold">
+              <Scissors className="text-primary/80 h-3.5 w-3.5 shrink-0" aria-hidden />
               {appt.service}
             </p>
-            <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-[11px] text-on-surface-variant">
+            <div className="text-on-surface-variant mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-[11px]">
               <WhenBlock startAt={appt.startAt} className="text-[11px]" />
-              <span className="shrink-0 font-medium text-on-surface">
+              <span className="text-on-surface shrink-0 font-medium">
                 ${appt.price} · {appt.duration}m
               </span>
             </div>
@@ -271,12 +241,8 @@ export function AppointmentCard({ appt, ...handlers }) {
         </div>
       </div>
 
-      <div className="mt-2.5 border-t border-outline-variant/60 pt-2.5">
-        <Actions
-          appt={appt}
-          layout={isPending ? "pending" : "compact"}
-          {...handlers}
-        />
+      <div className="border-outline-variant/60 mt-2.5 border-t pt-2.5">
+        <Actions appt={appt} layout={isPending ? "pending" : "compact"} {...handlers} />
       </div>
     </article>
   );

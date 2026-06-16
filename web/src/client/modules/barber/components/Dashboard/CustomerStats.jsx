@@ -58,10 +58,6 @@ export default function CustomerStats({ stats }) {
           value={`${rebookRate}%`}
           accent="text-primary bg-primary/15"
         />
-        <div className="rounded-lg border border-dashed border-outline-variant p-3 text-xs leading-relaxed text-on-surface-variant min-[400px]:col-span-2 sm:col-span-1">
-          Keep <span className="font-bold text-on-surface">rebook rate</span>{" "}
-          above 65% to unlock priority listing.
-        </div>
       </div>
     </section>
   );

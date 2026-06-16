@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { BellOff, CheckCheck, Filter, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { BellOff, CheckCheck, Filter, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import EmptyState from "@/client/modules/shared/components/ui/EmptyState";
-import Modal from "@/client/modules/shared/components/ui/Modal";
-import { INITIAL_NOTIFICATIONS } from "@/client/modules/admin/data/notifucationsData.js";
+import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
+import { mapAdminNotification } from "@/client/modules/admin/helpers/adminMappers.js";
 import {
   groupByDate,
   TabBar,
@@ -14,11 +15,35 @@ import {
 import { NotificationCard } from "@/client/modules/admin/components/Notifications/NotificationCard.jsx";
 
 export default function Notifications() {
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
   const [activeTab, setActiveTab] = useState("all");
-  const [showConfirmClear, setShowConfirmClear] = useState(false);
 
-  // Derived counts for tab badges
+  const listParams = useMemo(
+    () => ({
+      tab: activeTab,
+      page: 1,
+      limit: 100,
+    }),
+    [activeTab],
+  );
+
+  const { data, isPending, isError, error, refetch } =
+    adminHook.Notifications.useListNotifications(listParams);
+  const markReadMutation = adminHook.Notifications.useMarkNotificationRead();
+  const markAllReadMutation = adminHook.Notifications.useMarkAllNotificationsRead();
+
+  const busy = isPending || markReadMutation.isPending || markAllReadMutation.isPending;
+
+  const notifications = useMemo(
+    () => (data?.items ?? []).map(mapAdminNotification),
+    [data?.items],
+  );
+
+  useEffect(() => {
+    if (isError) {
+      toast.error(error?.message || "Could not load notifications.");
+    }
+  }, [isError, error]);
+
   const counts = useMemo(() => {
     const unread = notifications.filter((n) => !n.read);
     return {
@@ -32,54 +57,64 @@ export default function Notifications() {
   }, [notifications]);
 
   const unreadCount = counts.unread;
-
-  // Filtered & sorted list
-  const filtered = useMemo(() => {
-    let list = [...notifications].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-    if (activeTab === "unread") return list.filter((n) => !n.read);
-    if (activeTab === "system") return list.filter((n) => n.type === "system");
-    if (activeTab === "appointments") return list.filter((n) => n.type === "appointments");
-    if (activeTab === "barber") return list.filter((n) => n.type === "barber");
-    if (activeTab === "contact") return list.filter((n) => n.type === "contact");
-    return list;
-  }, [notifications, activeTab]);
-
+  const filtered = notifications;
   const grouped = useMemo(() => groupByDate(filtered), [filtered]);
 
-  // Actions
-  const handleMarkRead = (id) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-  };
-
-  const handleDelete = (id) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-  };
-
-  const handleMarkAllRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  };
-
-  const handleClearAll = () => {
-    if (activeTab === "all") {
-      setNotifications([]);
-    } else {
-      const typeMap = {
-        unread: (n) => !n.read,
-        system: (n) => n.type === "system",
-        appointments: (n) => n.type === "appointments",
-        barber: (n) => n.type === "barber",
-        contact: (n) => n.type === "contact",
-      };
-      const predicate = typeMap[activeTab];
-      setNotifications((prev) => (predicate ? prev.filter((n) => !predicate(n)) : prev));
+  async function handleMarkRead(id) {
+    if (busy) return;
+    try {
+      await markReadMutation.mutateAsync({ id, isRead: true });
+      await refetch();
+    } catch {
+      toast.error("Could not mark notification as read.");
     }
-    setShowConfirmClear(false);
-  };
+  }
+
+  async function handleDelete(id) {
+    await handleMarkRead(id);
+  }
+
+  async function handleMarkAllRead() {
+    if (busy || unreadCount === 0) return;
+    try {
+      await toast.promise(markAllReadMutation.mutateAsync(), {
+        loading: "Marking all as read…",
+        success: "All notifications marked as read.",
+        error: "Could not mark all as read.",
+      });
+      await refetch();
+    } catch {
+      /* toast handles error */
+    }
+  }
+
+  if (isPending && notifications.length === 0) {
+    return (
+      <div className="mx-auto max-w-7xl space-y-8 pb-4">
+        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
+        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
+      </div>
+    );
+  }
+
+  if (isError && notifications.length === 0) {
+    return (
+      <div className="text-on-surface mx-auto max-w-7xl py-16 text-center">
+        <p className="font-medium">Could not load notifications.</p>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          disabled={busy}
+          className="text-primary mt-3 text-sm font-semibold hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 pb-4">
-      {/* Page header */}
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="font-label-caps text-primary text-[11px] tracking-widest uppercase">
@@ -105,29 +140,18 @@ export default function Notifications() {
             <button
               type="button"
               onClick={handleMarkAllRead}
-              className="border-outline-variant bg-surface-container text-on-surface hover:bg-surface-container-high focus-visible:ring-primary/60 inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:outline-none"
+              disabled={busy}
+              className="border-outline-variant bg-surface-container text-on-surface hover:bg-surface-container-high focus-visible:ring-primary/60 inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             >
               <CheckCheck className="text-primary h-3.5 w-3.5" aria-hidden />
               Mark all read
             </button>
           )}
-          {filtered.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowConfirmClear(true)}
-              className="border-outline-variant bg-surface-container text-on-surface-variant hover:border-status-cancelled/40 hover:bg-status-cancelled/8 hover:text-status-cancelled focus-visible:ring-status-cancelled/50 inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:outline-none"
-            >
-              <Trash2 className="h-3.5 w-3.5" aria-hidden />
-              Clear{activeTab !== "all" ? " filtered" : " all"}
-            </button>
-          )}
         </div>
       </header>
 
-      {/* Stats */}
       <StatsRow notifications={notifications} />
 
-      {/* Filter panel */}
       <div className="border-outline-variant bg-surface-container-low rounded-xl border">
         <div className="border-outline-variant flex items-center gap-3 border-b px-4 py-3 sm:px-5">
           <span className="font-label-caps text-on-surface-variant inline-flex items-center gap-1.5 text-[10px] tracking-widest uppercase">
@@ -137,9 +161,13 @@ export default function Notifications() {
           <TabBar active={activeTab} onChange={setActiveTab} counts={counts} />
         </div>
 
-        {/* Notification list */}
         <div className="p-4 sm:p-5">
-          {filtered.length === 0 ? (
+          {busy && notifications.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <Loader2 className="text-primary h-8 w-8 animate-spin" aria-hidden />
+              <p className="text-on-surface-variant mt-3 text-sm">Loading notifications…</p>
+            </div>
+          ) : filtered.length === 0 ? (
             <EmptyState
               icon={BellOff}
               title={activeTab === "unread" ? "You're all caught up" : "No notifications here"}
@@ -182,43 +210,6 @@ export default function Notifications() {
           )}
         </div>
       </div>
-
-      {/* Confirm clear dialog */}
-      <Modal
-        open={showConfirmClear}
-        onClose={() => setShowConfirmClear(false)}
-        size="sm"
-        panelClassName="border-outline-variant bg-surface-container-low rounded-xl border p-6 shadow-2xl"
-      >
-            <div className="bg-status-cancelled/15 text-status-cancelled flex h-11 w-11 items-center justify-center rounded-lg">
-              <Trash2 className="h-5 w-5" aria-hidden />
-            </div>
-            <h2 className="text-on-surface mt-4 font-serif text-lg font-bold">
-              Clear {activeTab !== "all" ? `${activeTab} ` : "all "}
-              notifications?
-            </h2>
-            <p className="text-on-surface-variant mt-2 text-sm">
-              This will permanently delete{" "}
-              <span className="text-on-surface font-semibold">{filtered.length}</span> notification
-              {filtered.length !== 1 ? "s" : ""}. This action cannot be undone.
-            </p>
-            <div className="mt-5 flex gap-3">
-              <button
-                type="button"
-                onClick={() => setShowConfirmClear(false)}
-                className="border-outline-variant bg-surface-container text-on-surface hover:bg-surface-container-high flex-1 rounded-md border py-2.5 text-sm font-semibold transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleClearAll}
-                className="bg-status-cancelled text-on-error flex-1 rounded-md py-2.5 text-sm font-bold transition-opacity hover:opacity-90"
-              >
-                Clear
-              </button>
-            </div>
-      </Modal>
     </div>
   );
 }

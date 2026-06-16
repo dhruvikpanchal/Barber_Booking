@@ -1,70 +1,107 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Bell, BellOff, CheckCheck, Search } from "lucide-react";
+import { toast } from "sonner";
 import EmptyState from "@/client/modules/shared/components/ui/EmptyState";
-import customerServices from "@/client/modules/customer/services/customerServices.jsx";
+import { customerHook } from "@/client/modules/customer/hooks/customerQuery.jsx";
 import {
   FILTERS,
   TYPE_META,
+  APPOINTMENT_TYPES,
+} from "@/client/modules/customer/constants/notificationsConstants.js";
+import {
   matchesFilter,
   unreadCountForFilter,
-  APPOINTMENT_TYPES,
-} from "@/client/modules/customer/constants/notifications.js";
+} from "@/client/modules/customer/helpers/notificationsHelpers.js";
 import AppointmentNotificationCard from "@/client/modules/customer/components/Notifications/AppointmentNotificationCard.jsx";
 import ServiceChangeCard from "@/client/modules/customer/components/Notifications/ServiceChangeCard.jsx";
 import ReviewRequestCard from "@/client/modules/customer/components/Notifications/ReviewRequestCard.jsx";
 import PromotionCard from "@/client/modules/customer/components/Notifications/PromotionCard.jsx";
+import GenericNotificationCard from "@/client/modules/customer/components/Notifications/GenericNotificationCard.jsx";
 import StatsBar from "@/client/modules/customer/components/Notifications/StatsBar.jsx";
 
+function invalidateNotificationQueries(queryClient) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["listNotifications"] }),
+    queryClient.invalidateQueries({ queryKey: ["getUnreadNotificationCount"] }),
+    queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+  ]);
+}
+
 export default function Notifications() {
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data, isPending, isError, error, refetch } =
+    customerHook.Notifications.useListNotifications({
+      limit: 100,
+    });
+  const markReadMutation = customerHook.Notifications.useMarkNotificationRead();
+  const markAllReadMutation = customerHook.Notifications.useMarkAllNotificationsRead();
+  const deleteMutation = customerHook.Notifications.useDeleteNotification();
+
   const [filter, setFilter] = useState("all");
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [search, setSearch] = useState("");
 
-  const loadNotifications = useCallback(() => {
-    setLoading(true);
-    customerServices
-      .listNotifications({ limit: 100 })
-      .then((result) => setNotifications(result.items ?? []))
-      .catch(() => setNotifications([]))
-      .finally(() => setLoading(false));
-  }, []);
+  const notifications = data?.items ?? [];
+  const busy =
+    isPending ||
+    markReadMutation.isPending ||
+    markAllReadMutation.isPending ||
+    deleteMutation.isPending;
 
   useEffect(() => {
-    loadNotifications();
-  }, [loadNotifications]);
+    if (isError) {
+      toast.error(error?.message || "Could not load notifications.");
+    }
+  }, [isError, error]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const markRead = async (id) => {
-    try {
-      await customerServices.markNotificationRead(id);
-      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-    } catch {
-      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-    }
-  };
+  const markRead = useCallback(
+    async (id) => {
+      if (busy) return;
+      try {
+        await markReadMutation.mutateAsync(id);
+        await invalidateNotificationQueries(queryClient);
+      } catch {
+        toast.error("Could not mark notification as read.");
+      }
+    },
+    [busy, markReadMutation, queryClient],
+  );
 
-  const markAllRead = async () => {
+  const markAllRead = useCallback(async () => {
+    if (busy) return;
     try {
-      await customerServices.markAllNotificationsRead();
+      await toast.promise(markAllReadMutation.mutateAsync(), {
+        loading: "Marking all as read…",
+        success: "All notifications marked as read.",
+        error: "Could not mark all as read.",
+      });
+      await invalidateNotificationQueries(queryClient);
     } catch {
-      /* still update UI */
+      /* toast handles error */
     }
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  };
+  }, [busy, markAllReadMutation, queryClient]);
 
-  const deleteNotif = async (id) => {
-    try {
-      await customerServices.deleteNotification(id);
-    } catch {
-      /* remove locally anyway */
-    }
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-  };
+  const deleteNotif = useCallback(
+    async (id) => {
+      if (busy) return;
+      try {
+        await toast.promise(deleteMutation.mutateAsync(id), {
+          loading: "Deleting notification…",
+          success: "Notification deleted.",
+          error: "Could not delete notification.",
+        });
+        await invalidateNotificationQueries(queryClient);
+      } catch {
+        /* toast handles error */
+      }
+    },
+    [busy, deleteMutation, queryClient],
+  );
 
   const filtered = notifications.filter((n) => {
     if (!matchesFilter(n, filter)) return false;
@@ -94,7 +131,7 @@ export default function Notifications() {
       case "promotion":
         return <PromotionCard {...props} />;
       default:
-        return null;
+        return <GenericNotificationCard {...props} />;
     }
   };
 
@@ -129,7 +166,8 @@ export default function Notifications() {
             <button
               type="button"
               onClick={markAllRead}
-              className="border-outline-variant text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface inline-flex items-center justify-center gap-1.5 rounded-full border px-4 py-2 text-xs font-medium transition-all active:scale-95"
+              disabled={busy}
+              className="border-outline-variant text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface inline-flex items-center justify-center gap-1.5 rounded-full border px-4 py-2 text-xs font-medium transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <CheckCheck className="h-3.5 w-3.5" />
               Mark all read
@@ -148,14 +186,16 @@ export default function Notifications() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search notifications…"
-            className="border-outline-variant bg-surface-container-low text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary w-full rounded-md border py-2 pr-3 pl-8 text-sm transition-colors focus:outline-none"
+            disabled={busy}
+            className="border-outline-variant bg-surface-container-low text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary w-full rounded-md border py-2 pr-3 pl-8 text-sm transition-colors focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           />
         </div>
 
         <button
           type="button"
           onClick={() => setShowUnreadOnly((v) => !v)}
-          className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-all ${
+          disabled={busy}
+          className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
             showUnreadOnly
               ? "border-primary bg-primary/10 text-primary"
               : "border-outline-variant text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
@@ -176,7 +216,8 @@ export default function Notifications() {
               key={f.id}
               type="button"
               onClick={() => setFilter(f.id)}
-              className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium whitespace-nowrap transition-all ${
+              disabled={busy}
+              className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium whitespace-nowrap transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
                 filter === f.id
                   ? f.id === "all"
                     ? "border-primary bg-primary/10 text-primary"
@@ -197,7 +238,7 @@ export default function Notifications() {
         })}
       </div>
 
-      {loading ? (
+      {isPending ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="bg-surface-container h-24 animate-pulse rounded-xl" />

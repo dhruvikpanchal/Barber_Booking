@@ -2,45 +2,31 @@
 
 import { useEffect, useState } from "react";
 import { Search, Users } from "lucide-react";
+import { toast } from "sonner";
 import BarberListCard from "@/client/modules/public/components/Barbers/BarberListCard.jsx";
-import { publicServices } from "@/client/modules/public/services/publicServices.jsx";
+import { publicHook } from "@/client/modules/public/hooks/publicQuery.jsx";
 
-export default function BarbersList() {
+export default function BarbersList({ initialBarbers }) {
   const [query, setQuery] = useState("");
-  const [barbers, setBarbers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
 
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError("");
-
-    const timer = setTimeout(() => {
-      publicServices
-        .getBarbers({ q: query.trim() || undefined, limit: 50 })
-        .then((items) => {
-          if (!cancelled) setBarbers(items);
-        })
-        .catch((err) => {
-          if (!cancelled) {
-            setBarbers([]);
-            setError(err?.message || "Could not load barbers.");
-          }
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false);
-        });
-    }, query ? 300 : 0);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), query ? 300 : 0);
+    return () => clearTimeout(timer);
   }, [query]);
 
-  const filtered = barbers;
+  const { data: barbers = [], isPending, isError, error } = publicHook.Barbers.useBarbers(
+    { q: debouncedQuery || undefined, limit: 50 },
+    { initialData: debouncedQuery ? undefined : (initialBarbers ?? undefined) },
+  );
 
+  useEffect(() => {
+    if (isError) {
+      toast.error(error?.message || "Could not load barbers.");
+    }
+  }, [isError, error]);
+
+  const filtered = barbers;
   const availableCount = filtered.filter((b) => b.available).length;
 
   return (
@@ -68,7 +54,8 @@ export default function BarbersList() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by name, service, specialty, or city…"
-            className="border-outline-variant bg-surface-container text-on-surface placeholder:text-on-surface-variant/60 focus:border-primary h-11 w-full rounded-lg border py-2 pr-3 pl-10 text-sm focus:outline-none"
+            disabled={isPending}
+            className="border-outline-variant bg-surface-container text-on-surface placeholder:text-on-surface-variant/60 focus:border-primary h-11 w-full rounded-lg border py-2 pr-3 pl-10 text-sm focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           />
         </label>
         <p className="text-on-surface-variant mt-3 flex flex-wrap items-center gap-2 text-xs">
@@ -84,11 +71,11 @@ export default function BarbersList() {
         </p>
       </div>
 
-      {loading ? (
+      {isPending && !barbers.length ? (
         <p className="text-on-surface-variant mt-10 text-center text-sm">Loading barbers…</p>
-      ) : error ? (
+      ) : isError ? (
         <p className="text-error mt-10 text-center text-sm" role="alert">
-          {error}
+          {error?.message || "Could not load barbers."}
         </p>
       ) : filtered.length === 0 ? (
         <div className="border-outline-variant mt-10 rounded-xl border border-dashed px-6 py-16 text-center">
@@ -100,7 +87,8 @@ export default function BarbersList() {
           <button
             type="button"
             onClick={() => setQuery("")}
-            className="text-primary mt-4 text-sm font-semibold hover:opacity-80"
+            disabled={isPending}
+            className="text-primary mt-4 text-sm font-semibold hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Clear search
           </button>

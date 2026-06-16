@@ -8,7 +8,7 @@ const TAB_CONFIG = [
   { key: "cancelled",label: "Cancelled",icon: XCircle },
 ];
 
-export default function AppointmentTabs({ activeTab, counts, onTabChange }) {
+export default function AppointmentTabs({ activeTab, counts, onTabChange, disabled = false }) {
   return (
     <div className="flex items-center gap-1 rounded-xl border border-outline-variant bg-surface-container p-1">
       {TAB_CONFIG.map(({ key, label, icon: Icon }) => {
@@ -19,7 +19,8 @@ export default function AppointmentTabs({ activeTab, counts, onTabChange }) {
             key={key}
             type="button"
             onClick={() => onTabChange(key)}
-            className={`relative flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150
+            disabled={disabled}
+            className={`relative flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50
               ${active
                 ? "bg-surface-container-low text-on-surface shadow-sm"
                 : "text-on-surface-variant hover:text-on-surface"

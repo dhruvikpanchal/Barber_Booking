@@ -13,32 +13,20 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { INITIAL_REVIEWS } from "@/client/modules/barber/data/reviewsData.js";
-import {
-  mergeReviewWithStoredReply,
-  saveBarberReply,
-  useBarberReviewReplies,
-} from "@/client/lib/storage/barberReviewRepliesStore.js";
+import { toast } from "sonner";
 import {
   SERVICES,
   SORT_OPTIONS,
   FILTER_OPTIONS,
   PAGE_SIZE,
-} from "@/client/modules/barber/constants/reviews.js";
+} from "@/client/modules/barber/constants/reviewsConstants.js";
 import { ReviewStats } from "@/client/modules/barber/components/Reviews/ReviewStats.jsx";
 import { ReplyModal } from "@/client/modules/barber/components/Reviews/ReplyModal.jsx";
 import { ReviewCard } from "@/client/modules/barber/components/Reviews/ReviewCard.jsx";
+import { barberHook } from "@/client/modules/barber/hooks/barberQuery.jsx";
+import { mapReview } from "@/client/modules/barber/helpers/barberMappers.js";
 
 export default function BarberReviews() {
-  const replyOverrides = useBarberReviewReplies();
-  const [reviews, setReviews] = useState(() =>
-    INITIAL_REVIEWS.map((r) => mergeReviewWithStoredReply(r, replyOverrides)),
-  );
-
-  useEffect(() => {
-    setReviews(INITIAL_REVIEWS.map((r) => mergeReviewWithStoredReply(r, replyOverrides)));
-  }, [replyOverrides]);
-
   const [query, setQuery] = useState("");
   const [filterStar, setFilterStar] = useState("all");
   const [filterService, setFilterService] = useState("All Services");
@@ -47,45 +35,42 @@ export default function BarberReviews() {
   const [replyTarget, setReplyTarget] = useState(null);
   const [serviceOpen, setServiceOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
-  const [toast, setToast] = useState(null);
 
-  function showToast(msg) {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2800);
-  }
+  const reviewsQuery = barberHook.Reviews.useListReviews({ page, limit: 100, q: query || undefined });
+  const replyMutation = barberHook.Reviews.useReplyToReview();
 
-  function handleReport(id) {
-    setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, reported: true } : r)));
-    showToast("Review flagged for review. Thank you.");
-  }
+  const busy = reviewsQuery.isPending || replyMutation.isPending;
 
-  function handleReply(id, text) {
+  useEffect(() => {
+    if (reviewsQuery.isError) {
+      toast.error(reviewsQuery.error?.message || "Could not load reviews.");
+    }
+  }, [reviewsQuery.isError, reviewsQuery.error]);
+
+  const reviews = useMemo(
+    () => (reviewsQuery.data?.reviews ?? []).map(mapReview),
+    [reviewsQuery.data],
+  );
+
+  async function handleReply(id, text) {
+    if (busy) return;
     const existing = reviews.find((r) => r.id === id);
     if (existing?.reply) {
-      showToast("This review already has a reply.");
+      toast.error("This review already has a reply.");
       setReplyTarget(null);
       return;
     }
-    const result = saveBarberReply(id, text);
-    if (!result.ok) {
-      showToast(result.error ?? "Could not post reply.");
-      return;
+    try {
+      await toast.promise(replyMutation.mutateAsync({ id, reply: text }), {
+        loading: "Posting reply…",
+        success: "Reply posted successfully.",
+        error: "Could not post reply.",
+      });
+      await reviewsQuery.refetch();
+      setReplyTarget(null);
+    } catch {
+      /* toast handles error */
     }
-    setReviews((prev) =>
-      prev.map((r) =>
-        r.id === id
-          ? mergeReviewWithStoredReply(r, {
-              ...replyOverrides,
-              [id]: {
-                reply: text.trim(),
-                replyAt: new Date().toISOString(),
-              },
-            })
-          : r,
-      ),
-    );
-    setReplyTarget(null);
-    showToast("Reply posted successfully.");
   }
 
   const filtered = useMemo(() => {
@@ -120,6 +105,7 @@ export default function BarberReviews() {
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   function resetFilters() {
+    if (busy) return;
     setFilterStar("all");
     setFilterService("All Services");
     setQuery("");
@@ -132,9 +118,17 @@ export default function BarberReviews() {
 
   const unreplied = reviews.filter((r) => !r.reply && !r.reported).length;
 
+  if (reviewsQuery.isPending && reviews.length === 0) {
+    return (
+      <div className="mx-auto max-w-6xl space-y-8 pb-4">
+        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
+        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-6xl space-y-8 pb-4">
-      {/* Page header */}
       <header className="space-y-2">
         <p className="font-label-caps text-primary">Barber · Reviews</p>
         <h1 className="text-on-surface font-serif text-2xl font-bold tracking-tight md:text-3xl">
@@ -145,7 +139,6 @@ export default function BarberReviews() {
         </p>
       </header>
 
-      {/* Top stat pills */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           {
@@ -182,15 +175,12 @@ export default function BarberReviews() {
         ))}
       </div>
 
-      {/* Review statistics panel */}
       <section>
         <h2 className="font-label-caps text-on-surface-variant mb-4">Review Statistics</h2>
         <ReviewStats reviews={reviews.filter((r) => !r.reported)} />
       </section>
 
-      {/* Reviews list section */}
       <section className="border-outline-variant bg-surface-container-low rounded-xl border">
-        {/* Section header */}
         <div className="border-outline-variant border-b px-5 py-4 md:px-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3">
@@ -206,7 +196,6 @@ export default function BarberReviews() {
               </div>
             </div>
 
-            {/* Search */}
             <label className="relative block md:w-64">
               <Search
                 className="text-on-surface-variant pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2"
@@ -219,15 +208,14 @@ export default function BarberReviews() {
                   setPage(1);
                 }}
                 placeholder="Search reviews…"
-                className="border-outline-variant bg-surface-container text-on-surface placeholder:text-on-surface-variant/70 focus:border-primary h-10 w-full rounded-md border py-2 pr-3 pl-9 text-sm focus:outline-none"
+                disabled={busy}
+                className="border-outline-variant bg-surface-container text-on-surface placeholder:text-on-surface-variant/70 focus:border-primary h-10 w-full rounded-md border py-2 pr-3 pl-9 text-sm focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               />
             </label>
           </div>
         </div>
 
-        {/* Filter bar */}
         <div className="scrollbar-thin border-outline-variant flex flex-wrap items-center gap-2 border-b px-4 py-3 md:px-6">
-          {/* Star filter pills */}
           <div className="flex flex-wrap gap-1">
             {FILTER_OPTIONS.map((opt) => {
               const active = filterStar === opt.key;
@@ -235,10 +223,12 @@ export default function BarberReviews() {
                 <button
                   key={opt.key}
                   onClick={() => {
+                    if (busy) return;
                     setFilterStar(opt.key);
                     setPage(1);
                   }}
-                  className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  disabled={busy}
+                  className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                     active
                       ? "border-primary bg-primary text-on-primary"
                       : "border-outline-variant text-on-surface-variant hover:text-on-surface"
@@ -252,14 +242,15 @@ export default function BarberReviews() {
           </div>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            {/* Service dropdown */}
             <div className="relative">
               <button
                 onClick={() => {
+                  if (busy) return;
                   setServiceOpen((o) => !o);
                   setSortOpen(false);
                 }}
-                className="border-outline-variant bg-surface-container text-on-surface-variant hover:text-on-surface inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors"
+                disabled={busy}
+                className="border-outline-variant bg-surface-container text-on-surface-variant hover:text-on-surface inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Filter className="h-3.5 w-3.5" aria-hidden />
                 {filterService}
@@ -288,14 +279,15 @@ export default function BarberReviews() {
               )}
             </div>
 
-            {/* Sort dropdown */}
             <div className="relative">
               <button
                 onClick={() => {
+                  if (busy) return;
                   setSortOpen((o) => !o);
                   setServiceOpen(false);
                 }}
-                className="border-outline-variant bg-surface-container text-on-surface-variant hover:text-on-surface inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors"
+                disabled={busy}
+                className="border-outline-variant bg-surface-container text-on-surface-variant hover:text-on-surface inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {SORT_OPTIONS.find((o) => o.key === sortKey)?.label}
                 <ChevronDown className="h-3.5 w-3.5" aria-hidden />
@@ -325,7 +317,8 @@ export default function BarberReviews() {
             {isFiltered && (
               <button
                 onClick={resetFilters}
-                className="text-error hover:bg-surface-container inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors"
+                disabled={busy}
+                className="text-error hover:bg-surface-container inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <X className="h-3.5 w-3.5" aria-hidden />
                 Clear
@@ -334,7 +327,6 @@ export default function BarberReviews() {
           </div>
         </div>
 
-        {/* Review cards */}
         {paged.length === 0 ? (
           <div className="px-4 py-16 text-center">
             <MessageSquare
@@ -352,14 +344,14 @@ export default function BarberReviews() {
               <ReviewCard
                 key={review.id}
                 review={review}
-                onReply={(r) => setReplyTarget(r)}
-                onReport={handleReport}
+                onReply={(r) => !busy && setReplyTarget(r)}
+                onReport={() => toast.info("Review reports are handled by support.")}
+                disabled={busy}
               />
             ))}
           </div>
         )}
 
-        {/* Pagination */}
         {totalPages > 1 && (
           <div className="border-outline-variant flex items-center justify-between border-t px-5 py-3 md:px-6">
             <p className="text-on-surface-variant text-xs">
@@ -367,7 +359,7 @@ export default function BarberReviews() {
             </p>
             <div className="flex items-center gap-1">
               <button
-                disabled={page === 1}
+                disabled={page === 1 || busy}
                 onClick={() => setPage((p) => p - 1)}
                 className="border-outline-variant text-on-surface-variant hover:bg-surface-container flex h-8 w-8 items-center justify-center rounded-md border transition-colors disabled:opacity-40"
               >
@@ -376,7 +368,8 @@ export default function BarberReviews() {
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
                 <button
                   key={n}
-                  onClick={() => setPage(n)}
+                  onClick={() => !busy && setPage(n)}
+                  disabled={busy}
                   className={`flex h-8 w-8 items-center justify-center rounded-md text-xs font-medium transition-colors ${
                     n === page
                       ? "bg-primary text-on-primary"
@@ -387,7 +380,7 @@ export default function BarberReviews() {
                 </button>
               ))}
               <button
-                disabled={page === totalPages}
+                disabled={page === totalPages || busy}
                 onClick={() => setPage((p) => p + 1)}
                 className="border-outline-variant text-on-surface-variant hover:bg-surface-container flex h-8 w-8 items-center justify-center rounded-md border transition-colors disabled:opacity-40"
               >
@@ -398,20 +391,13 @@ export default function BarberReviews() {
         )}
       </section>
 
-      {/* Reply modal */}
       {replyTarget && (
         <ReplyModal
           review={replyTarget}
           onClose={() => setReplyTarget(null)}
           onSubmit={handleReply}
+          disabled={busy}
         />
-      )}
-
-      {/* Toast */}
-      {toast && (
-        <div className="border-outline-variant bg-surface-container fixed bottom-[calc(var(--bottom-nav-height)+1rem)] left-1/2 z-50 -translate-x-1/2 rounded-lg border px-4 py-2.5 shadow-xl">
-          <p className="text-on-surface text-sm font-medium">{toast}</p>
-        </div>
       )}
     </div>
   );

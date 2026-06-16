@@ -1,4 +1,4 @@
-import { STATUSES } from "../../constants/status";
+import { STATUSES } from "../../constants/statusConstants";
 
 export default function StatusPill({ status, className = "" }) {
   const s = STATUSES[status] ?? STATUSES.upcoming;

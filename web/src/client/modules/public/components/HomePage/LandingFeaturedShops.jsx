@@ -1,5 +1,5 @@
 import LandingShopCard from "@/client/modules/public/components/HomePage/LandingShopCard";
-import { shops } from "@/client/modules/public/data/shops.js";
+import { shops } from "@/client/modules/public/constants/shopsConstants.js";
 
 export default function LandingFeaturedShops() {
   return (

@@ -3,7 +3,8 @@ import { Armchair, ChevronRight, Timer, Users } from "lucide-react";
 
 export default function QueueSnapshot({ snapshot }) {
   const { chairsTotal, chairsBusy, waiting, avgWaitMin, nextUp } = snapshot;
-  const occupancy = Math.round((chairsBusy / chairsTotal) * 100);
+  const occupancy =
+    chairsTotal > 0 ? Math.round((chairsBusy / chairsTotal) * 100) : 0;
 
   return (
     <section className="min-w-0 overflow-hidden rounded-xl border border-outline-variant bg-surface-container-low">
@@ -17,7 +18,7 @@ export default function QueueSnapshot({ snapshot }) {
               Queue snapshot
             </h2>
             <p className="text-xs text-on-surface-variant">
-              {waiting} waiting · {chairsBusy}/{chairsTotal} chairs in use
+              {waiting} waiting · {chairsTotal > 0 ? `${chairsBusy}/${chairsTotal} chairs in use` : "No chairs configured"}
             </p>
           </div>
         </div>
@@ -32,14 +33,17 @@ export default function QueueSnapshot({ snapshot }) {
 
       <div className="grid grid-cols-1 gap-2 px-4 py-3.5 min-[380px]:grid-cols-3 min-[380px]:gap-3 sm:px-5 sm:py-4">
         <Mini Icon={Users} label="Waiting" value={waiting} />
-        <Mini Icon={Armchair} label="Occupancy" value={`${occupancy}%`} />
+        <Mini Icon={Armchair} label="Occupancy" value={chairsTotal > 0 ? `${occupancy}%` : "—"} />
         <Mini Icon={Timer} label="Avg wait" value={`${avgWaitMin}m`} />
       </div>
 
       <div className="border-t border-outline-variant px-4 py-3 sm:px-5">
         <p className="font-label-caps mb-2 text-on-surface-variant">Next up</p>
-        <ul className="space-y-2">
-          {nextUp.map((q, i) => (
+        {nextUp.length === 0 ? (
+          <p className="text-on-surface-variant text-sm">No one waiting in the queue.</p>
+        ) : (
+          <ul className="space-y-2">
+            {nextUp.map((q, i) => (
             <li
               key={q.id}
               className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-outline-variant bg-surface-container px-3 py-2.5"
@@ -71,7 +75,8 @@ export default function QueueSnapshot({ snapshot }) {
               </div>
             </li>
           ))}
-        </ul>
+          </ul>
+        )}
       </div>
     </section>
   );

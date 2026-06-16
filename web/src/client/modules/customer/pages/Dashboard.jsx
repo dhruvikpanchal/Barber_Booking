@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { CalendarDays, CheckCircle2, CalendarClock, XCircle, CalendarPlus } from "lucide-react";
-import customerServices from "@/client/modules/customer/services/customerServices.jsx";
+import { toast } from "sonner";
 import { getGreeting, getTodayDateLabel } from "@/client/lib/format/formatDateTime.js";
 import { useHydrated } from "@/client/modules/shared/hooks/useHydrated.js";
 import { routes } from "@/client/config/routes/routes.js";
+import { customerHook } from "@/client/modules/customer/hooks/customerQuery.jsx";
 import StatTile from "@/client/modules/shared/components/ui/StatTile";
 import QuickActions from "@/client/modules/customer/components/Dashboard/QuickActions.jsx";
 import NextAppointmentCard from "@/client/modules/customer/components/Dashboard/NextAppointmentCard.jsx";
@@ -16,27 +17,13 @@ import NotificationsPreview from "@/client/modules/customer/components/Dashboard
 
 export default function Dashboard() {
   const hydrated = useHydrated();
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { data, isPending, isError, error, refetch } = customerHook.Dashboard.useDashboard();
 
   useEffect(() => {
-    let cancelled = false;
-    customerServices
-      .getDashboard()
-      .then((result) => {
-        if (!cancelled) setData(result);
-      })
-      .catch(() => {
-        if (!cancelled) setError(true);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (isError) {
+      toast.error(error?.message || "Could not load your dashboard.");
+    }
+  }, [isError, error]);
 
   const greeting = hydrated ? getGreeting() : "Hello";
   const today = hydrated ? getTodayDateLabel() : "";
@@ -49,7 +36,7 @@ export default function Dashboard() {
   const notificationPreview = data?.notifications?.preview ?? [];
   const unreadCount = data?.notifications?.unreadCount ?? 0;
 
-  if (loading) {
+  if (isPending) {
     return (
       <div className="text-on-surface mx-auto w-full max-w-6xl min-w-0 space-y-6 pb-28 md:pb-8">
         <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
@@ -62,14 +49,15 @@ export default function Dashboard() {
     );
   }
 
-  if (error) {
+  if (isError) {
     return (
       <div className="text-on-surface mx-auto max-w-6xl px-4 py-16 text-center">
         <p className="font-medium">Could not load your dashboard.</p>
         <button
           type="button"
-          onClick={() => window.location.reload()}
-          className="text-primary mt-3 text-sm font-semibold hover:underline"
+          onClick={() => refetch()}
+          disabled={isPending}
+          className="text-primary mt-3 text-sm font-semibold hover:underline disabled:cursor-not-allowed disabled:opacity-50"
         >
           Try again
         </button>
@@ -102,14 +90,18 @@ export default function Dashboard() {
         <div className="flex flex-wrap gap-2">
           <Link
             href={routes.customer.myAppointments}
-            className="border-outline-variant bg-surface-container-low text-on-surface hover:bg-surface-container inline-flex h-10 items-center gap-2 rounded-md border px-4 text-sm font-medium transition-colors"
+            aria-disabled={isPending}
+            tabIndex={isPending ? -1 : undefined}
+            className="border-outline-variant bg-surface-container-low text-on-surface hover:bg-surface-container inline-flex h-10 items-center gap-2 rounded-md border px-4 text-sm font-medium transition-colors aria-disabled:pointer-events-none aria-disabled:opacity-50"
           >
             <CalendarClock className="h-4 w-4" aria-hidden />
             My appointments
           </Link>
           <Link
             href={routes.customer.bookAppointment}
-            className="bg-primary text-on-primary hover:bg-primary/90 inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-bold transition-colors"
+            aria-disabled={isPending}
+            tabIndex={isPending ? -1 : undefined}
+            className="bg-primary text-on-primary hover:bg-primary/90 inline-flex h-10 items-center gap-2 rounded-md px-4 text-sm font-bold transition-colors aria-disabled:pointer-events-none aria-disabled:opacity-50"
           >
             <CalendarPlus className="h-4 w-4" aria-hidden />
             Book appointment
@@ -152,7 +144,6 @@ export default function Dashboard() {
       </section>
 
       <NextAppointmentCard appointment={nextAppointment} />
-
       <div className="grid min-w-0 gap-6 lg:grid-cols-3">
         <div className="min-w-0 space-y-6 lg:col-span-2">
           <UpcomingBookingsWidget appointments={upcoming} />

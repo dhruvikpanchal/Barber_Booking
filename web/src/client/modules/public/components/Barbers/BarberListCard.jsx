@@ -4,7 +4,7 @@ import { routes } from "@/config/routes/routes.js";
 
 /**
  * Matches booking step barber preview — image, stats, services, availability.
- * @param {{ barber: import('@/modules/public/data/barbers.js').barbers[number] }} props
+ * @param {{ barber: import('@/client/modules/public/data/barbersData.js').barbers[number] }} props
  */
 export default function BarberListCard({ barber }) {
   const profileHref = routes.public.barbersDetail(barber.id);

@@ -1,7 +1,7 @@
 "use client";
 
 import { DollarSign, Receipt } from "lucide-react";
-import { formatMoney } from "../../data/appointmentsData.js";
+import { formatMoney } from "@/client/lib/format/formatMoney.js";
 
 export default function FinalBillView({
   originalServices = [],

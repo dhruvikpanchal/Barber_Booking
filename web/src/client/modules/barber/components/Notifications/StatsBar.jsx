@@ -1,4 +1,4 @@
-import { TYPE_META } from "../../constants/notifications.js";
+import { TYPE_META } from "../../constants/notificationsConstants.js";
 
 export default function StatsBar({ notifications }) {
   const counts = {

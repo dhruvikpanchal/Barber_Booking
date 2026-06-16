@@ -1,17 +1,12 @@
-"use client";
-
-import { Check, CheckCheck, Trash2, ArrowRight } from "lucide-react";
-import { TYPE_META } from "../../constants/notifications.js";
+import { CheckCheck, Trash2 } from "lucide-react";
+import { TYPE_META } from "../../constants/notificationsConstants.js";
 import { InitialsAvatar } from "@/client/modules/shared/components/ui/InitialsAvatar.jsx";
 import { StarRow } from "@/client/modules/shared/components/ui/StarRow.jsx";
-import { useState } from "react";
+import { ViewDetailsLink } from "./helpers.jsx";
 
-export default function ReviewCard({ notif, onRead, onDelete }) {
+export default function ReviewCard({ notif, onNavigate, onRead, onDelete, disabled }) {
   const meta = TYPE_META.review;
   const Icon = meta.icon;
-  const [replied, setReplied] = useState(false);
-  const [reply, setReply] = useState("");
-  const [showReply, setShowReply] = useState(false);
 
   return (
     <div
@@ -45,7 +40,6 @@ export default function ReviewCard({ notif, onRead, onDelete }) {
           </div>
         </div>
 
-        {/* Review block */}
         <div className="border-outline-variant bg-surface-container-lowest mt-3 ml-11 rounded-md border p-3">
           <div className="mb-2 flex items-center gap-2">
             <InitialsAvatar initials={notif.avatar} size="sm" />
@@ -57,73 +51,31 @@ export default function ReviewCard({ notif, onRead, onDelete }) {
               </div>
             </div>
           </div>
-          <p className="text-on-surface-variant border-primary/30 mt-2 border-l-2 pl-3 text-xs leading-relaxed italic">
-            "{notif.review}"
-          </p>
-
-          {/* Reply */}
-          {!replied && (
-            <div className="mt-3">
-              {!showReply ? (
-                <button
-                  onClick={() => setShowReply(true)}
-                  className="text-primary flex items-center gap-1 text-xs font-medium transition hover:opacity-70"
-                >
-                  <ArrowRight className="h-3 w-3" /> Reply to review
-                </button>
-              ) : (
-                <div className="space-y-2">
-                  <textarea
-                    rows={2}
-                    value={reply}
-                    onChange={(e) => setReply(e.target.value)}
-                    placeholder="Thank you for your feedback…"
-                    className="border-outline-variant bg-surface-container text-on-surface placeholder:text-on-surface-variant/40 focus:border-primary w-full resize-none rounded border px-3 py-2 text-xs focus:outline-none"
-                  />
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        if (reply.trim()) setReplied(true);
-                      }}
-                      disabled={!reply.trim()}
-                      className="bg-primary text-on-primary rounded px-3 py-1.5 text-[11px] font-semibold transition hover:opacity-90 active:scale-95 disabled:opacity-30"
-                    >
-                      Post Reply
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowReply(false);
-                        setReply("");
-                      }}
-                      className="text-on-surface-variant hover:text-on-surface text-[11px] transition"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          {replied && (
-            <div className="text-status-confirmed mt-2 flex items-center gap-1.5 text-xs">
-              <Check className="h-3.5 w-3.5" /> Reply posted
-            </div>
-          )}
+          {notif.review ? (
+            <p className="text-on-surface-variant border-primary/30 mt-2 border-l-2 pl-3 text-xs leading-relaxed italic">
+              "{notif.review}"
+            </p>
+          ) : null}
         </div>
 
-        <div className="mt-3 ml-11 flex justify-end">
+        <div className="mt-3 ml-11 flex flex-wrap items-center justify-between gap-2">
+          <ViewDetailsLink notif={notif} onNavigate={onNavigate} disabled={disabled} />
           <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
             {!notif.read && (
               <button
+                type="button"
                 onClick={() => onRead(notif.id)}
                 className="text-on-surface-variant hover:text-primary hover:bg-surface-container-high rounded p-1.5 transition-colors"
+                title="Mark as read"
               >
                 <CheckCheck className="h-3.5 w-3.5" />
               </button>
             )}
             <button
+              type="button"
               onClick={() => onDelete(notif.id)}
               className="text-on-surface-variant hover:text-error hover:bg-surface-container-high rounded p-1.5 transition-colors"
+              title="Dismiss"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>

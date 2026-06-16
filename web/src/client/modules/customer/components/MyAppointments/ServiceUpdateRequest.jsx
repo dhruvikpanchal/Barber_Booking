@@ -1,7 +1,8 @@
 "use client";
 
 import { ArrowRight, Clock, Scissors } from "lucide-react";
-import { formatMoney, getTotalDuration } from "@/modules/customer/data/appointmentsData.js";
+import { getTotalDuration } from "@/client/modules/customer/helpers/appointmentsHelpers.js";
+import { formatMoney } from "@/client/lib/format/formatMoney.js";
 import ChangeRequestPendingBadge from "./ChangeRequestPendingBadge.jsx";
 import ChangeRequestStatusBadge from "./ChangeRequestStatusBadge.jsx";
 

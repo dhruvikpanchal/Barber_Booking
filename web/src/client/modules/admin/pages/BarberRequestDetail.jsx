@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   Award,
@@ -18,13 +17,13 @@ import {
   User,
   UserCheck,
 } from "lucide-react";
+import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
-import { getBarberRequestById } from "@/client/modules/admin/data/barberRequestsData.js";
-import { useHydrated } from "@/client/modules/shared/hooks/useHydrated.js";
+import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
+import { mapBarberRequestDetail } from "@/client/modules/admin/helpers/adminMappers.js";
 import StatusBadge from "@/client/modules/shared/components/ui/StatusBadge";
-import { BARBER_REQUEST_STATUSES } from "@/modules/admin/constants/admin.js";
+import { BARBER_REQUEST_STATUSES } from "@/client/modules/admin/constants/adminConstants.js";
 import RejectModal from "@/client/modules/admin/components/BarberRequests/RejectModal.jsx";
-import { Toast } from "@/client/modules/shared/components/common/settings/TinyPrimitives.jsx";
 import {
   fullDate,
   SectionCard,
@@ -39,47 +38,63 @@ import {
  * @param {{ id: string }} props
  */
 export default function BarberRequestDetail({ id }) {
-  const hydrated = useHydrated();
+  const {
+    data,
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = adminHook.BarberRequests.useBarberRequest(id);
+  const approveMutation = adminHook.BarberRequests.useApproveBarberRequest();
+  const rejectMutation = adminHook.BarberRequests.useRejectBarberRequest();
 
-  const seed = useMemo(() => getBarberRequestById(id), [id]);
+  const busy = isPending || approveMutation.isPending || rejectMutation.isPending;
 
-  if (!seed) notFound();
-
-  const [request, setRequest] = useState(seed);
   const [rejectOpen, setRejectOpen] = useState(false);
-  const [toast, setToast] = useState(null);
-  const [actionLoading, setActionLoading] = useState(false);
 
-  const showToast = (message, type = "success") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  };
+  useEffect(() => {
+    if (isError) {
+      toast.error(error?.message || "Could not load application.");
+    }
+  }, [isError, error]);
 
-  const isPending = request.status === "pending";
+  const request = useMemo(() => (data ? mapBarberRequestDetail(data) : null), [data]);
+
+  const isPendingStatus = request?.status === "pending";
 
   async function handleApprove() {
-    setActionLoading(true);
-    await new Promise((r) => setTimeout(r, 400));
-    setRequest((prev) => ({ ...prev, status: "approved" }));
-    setActionLoading(false);
-    showToast("Application approved. Barber will receive onboarding email.", "success");
+    if (busy || !request) return;
+    try {
+      await toast.promise(approveMutation.mutateAsync({ id }), {
+        loading: "Approving application…",
+        success: "Application approved. Barber will receive onboarding email.",
+        error: "Could not approve application.",
+      });
+      await refetch();
+    } catch {
+      /* toast handles error */
+    }
   }
 
-  function handleRejectConfirm(requestId, note) {
-    setRequest((prev) =>
-      prev.id === requestId
-        ? {
-            ...prev,
-            status: "rejected",
-            rejectionNote: note,
-          }
-        : prev,
-    );
-    setRejectOpen(false);
-    showToast("Application rejected.", "info");
+  async function handleRejectConfirm(requestId, note) {
+    if (busy) return;
+    try {
+      await toast.promise(
+        rejectMutation.mutateAsync({ id: requestId, rejectionNote: note }),
+        {
+          loading: "Rejecting application…",
+          success: "Application rejected.",
+          error: "Could not reject application.",
+        },
+      );
+      setRejectOpen(false);
+      await refetch();
+    } catch {
+      /* toast handles error */
+    }
   }
 
-  if (!hydrated) {
+  if (isPending) {
     return (
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="text-on-surface-variant flex items-center gap-2 text-sm">
@@ -87,6 +102,31 @@ export default function BarberRequestDetail({ id }) {
           Loading application…
         </div>
         <LoadingSkeleton />
+      </div>
+    );
+  }
+
+  if (isError || !request) {
+    return (
+      <div className="text-on-surface mx-auto max-w-5xl py-16 text-center">
+        <p className="font-medium">Could not load application.</p>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => refetch()}
+            disabled={busy}
+            className="text-primary text-sm font-semibold hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Try again
+          </button>
+          <Link
+            href={routes.admin.barberRequests}
+            className="border-outline-variant text-on-surface-variant hover:text-on-surface inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            Back to barber requests
+          </Link>
+        </div>
       </div>
     );
   }
@@ -318,15 +358,15 @@ export default function BarberRequestDetail({ id }) {
                 "This application was rejected. The applicant was notified."}
             </p>
 
-            {isPending && (
+            {isPendingStatus && (
               <div className="mt-5 flex flex-col gap-2">
                 <button
                   type="button"
-                  disabled={actionLoading}
+                  disabled={busy}
                   onClick={handleApprove}
-                  className="bg-primary text-on-primary inline-flex w-full items-center justify-center gap-2 rounded-md px-4 py-2.5 text-xs font-semibold tracking-wide transition-opacity hover:opacity-90 disabled:opacity-50"
+                  className="bg-primary text-on-primary inline-flex w-full items-center justify-center gap-2 rounded-md px-4 py-2.5 text-xs font-semibold tracking-wide transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {actionLoading ? (
+                  {approveMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
                   ) : (
                     <UserCheck className="h-4 w-4" aria-hidden />
@@ -335,9 +375,9 @@ export default function BarberRequestDetail({ id }) {
                 </button>
                 <button
                   type="button"
-                  disabled={actionLoading}
+                  disabled={busy}
                   onClick={() => setRejectOpen(true)}
-                  className="border-outline-variant text-on-surface-variant hover:border-status-cancelled/50 hover:text-status-cancelled inline-flex w-full items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-xs font-semibold tracking-wide transition-colors disabled:opacity-50"
+                  className="border-outline-variant text-on-surface-variant hover:border-status-cancelled/50 hover:text-status-cancelled inline-flex w-full items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-xs font-semibold tracking-wide transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Reject request
                 </button>
@@ -360,8 +400,6 @@ export default function BarberRequestDetail({ id }) {
         onClose={() => setRejectOpen(false)}
         onConfirm={handleRejectConfirm}
       />
-
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

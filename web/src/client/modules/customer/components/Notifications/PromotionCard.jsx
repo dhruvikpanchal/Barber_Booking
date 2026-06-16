@@ -1,4 +1,4 @@
-import { TYPE_META } from "@/modules/customer/constants/notifications.js";
+import { TYPE_META } from "@/client/modules/customer/constants/notificationsConstants.js";
 import { BarberAvatar, CardActions } from "./helpers.jsx";
 
 export default function PromotionCard({ notif, onRead, onDelete }) {

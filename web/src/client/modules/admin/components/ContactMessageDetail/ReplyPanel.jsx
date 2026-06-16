@@ -3,15 +3,12 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, Loader2, Send } from "lucide-react";
 
-import {
-  Panel,
-} from "./Primitives.jsx";
+import { Panel } from "./Primitives.jsx";
 
 const REPLY_CHAR_LIMIT = 2000;
 
-export function ReplyPanel({ message, onSend, disabled }) {
+export function ReplyPanel({ message, onSend, disabled, sending = false }) {
   const [body, setBody] = useState("");
-  const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
 
   useEffect(() => {
@@ -24,19 +21,18 @@ export function ReplyPanel({ message, onSend, disabled }) {
     const text = body.trim();
     if (!text || sending || disabled) return;
 
-    setSending(true);
-    await new Promise((r) => setTimeout(r, 600));
-    onSend(text);
+    await onSend(text);
     setBody("");
     setSent(true);
-    setSending(false);
     window.setTimeout(() => setSent(false), 2000);
   }
 
+  const inputsDisabled = disabled || sending;
+
   return (
     <Panel title="Reply" icon={Send}>
-      {disabled ? (
-        <p className="text-sm text-on-surface-variant">
+      {disabled && !sending ? (
+        <p className="text-on-surface-variant text-sm">
           This thread is closed. Reopen the workflow to send another reply.
         </p>
       ) : (
@@ -45,23 +41,22 @@ export function ReplyPanel({ message, onSend, disabled }) {
             <span className="sr-only">Reply to {message.name}</span>
             <textarea
               value={body}
-              onChange={(e) =>
-                setBody(e.target.value.slice(0, REPLY_CHAR_LIMIT))
-              }
+              onChange={(e) => setBody(e.target.value.slice(0, REPLY_CHAR_LIMIT))}
               rows={4}
               required
+              disabled={inputsDisabled}
               placeholder={`Write your reply to ${message.name}…`}
-              className="w-full resize-y rounded-lg border border-outline-variant bg-surface-container px-3 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary focus:outline-none"
+              className="border-outline-variant bg-surface-container text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary w-full resize-y rounded-lg border px-3 py-2.5 text-sm focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             />
           </label>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <span className="text-xs text-on-surface-variant">
+            <span className="text-on-surface-variant text-xs">
               {body.length}/{REPLY_CHAR_LIMIT}
             </span>
             <button
               type="submit"
-              disabled={sending || !body.trim()}
-              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-bold text-on-primary transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto sm:px-6"
+              disabled={inputsDisabled || !body.trim()}
+              className="bg-primary text-on-primary inline-flex h-10 w-full items-center justify-center gap-2 rounded-md text-sm font-bold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto sm:px-6"
             >
               {sending ? (
                 <>

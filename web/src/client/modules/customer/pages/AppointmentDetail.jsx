@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   Calendar,
@@ -15,7 +17,7 @@ import {
   User,
 } from "lucide-react";
 import StatusBadge from "@/client/modules/shared/components/ui/StatusBadge";
-import { CUSTOMER_APPOINTMENT_STATUSES } from "@/client/modules/customer/constants/appointmentStatuses.js";
+import { CUSTOMER_APPOINTMENT_STATUSES } from "@/client/modules/customer/constants/appointmentStatusesConstants.js";
 import AppointmentProgressTracker from "@/client/modules/customer/components/MyAppointments/AppointmentProgressTracker.jsx";
 import AppointmentSummaryCard from "@/client/modules/customer/components/MyAppointments/AppointmentSummaryCard.jsx";
 import ServiceUpdateRequest from "@/client/modules/customer/components/MyAppointments/ServiceUpdateRequest.jsx";
@@ -29,12 +31,12 @@ import RequestServiceChangeModal from "@/client/modules/customer/components/MyAp
 import {
   formatDateTime,
   getTotalDuration,
-} from "@/client/modules/customer/data/appointmentsData.js";
+} from "@/client/modules/customer/helpers/appointmentsHelpers.js";
 import {
   buildProgressTracker,
   canRequestServiceChange,
-} from "@/client/modules/customer/helpers/appointments.js";
-import customerServices from "@/client/modules/customer/services/customerServices.jsx";
+} from "@/client/modules/customer/helpers/appointmentsHelpers.js";
+import { customerHook } from "@/client/modules/customer/hooks/customerQuery.jsx";
 import { routes } from "@/client/config/routes/routes.js";
 
 function InfoLine({ icon: Icon, label, value }) {
@@ -51,53 +53,54 @@ function InfoLine({ icon: Icon, label, value }) {
 
 export default function AppointmentDetail({ appt: initialAppt, appointmentId }) {
   const router = useRouter();
-  const [appt, setAppt] = useState(initialAppt ?? null);
-  const [loading, setLoading] = useState(Boolean(appointmentId && !initialAppt));
-  const [loadError, setLoadError] = useState(false);
-  const [serviceCatalog, setServiceCatalog] = useState([]);
-  const [favoriteIds, setFavoriteIds] = useState(new Set());
+  const queryClient = useQueryClient();
+  const id = appointmentId ?? initialAppt?.id ?? "";
+
+  const {
+    data: apptFromQuery,
+    isPending,
+    isError,
+    error,
+    refetch,
+  } = customerHook.Appointments.useGetAppointment(id);
+  const appt = apptFromQuery ?? initialAppt ?? null;
+
+  const { data: favorites = [], refetch: refetchFavorites } =
+    customerHook.Favorites.useListFavorites();
+  const favoriteIds = useMemo(
+    () => new Set((Array.isArray(favorites) ? favorites : []).map((b) => b.id)),
+    [favorites],
+  );
+
+  const barberSlug = appt?.barber?.slug ?? appt?.barber?.id ?? "";
+  const { data: serviceCatalogRaw = [] } = customerHook.Booking.useListBookingServices(barberSlug);
+  const serviceCatalog = Array.isArray(serviceCatalogRaw) ? serviceCatalogRaw : [];
+
+  const cancelMutation = customerHook.Appointments.useCancelAppointment();
+  const reviewMutation = customerHook.Appointments.useCreateReviewForAppointment();
+  const changeMutation = customerHook.Appointments.useRequestServiceChange();
+  const addFavoriteMutation = customerHook.Favorites.useAddFavorite();
+  const removeFavoriteMutation = customerHook.Favorites.useRemoveFavorite();
+
   const [changeModalOpen, setChangeModalOpen] = useState(false);
-  const [submittingChange, setSubmittingChange] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
-  const [reviewing, setReviewing] = useState(false);
-  const [toast, setToast] = useState(null);
 
-  const reload = useCallback(() => {
-    const id = appointmentId ?? appt?.id;
-    if (!id) return Promise.resolve();
-    return customerServices.getAppointment(id).then(setAppt);
-  }, [appointmentId, appt?.id]);
-
-  useEffect(() => {
-    const id = appointmentId ?? initialAppt?.id;
-    if (!id || initialAppt) return;
-    setLoading(true);
-    customerServices
-      .getAppointment(id)
-      .then(setAppt)
-      .catch(() => setLoadError(true))
-      .finally(() => setLoading(false));
-  }, [appointmentId, initialAppt]);
+  const busy =
+    isPending ||
+    cancelMutation.isPending ||
+    reviewMutation.isPending ||
+    changeMutation.isPending ||
+    addFavoriteMutation.isPending ||
+    removeFavoriteMutation.isPending;
 
   useEffect(() => {
-    customerServices
-      .listFavorites()
-      .then((list) => setFavoriteIds(new Set(list.map((b) => b.id))))
-      .catch(() => {});
-  }, []);
+    if (isError) {
+      toast.error(error?.message || "Could not load appointment.");
+    }
+  }, [isError, error]);
 
-  useEffect(() => {
-    const slug = appt?.barber?.slug ?? appt?.barber?.id;
-    if (!slug) return;
-    customerServices
-      .listBookingServices(slug)
-      .then((items) => setServiceCatalog(Array.isArray(items) ? items : []))
-      .catch(() => setServiceCatalog([]));
-  }, [appt?.barber?.slug, appt?.barber?.id]);
-
-  if (loading) {
+  if (isPending && !appt) {
     return (
       <div className="mx-auto max-w-6xl space-y-4 pb-28">
         <div className="bg-surface-container h-8 w-48 animate-pulse rounded" />
@@ -107,11 +110,14 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
     );
   }
 
-  if (loadError || !appt) {
+  if ((isError || !appt) && !isPending) {
     return (
       <div className="text-on-surface mx-auto max-w-6xl py-16 text-center">
         <p className="font-medium">Appointment not found.</p>
-        <Link href={routes.customer.myAppointments} className="text-primary mt-3 inline-block text-sm">
+        <Link
+          href={routes.customer.myAppointments}
+          className="text-primary mt-3 inline-block text-sm"
+        >
           Back to my appointments
         </Link>
       </div>
@@ -135,73 +141,78 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
   const progressSteps = buildProgressTracker(displayAppt);
   const isUpcoming = displayAppt.status === "pending" || displayAppt.status === "confirmed";
 
-  function showToast(message, type = "success") {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  }
-
   async function toggleFavorite() {
+    if (busy) return;
     try {
       if (isFavorite) {
-        await customerServices.removeFavorite(barberId);
-        setFavoriteIds((prev) => {
-          const next = new Set(prev);
-          next.delete(barberId);
-          return next;
+        await toast.promise(removeFavoriteMutation.mutateAsync(barberId), {
+          loading: "Updating favorites…",
+          success: `${displayAppt.barber.name} removed from favorites.`,
+          error: "Could not update favorites.",
         });
-        showToast(`${displayAppt.barber.name} removed from favorites.`, "info");
       } else {
-        await customerServices.addFavorite(barberId);
-        setFavoriteIds((prev) => new Set(prev).add(barberId));
-        showToast(`${displayAppt.barber.name} added to favorites.`, "info");
+        await toast.promise(addFavoriteMutation.mutateAsync(barberId), {
+          loading: "Updating favorites…",
+          success: `${displayAppt.barber.name} added to favorites.`,
+          error: "Could not update favorites.",
+        });
       }
-    } catch (err) {
-      showToast(err?.message ?? "Could not update favorites.", "info");
+      await refetchFavorites();
+      await queryClient.invalidateQueries({ queryKey: ["listFavorites"] });
+    } catch {
+      /* toast handles error */
     }
   }
 
   async function handleSubmitChangeRequest({ serviceIds, customerNote }) {
-    setSubmittingChange(true);
+    if (busy) return;
     try {
-      await customerServices.requestServiceChange(displayAppt.id, {
-        serviceIds,
-        customerNote,
-      });
+      await toast.promise(
+        changeMutation.mutateAsync({
+          id: displayAppt.id,
+          serviceIds,
+          customerNote,
+        }),
+        {
+          loading: "Sending change request…",
+          success: "Service change request sent. Your barber will review it shortly.",
+          error: "Could not send change request.",
+        },
+      );
       setChangeModalOpen(false);
-      await reload();
-      showToast("Service change request sent. Your barber will review it shortly.", "success");
-    } catch (err) {
-      showToast(err?.message ?? "Could not send change request.", "info");
-    } finally {
-      setSubmittingChange(false);
+      await refetch();
+    } catch {
+      /* toast handles error */
     }
   }
 
   async function handleCancelConfirm() {
-    setCancelling(true);
+    if (busy) return;
     try {
-      const updated = await customerServices.cancelAppointment(displayAppt.id, { reason: "" });
-      setAppt(updated);
+      await toast.promise(cancelMutation.mutateAsync({ id: displayAppt.id, reason: "" }), {
+        loading: "Cancelling booking…",
+        success: "Booking cancelled successfully.",
+        error: "Could not cancel booking.",
+      });
       setCancelOpen(false);
-      showToast("Booking cancelled successfully.", "info");
-    } catch (err) {
-      showToast(err?.message ?? "Could not cancel booking.", "info");
-    } finally {
-      setCancelling(false);
+      await refetch();
+    } catch {
+      /* toast handles error */
     }
   }
 
   async function handleReviewSubmit({ rating, comment }) {
-    setReviewing(true);
+    if (busy) return;
     try {
-      await customerServices.createReviewForAppointment(displayAppt.id, { rating, comment });
-      await reload();
+      await toast.promise(reviewMutation.mutateAsync({ id: displayAppt.id, rating, comment }), {
+        loading: "Submitting review…",
+        success: `Review submitted — ${rating} stars. Thanks!`,
+        error: "Could not submit review.",
+      });
       setReviewOpen(false);
-      showToast(`Review submitted — ${rating} stars. Thanks!`, "success");
-    } catch (err) {
-      showToast(err?.message ?? "Could not submit review.", "info");
-    } finally {
-      setReviewing(false);
+      await refetch();
+    } catch {
+      /* toast handles error */
     }
   }
 
@@ -209,7 +220,9 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
     <div className="mx-auto w-full max-w-6xl min-w-0 pb-28 md:pb-10">
       <Link
         href={routes.customer.myAppointments}
-        className="text-on-surface-variant hover:text-primary mb-4 inline-flex items-center gap-2 text-sm font-medium transition-colors"
+        aria-disabled={busy}
+        tabIndex={busy ? -1 : undefined}
+        className="text-on-surface-variant hover:text-primary mb-4 inline-flex items-center gap-2 text-sm font-medium transition-colors aria-disabled:pointer-events-none aria-disabled:opacity-50"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden />
         Back to my appointments
@@ -378,6 +391,7 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
                 isFavorite={isFavorite}
                 onToggle={toggleFavorite}
                 barberName={displayAppt.barber.name}
+                disabled={busy}
               />
             </div>
           </section>
@@ -393,7 +407,7 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
                 <>
                   <button
                     type="button"
-                    disabled={!changeEligibility.allowed}
+                    disabled={busy || !changeEligibility.allowed}
                     onClick={() => setChangeModalOpen(true)}
                     className="border-primary/30 bg-primary/10 text-primary hover:bg-primary/15 flex h-11 w-full items-center justify-center gap-2 rounded-xl border text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-45"
                   >
@@ -403,7 +417,8 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
                   <button
                     type="button"
                     onClick={() => setCancelOpen(true)}
-                    className="border-status-cancelled/30 bg-status-cancelled/10 text-status-cancelled hover:bg-status-cancelled/20 flex h-11 w-full items-center justify-center rounded-xl border text-sm font-semibold transition-all"
+                    disabled={busy}
+                    className="border-status-cancelled/30 bg-status-cancelled/10 text-status-cancelled hover:bg-status-cancelled/20 flex h-11 w-full items-center justify-center rounded-xl border text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Cancel appointment
                   </button>
@@ -413,7 +428,8 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
                 <button
                   type="button"
                   onClick={() => setReviewOpen(true)}
-                  className="bg-primary text-on-primary flex h-11 w-full items-center justify-center rounded-xl text-sm font-semibold transition-all hover:opacity-90"
+                  disabled={busy}
+                  className="bg-primary text-on-primary flex h-11 w-full items-center justify-center rounded-xl text-sm font-semibold transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Leave a review
                 </button>
@@ -421,8 +437,9 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
               {(displayAppt.status === "completed" || displayAppt.status === "cancelled") && (
                 <button
                   type="button"
-                  onClick={() => router.push(routes.customer.bookAppointment)}
-                  className="border-outline-variant text-on-surface hover:bg-surface-container-high flex h-11 w-full items-center justify-center rounded-xl border text-sm font-semibold transition-all"
+                  onClick={() => !busy && router.push(routes.customer.bookAppointment)}
+                  disabled={busy}
+                  className="border-outline-variant text-on-surface hover:bg-surface-container-high flex h-11 w-full items-center justify-center rounded-xl border text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Rebook appointment
                 </button>
@@ -439,7 +456,7 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
           catalog={serviceCatalog}
           onClose={() => setChangeModalOpen(false)}
           onSubmit={handleSubmitChangeRequest}
-          submitting={submittingChange}
+          submitting={changeMutation.isPending}
         />
       )}
 
@@ -448,7 +465,7 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
           appt={displayAppt}
           onConfirm={handleCancelConfirm}
           onClose={() => setCancelOpen(false)}
-          cancelling={cancelling}
+          cancelling={cancelMutation.isPending}
         />
       )}
 
@@ -457,27 +474,8 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
           appt={displayAppt}
           onSubmit={handleReviewSubmit}
           onClose={() => setReviewOpen(false)}
-          submitting={reviewing}
+          submitting={reviewMutation.isPending}
         />
-      )}
-
-      {toast && (
-        <div
-          className={`fixed right-6 bottom-6 z-50 flex max-w-sm items-center gap-3 rounded-xl border px-4 py-3 shadow-2xl backdrop-blur-sm ${
-            toast.type === "success"
-              ? "border-status-confirmed/30 bg-status-confirmed/10 text-status-confirmed"
-              : "border-primary/30 bg-primary/10 text-primary"
-          }`}
-        >
-          <span className="text-on-surface text-sm font-medium">{toast.message}</span>
-          <button
-            type="button"
-            onClick={() => setToast(null)}
-            className="text-on-surface-variant hover:text-on-surface ml-2 transition-colors"
-          >
-            ✕
-          </button>
-        </div>
       )}
     </div>
   );

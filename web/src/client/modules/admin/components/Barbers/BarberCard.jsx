@@ -1,44 +1,31 @@
 import { Ban, Eye, ShieldCheck, Star, Store } from "lucide-react";
-import { BarberStatusBadge } from "@/client/modules/admin/helpers/badges.jsx";
+import { BarberStatusBadge } from "@/client/modules/shared/components/ui/badges.jsx";
 
 /** Compact mobile-only card — desktop uses BarberTableRow. */
 export default function BarberCard({ barber, onAction }) {
   return (
-    <article className="rounded-lg border border-outline-variant bg-surface-container-low p-3">
+    <article className="border-outline-variant bg-surface-container-low rounded-lg border p-3">
       <div className="flex items-start justify-between gap-2.5">
         <div className="flex min-w-0 items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/20 font-serif text-sm font-bold text-primary">
+          <div className="bg-primary/20 text-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-serif text-sm font-bold">
             {barber.initials}
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-on-surface">
-              {barber.name}
-            </p>
-            <p className="truncate text-xs text-on-surface-variant">
-              {barber.email}
-            </p>
+            <p className="text-on-surface truncate text-sm font-semibold">{barber.name}</p>
+            <p className="text-on-surface-variant truncate text-xs">{barber.email}</p>
 
             <div className="mt-1">
-              <p className="flex items-center gap-1 truncate text-xs text-on-surface-variant">
+              <p className="text-on-surface-variant flex items-center gap-1 truncate text-xs">
                 <Store className="h-3 w-3 shrink-0" aria-hidden />
                 {barber.shop.name}
               </p>
-              <p className="truncate text-[11px] text-on-surface-variant">
-                {barber.shop.city}
-              </p>
+              <p className="text-on-surface-variant truncate text-[11px]">{barber.shop.city}</p>
             </div>
 
-            <div className="mt-2 flex items-center gap-1.5 text-xs text-on-surface-variant">
-              <Star
-                className="h-3 w-3 fill-primary text-primary"
-                aria-hidden
-              />
-              <span className="font-semibold text-on-surface">
-                {barber.rating.toFixed(1)}
-              </span>
-              <span className="text-on-surface-variant">
-                · {barber.reviewCount} reviews
-              </span>
+            <div className="text-on-surface-variant mt-2 flex items-center gap-1.5 text-xs">
+              <Star className="fill-primary text-primary h-3 w-3" aria-hidden />
+              <span className="text-on-surface font-semibold">{barber.rating.toFixed(1)}</span>
+              <span className="text-on-surface-variant">· {barber.reviewCount} reviews</span>
             </div>
           </div>
         </div>
@@ -52,7 +39,7 @@ export default function BarberCard({ barber, onAction }) {
         <button
           type="button"
           onClick={() => onAction("view", barber)}
-          className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-outline-variant text-xs font-semibold text-on-surface transition-colors hover:bg-surface-container"
+          className="border-outline-variant text-on-surface hover:bg-surface-container inline-flex h-9 items-center justify-center gap-1.5 rounded-md border text-xs font-semibold transition-colors"
         >
           <Eye className="h-3.5 w-3.5 shrink-0" aria-hidden />
           View
@@ -62,7 +49,7 @@ export default function BarberCard({ barber, onAction }) {
           <button
             type="button"
             onClick={() => onAction("enable", barber)}
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-status-confirmed/30 bg-status-confirmed/10 text-xs font-semibold text-status-confirmed transition-colors hover:bg-status-confirmed/20"
+            className="border-status-confirmed/30 bg-status-confirmed/10 text-status-confirmed hover:bg-status-confirmed/20 inline-flex h-9 items-center justify-center gap-1.5 rounded-md border text-xs font-semibold transition-colors"
           >
             <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
             Enable
@@ -71,7 +58,7 @@ export default function BarberCard({ barber, onAction }) {
           <button
             type="button"
             onClick={() => onAction("disable", barber)}
-            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-status-pending/30 bg-status-pending/10 text-xs font-semibold text-status-pending transition-colors hover:bg-status-pending/20"
+            className="border-status-pending/30 bg-status-pending/10 text-status-pending hover:bg-status-pending/20 inline-flex h-9 items-center justify-center gap-1.5 rounded-md border text-xs font-semibold transition-colors"
           >
             <Ban className="h-3.5 w-3.5 shrink-0" aria-hidden />
             Disable

@@ -1,77 +1,68 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Star, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 import {
   REVIEW_EDIT_MS,
-  canEditReview,
-  StarDisplay,
-  RatingInput,
   ReviewableCard,
   StatsBar,
   EmptyState,
-  Toast,
 } from "@/client/modules/customer/components/Reviews/Primitives.jsx";
-import customerServices from "@/client/modules/customer/services/customerServices.jsx";
+import { customerHook } from "@/client/modules/customer/hooks/customerQuery.jsx";
 import { ReviewCard } from "@/client/modules/customer/components/Reviews/ReviewCard.jsx";
 import { ReviewFormModal } from "@/client/modules/customer/components/Reviews/ReviewFormModal.jsx";
 import { DeleteModal } from "@/client/modules/customer/components/Reviews/DeleteModal.jsx";
 
 export default function Reviews() {
-  const [reviews, setReviews] = useState([]);
-  const [reviewable, setReviewable] = useState([]);
-  const [loading, setLoading] = useState(true);
-
+  const [filterRating, setFilterRating] = useState(0);
+  const [sortBy, setSortBy] = useState("newest");
   const [editTarget, setEditTarget] = useState(null);
   const [writeTarget, setWriteTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
-  const [submitting, setSubmitting] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [toast, setToast] = useState(null);
+  const reviewsQuery = customerHook.Reviews.useListReviews({ limit: 100, sort: sortBy });
+  const pastAppointmentsQuery = customerHook.Appointments.useListAppointments({
+    tab: "past",
+    limit: 50,
+  });
 
-  const [filterRating, setFilterRating] = useState(0);
-  const [sortBy, setSortBy] = useState("newest");
+  const reviewMutation = customerHook.Appointments.useCreateReviewForAppointment();
+  const updateMutation = customerHook.Reviews.useUpdateReview();
+  const deleteMutation = customerHook.Reviews.useDeleteReview();
 
-  function showToast(message, type = "success") {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 4000);
-  }
+  const isPending =
+    reviewsQuery.isPending ||
+    pastAppointmentsQuery.isPending ||
+    reviewMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending;
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [reviewsResult, pastResult] = await Promise.all([
-        customerServices.listReviews({ limit: 100, sort: sortBy }),
-        customerServices.listAppointments({ tab: "past", limit: 50 }),
-      ]);
-      setReviews(reviewsResult.items ?? []);
-      const reviewedIds = new Set((reviewsResult.items ?? []).map((r) => r.appointmentId));
-      const pending = (pastResult.items ?? []).filter((a) => {
+  useEffect(() => {
+    if (reviewsQuery.isError) {
+      toast.error(reviewsQuery.error?.message || "Could not load reviews.");
+    }
+  }, [reviewsQuery.isError, reviewsQuery.error]);
+
+  const reviews = reviewsQuery.data?.items ?? [];
+
+  const reviewable = useMemo(() => {
+    const reviewedIds = new Set(reviews.map((r) => r.appointmentId));
+    const pastItems = pastAppointmentsQuery.data?.items ?? [];
+    return pastItems
+      .filter((a) => {
         if (a.status !== "completed" || a.reviewed || reviewedIds.has(a.id)) return false;
         const completedAt = a.completedAt ?? a.startAt;
         return Date.now() - new Date(completedAt).getTime() <= REVIEW_EDIT_MS;
-      });
-      setReviewable(
-        pending.map((a) => ({
-          id: a.id,
-          completedAt: a.completedAt ?? a.startAt,
-          services: a.services,
-          barber: a.barber,
-          shop: a.shop,
-        })),
-      );
-    } catch {
-      setReviews([]);
-      setReviewable([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [sortBy]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+      })
+      .map((a) => ({
+        id: a.id,
+        completedAt: a.completedAt ?? a.startAt,
+        services: a.services,
+        barber: a.barber,
+        shop: a.shop,
+      }));
+  }, [reviews, pastAppointmentsQuery.data]);
 
   const visible = useMemo(() => {
     let list = filterRating ? reviews.filter((r) => r.rating === filterRating) : reviews;
@@ -82,38 +73,52 @@ export default function Reviews() {
     return list;
   }, [reviews, filterRating, sortBy]);
 
+  async function refetchAll() {
+    await Promise.all([reviewsQuery.refetch(), pastAppointmentsQuery.refetch()]);
+  }
+
   async function handleSubmitReview({ rating, comment }) {
-    setSubmitting(true);
+    if (isPending) return;
     try {
       if (writeTarget) {
-        await customerServices.createReviewForAppointment(writeTarget.id, { rating, comment });
-        showToast(`Review submitted — ${rating} ★. Thanks!`);
+        await toast.promise(
+          reviewMutation.mutateAsync({ id: writeTarget.id, rating, comment }),
+          {
+            loading: "Submitting review…",
+            success: `Review submitted — ${rating} ★. Thanks!`,
+            error: "Could not save review.",
+          },
+        );
         setWriteTarget(null);
       } else if (editTarget) {
-        await customerServices.updateReview(editTarget.id, { rating, comment });
-        showToast("Review updated.");
+        await toast.promise(
+          updateMutation.mutateAsync({ id: editTarget.id, rating, comment }),
+          {
+            loading: "Updating review…",
+            success: "Review updated.",
+            error: "Could not save review.",
+          },
+        );
         setEditTarget(null);
       }
-      await loadData();
-    } catch (err) {
-      showToast(err?.message ?? "Could not save review.", "info");
-    } finally {
-      setSubmitting(false);
+      await refetchAll();
+    } catch {
+      /* toast handles error */
     }
   }
 
   async function handleDeleteConfirm() {
-    if (!deleteTarget) return;
-    setDeleting(true);
+    if (!deleteTarget || deleteMutation.isPending) return;
     try {
-      await customerServices.deleteReview(deleteTarget.id);
+      await toast.promise(deleteMutation.mutateAsync(deleteTarget.id), {
+        loading: "Deleting review…",
+        success: "Review deleted.",
+        error: "Could not delete review.",
+      });
       setDeleteTarget(null);
-      showToast("Review deleted.", "info");
-      await loadData();
-    } catch (err) {
-      showToast(err?.message ?? "Could not delete review.", "info");
-    } finally {
-      setDeleting(false);
+      await refetchAll();
+    } catch {
+      /* toast handles error */
     }
   }
 
@@ -134,7 +139,7 @@ export default function Reviews() {
         </p>
       </header>
 
-      {loading ? (
+      {isPending && reviews.length === 0 ? (
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="bg-surface-container h-40 animate-pulse rounded-2xl" />
@@ -171,7 +176,8 @@ export default function Reviews() {
                       key={r}
                       type="button"
                       onClick={() => setFilterRating(filterRating === r ? 0 : r)}
-                      className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition-all ${
+                      disabled={isPending}
+                      className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
                         filterRating === r
                           ? "border-primary bg-primary/10 text-primary"
                           : "border-outline-variant text-on-surface-variant hover:border-primary/40"
@@ -192,7 +198,8 @@ export default function Reviews() {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="border-outline-variant bg-surface-container text-on-surface focus:border-primary rounded-xl border px-3 py-1.5 text-xs font-medium focus:outline-none"
+                  disabled={isPending}
+                  className="border-outline-variant bg-surface-container text-on-surface focus:border-primary rounded-xl border px-3 py-1.5 text-xs font-medium focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <option value="newest">Newest first</option>
                   <option value="oldest">Oldest first</option>
@@ -239,7 +246,7 @@ export default function Reviews() {
             setWriteTarget(null);
             setEditTarget(null);
           }}
-          submitting={submitting}
+          submitting={reviewMutation.isPending || updateMutation.isPending}
         />
       )}
 
@@ -248,11 +255,9 @@ export default function Reviews() {
           review={deleteTarget}
           onConfirm={handleDeleteConfirm}
           onClose={() => setDeleteTarget(null)}
-          deleting={deleting}
+          deleting={deleteMutation.isPending}
         />
       )}
-
-      <Toast toast={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }

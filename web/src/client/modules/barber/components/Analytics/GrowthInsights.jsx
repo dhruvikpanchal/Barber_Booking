@@ -20,7 +20,12 @@ export default function GrowthInsights({ insights = [] }) {
         </div>
       </header>
       <ul className="space-y-3">
-        {insights.map((item) => {
+        {insights.length === 0 ? (
+          <li className="text-on-surface-variant rounded-lg border border-dashed border-outline-variant px-3.5 py-4 text-center text-sm">
+            Insights will appear once you have bookings and reviews in this period.
+          </li>
+        ) : (
+          insights.map((item) => {
           const positive = item.trend >= 0;
           return (
             <li
@@ -54,7 +59,8 @@ export default function GrowthInsights({ insights = [] }) {
               </p>
             </li>
           );
-        })}
+        })
+        )}
       </ul>
     </section>
   );

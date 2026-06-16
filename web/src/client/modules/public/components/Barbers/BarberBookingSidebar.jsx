@@ -5,7 +5,7 @@ import { routes } from "@/config/routes/routes.js";
 /**
  * @param {{ barber: object }} props
  */
-export default function BarberBookingSidebar({ barber }) {
+export default function BarberBookingSidebar({ barber, disabled = false }) {
   const bookHref = routes.auth.login;
 
   return (
@@ -33,7 +33,9 @@ export default function BarberBookingSidebar({ barber }) {
         {barber.available ? (
           <Link
             href={bookHref}
-            className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-bold text-on-primary transition-colors hover:bg-primary/90"
+            aria-disabled={disabled}
+            tabIndex={disabled ? -1 : undefined}
+            className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-bold text-on-primary transition-colors hover:bg-primary/90 aria-disabled:pointer-events-none aria-disabled:opacity-50"
           >
             <CalendarPlus className="h-4 w-4" aria-hidden />
             Book appointment
@@ -47,14 +49,18 @@ export default function BarberBookingSidebar({ barber }) {
         <div className="mt-3 flex flex-col gap-2">
           <a
             href="#gallery"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-outline-variant text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
+            aria-disabled={disabled}
+            tabIndex={disabled ? -1 : undefined}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-outline-variant text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container aria-disabled:pointer-events-none aria-disabled:opacity-50"
           >
             <Images className="h-4 w-4" aria-hidden />
             View gallery
           </a>
           <a
             href="#reviews"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-outline-variant text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container"
+            aria-disabled={disabled}
+            tabIndex={disabled ? -1 : undefined}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-outline-variant text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container aria-disabled:pointer-events-none aria-disabled:opacity-50"
           >
             <MessageSquare className="h-4 w-4" aria-hidden />
             Read reviews

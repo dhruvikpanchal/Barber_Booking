@@ -1,9 +1,9 @@
 import { CheckCheck, Trash2, Clock, Scissors, MapPin } from "lucide-react";
-import { TYPE_META } from "../../constants/notifications.js";
+import { TYPE_META } from "../../constants/notificationsConstants.js";
 import { InitialsAvatar } from "@/client/modules/shared/components/ui/InitialsAvatar.jsx";
-import { ActionButtons } from "./helpers.jsx";
+import { ViewDetailsLink } from "./helpers.jsx";
 
-export default function BookingCard({ notif, onAction, onRead, onDelete }) {
+export default function BookingCard({ notif, onNavigate, onRead, onDelete, disabled }) {
   const meta = TYPE_META.booking_request;
   const Icon = meta.icon;
   return (
@@ -65,11 +65,7 @@ export default function BookingCard({ notif, onAction, onRead, onDelete }) {
 
         {/* Actions */}
         <div className="mt-3 ml-11 flex flex-wrap items-center justify-between gap-2">
-          {notif.actionable ? (
-            <ActionButtons id={notif.id} type="booking_request" onAction={onAction} />
-          ) : (
-            <span className="text-on-surface-variant text-xs italic">No action required</span>
-          )}
+          <ViewDetailsLink notif={notif} onNavigate={onNavigate} disabled={disabled} />
           <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
             {!notif.read && (
               <button

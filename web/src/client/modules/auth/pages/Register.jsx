@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { register } from "@/client/config/assets/ImagePath.js";
+import { register } from "@/client/assets/ImagePath.js";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import {
   getPasswordChecks,

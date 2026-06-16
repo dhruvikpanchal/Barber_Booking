@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ChevronRight, Home, Loader2, X } from "lucide-react";
 import Modal from "@/client/modules/shared/components/ui/Modal";
 import { routes } from "@/config/routes/routes.js";
-import { ACCOUNT_STATUS_CONFIG } from "@/modules/admin/data/barberDetailsData.js";
+import { ACCOUNT_STATUS_CONFIG } from "@/client/modules/admin/constants/barberDetailConstants.js";
 
 export function fullDateTime(iso) {
   return new Date(iso).toLocaleString(undefined, {
@@ -147,62 +147,62 @@ export function EditBarberModal({ barber, onClose, onSave }) {
       labelledBy="edit-barber-title"
       panelClassName="border-outline-variant bg-surface-container-low rounded-xl border p-6 shadow-2xl"
     >
-        <div className="flex items-start justify-between gap-3">
-          <h2 id="edit-barber-title" className="text-on-surface font-serif text-lg font-bold">
-            Edit barber
-          </h2>
+      <div className="flex items-start justify-between gap-3">
+        <h2 id="edit-barber-title" className="text-on-surface font-serif text-lg font-bold">
+          Edit barber
+        </h2>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="text-on-surface-variant hover:text-on-surface"
+        >
+          <X className="h-5 w-5" aria-hidden />
+        </button>
+      </div>
+      <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+        {[
+          { key: "name", label: "Full name" },
+          { key: "email", label: "Email", type: "email" },
+          { key: "phone", label: "Phone" },
+        ].map(({ key, label, type = "text" }) => (
+          <label key={key} className="block">
+            <span className="font-label-caps text-on-surface-variant">{label}</span>
+            <input
+              type={type}
+              value={form[key]}
+              onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+              className="border-outline-variant bg-surface-container text-on-surface focus:border-primary mt-1.5 w-full rounded-md border px-3 py-2.5 text-sm focus:outline-none"
+            />
+          </label>
+        ))}
+        <label className="block">
+          <span className="font-label-caps text-on-surface-variant">Bio</span>
+          <textarea
+            rows={3}
+            value={form.bio}
+            onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
+            className="border-outline-variant bg-surface-container text-on-surface focus:border-primary mt-1.5 w-full resize-y rounded-md border px-3 py-2.5 text-sm focus:outline-none"
+          />
+        </label>
+        <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close"
-            className="text-on-surface-variant hover:text-on-surface"
+            className="border-outline-variant text-on-surface-variant hover:bg-surface-container rounded-md border px-4 py-2.5 text-xs font-semibold"
           >
-            <X className="h-5 w-5" aria-hidden />
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="bg-primary text-on-primary inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-xs font-semibold hover:opacity-90 disabled:opacity-50"
+          >
+            {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+            Save changes
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-          {[
-            { key: "name", label: "Full name" },
-            { key: "email", label: "Email", type: "email" },
-            { key: "phone", label: "Phone" },
-          ].map(({ key, label, type = "text" }) => (
-            <label key={key} className="block">
-              <span className="font-label-caps text-on-surface-variant">{label}</span>
-              <input
-                type={type}
-                value={form[key]}
-                onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                className="border-outline-variant bg-surface-container text-on-surface focus:border-primary mt-1.5 w-full rounded-md border px-3 py-2.5 text-sm focus:outline-none"
-              />
-            </label>
-          ))}
-          <label className="block">
-            <span className="font-label-caps text-on-surface-variant">Bio</span>
-            <textarea
-              rows={3}
-              value={form.bio}
-              onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
-              className="border-outline-variant bg-surface-container text-on-surface focus:border-primary mt-1.5 w-full resize-y rounded-md border px-3 py-2.5 text-sm focus:outline-none"
-            />
-          </label>
-          <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-            <button
-              type="button"
-              onClick={onClose}
-              className="border-outline-variant text-on-surface-variant hover:bg-surface-container rounded-md border px-4 py-2.5 text-xs font-semibold"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="bg-primary text-on-primary inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-xs font-semibold hover:opacity-90 disabled:opacity-50"
-            >
-              {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-              Save changes
-            </button>
-          </div>
-        </form>
+      </form>
     </Modal>
   );
 }

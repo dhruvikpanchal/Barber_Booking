@@ -2,100 +2,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Clock, ChevronRight, Flame, Scissors, Zap, Star } from "lucide-react";
+import { Clock, ChevronRight, Flame, Scissors } from "lucide-react";
+import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes";
-import { publicServices } from "@/client/modules/public/services/publicServices.jsx";
-
-// ---------------------------------------------------------------------------
-// Service data enriched with categories
-// ---------------------------------------------------------------------------
-const SERVICES = [
-  {
-    id: "signature-cut",
-    name: "Signature Cut",
-    category: "Haircut",
-    startingPrice: 45,
-    duration: 45,
-    description:
-      "A thorough consultation followed by a precision cut, finished with a hot-towel close to leave the neckline crisp.",
-    popular: true,
-    icon: Scissors,
-  },
-  {
-    id: "skin-fade",
-    name: "Skin Fade",
-    category: "Haircut",
-    startingPrice: 40,
-    duration: 40,
-    description:
-      "Tight gradient fade tapering all the way to skin, refined with straight-razor detail along every edge.",
-    popular: true,
-    icon: Zap,
-  },
-  {
-    id: "beard-sculpt",
-    name: "Beard Sculpt",
-    category: "Beard",
-    startingPrice: 28,
-    duration: 25,
-    description:
-      "Precision trim and shape followed by a conditioning oil treatment that softens the beard and defines its line.",
-    popular: false,
-    icon: Scissors,
-  },
-  {
-    id: "hot-towel-shave",
-    name: "Hot Towel Shave",
-    category: "Beard",
-    startingPrice: 35,
-    duration: 30,
-    description:
-      "Classic straight-razor shave with a pre-softening hot-towel wrap and a soothing post-shave balm finish.",
-    popular: false,
-    icon: Star,
-  },
-  {
-    id: "father-son",
-    name: "Father & Son Cut",
-    category: "Packages",
-    startingPrice: 65,
-    duration: 60,
-    description:
-      "Two precision cuts booked side by side — the perfect excuse to spend an hour together at the chair.",
-    popular: false,
-    icon: Scissors,
-  },
-  {
-    id: "the-works",
-    name: "The Works",
-    category: "Packages",
-    startingPrice: 85,
-    duration: 75,
-    description:
-      "The full experience: haircut, straight-razor shave, beard sculpt, and a revitalising scalp treatment.",
-    popular: true,
-    icon: Flame,
-  },
-];
-
-const CATEGORY_ICONS = {
-  Haircut: Scissors,
-  Beard: Star,
-  Packages: Flame,
-  Package: Flame,
-  Service: Scissors,
-};
-
-function enrichService(service) {
-  const Icon = CATEGORY_ICONS[service.category] ?? Scissors;
-  return { ...service, icon: Icon };
-}
+import { publicHook } from "@/client/modules/public/hooks/publicQuery.jsx";
+import { enrichService } from "@/client/modules/public/helpers/serviceHelpers.js";
 
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function CategoryPills({ categories, active, onChange }) {
+function CategoryPills({ categories, active, onChange, disabled = false }) {
   return (
     <div className="flex flex-wrap gap-2" role="group" aria-label="Filter services by category">
       {categories.map((cat) => {
@@ -105,8 +22,10 @@ function CategoryPills({ categories, active, onChange }) {
             key={cat}
             type="button"
             onClick={() => onChange(cat)}
+            disabled={disabled}
             aria-pressed={isActive}
             className={[
+              "disabled:cursor-not-allowed disabled:opacity-50",
               "focus-visible:ring-primary/70 h-9 rounded-full border px-4 text-xs font-semibold tracking-wide transition-colors duration-150 focus-visible:ring-2 focus-visible:outline-none",
               isActive
                 ? "border-primary bg-primary text-on-primary"
@@ -191,7 +110,7 @@ function ServiceCard({ service }) {
   );
 }
 
-function EmptyState({ onReset }) {
+function EmptyState({ onReset, disabled = false }) {
   return (
     <div className="border-outline-variant col-span-full mt-4 rounded-xl border border-dashed px-6 py-20 text-center">
       <Scissors className="text-on-surface-variant/30 mx-auto h-10 w-10" aria-hidden />
@@ -204,7 +123,8 @@ function EmptyState({ onReset }) {
       <button
         type="button"
         onClick={onReset}
-        className="text-primary mt-5 text-sm font-semibold transition-opacity hover:opacity-75"
+        disabled={disabled}
+        className="text-primary mt-5 text-sm font-semibold transition-opacity hover:opacity-75 disabled:cursor-not-allowed disabled:opacity-50"
       >
         Show all services
       </button>
@@ -218,16 +138,17 @@ function EmptyState({ onReset }) {
 
 export default function ServicesList() {
   const [activeCategory, setActiveCategory] = useState("All");
-  const [services, setServices] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { data: rawServices = [], isPending, isError, error } = publicHook.Services.useServices({
+    limit: 50,
+  });
+
+  const services = useMemo(() => rawServices.map(enrichService), [rawServices]);
 
   useEffect(() => {
-    publicServices
-      .getServices({ limit: 50 })
-      .then((items) => setServices(items.map(enrichService)))
-      .catch(() => setServices([]))
-      .finally(() => setLoading(false));
-  }, []);
+    if (isError) {
+      toast.error(error?.message || "Could not load services.");
+    }
+  }, [isError, error]);
 
   const categories = useMemo(
     () => ["All", ...Array.from(new Set(services.map((s) => s.category).filter(Boolean)))],
@@ -285,6 +206,7 @@ export default function ServicesList() {
           categories={categories}
           active={activeCategory}
           onChange={setActiveCategory}
+          disabled={isPending}
         />
         {activeCategory !== "All" && (
           <p className="text-on-surface-variant mt-3 text-xs">
@@ -297,12 +219,12 @@ export default function ServicesList() {
 
       {/* Services grid */}
       <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-        {loading ? (
+        {isPending ? (
           <p className="text-on-surface-variant col-span-full text-center text-sm">
             Loading services…
           </p>
         ) : filtered.length === 0 ? (
-          <EmptyState onReset={() => setActiveCategory("All")} />
+          <EmptyState onReset={() => setActiveCategory("All")} disabled={isPending} />
         ) : (
           filtered.map((service) => <ServiceCard key={service.id} service={service} />)
         )}
