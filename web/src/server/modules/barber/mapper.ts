@@ -1,8 +1,9 @@
-import { buildPaginationMeta } from "@/server/shared/pagination";
+import { buildPaginationMeta } from "@/server/modules/shared/helpers/pagination";
 import {
   APPOINTMENT_TIMELINE_STEPS,
   BARBER_NOTIFICATION_TYPE_LABELS,
   BARBER_NOTIFICATION_ACTIONABLE,
+  type BarberExperienceTier,
   type ReviewCategoryKey,
   type BarberNotificationType,
   type TimelineStepState,
@@ -20,6 +21,26 @@ export function centsToDollars(cents: number): number {
 /** Convert decimal dollars to integer cents.  45.00 → 4500 */
 export function dollarsToCents(dollars: number): number {
   return Math.round(dollars * 100);
+}
+
+const EXPERIENCE_TIER_TO_YEARS: Record<BarberExperienceTier, number> = {
+  "0-2": 1,
+  "2-5": 3,
+  "5-10": 7,
+  "10+": 12,
+};
+
+/** Map API experience tier → integer years stored in barber_profiles.experience */
+export function experienceTierToYears(tier: BarberExperienceTier): number {
+  return EXPERIENCE_TIER_TO_YEARS[tier] ?? 0;
+}
+
+/** Map stored years → API experience tier */
+export function yearsToExperienceTier(years: number): BarberExperienceTier {
+  if (years < 2) return "0-2";
+  if (years < 5) return "2-5";
+  if (years < 10) return "5-10";
+  return "10+";
 }
 
 /** "09:00" → "9:00 AM",  "13:30" → "1:30 PM" */
@@ -552,7 +573,7 @@ export function toAppointmentListItemDto(row: AppointmentListDbRow): Appointment
 
   return {
     id: row.id,
-    status: row.status.toLowerCase(),
+    status: row.status.toLowerCase().replace(/_/g, "-"),
     startAt: row.startAt.toISOString(),
     dateDisplay: formatAppointmentDate(row.startAt),
     estimatedPrice: centsToDollars(row.estimatedPrice),
@@ -835,7 +856,7 @@ export function toWalkInDto(row: WalkInDbRow): WalkInDto {
     serviceName: row.serviceName,
     duration: row.duration,
     notes: row.notes,
-    status: row.status.toLowerCase(),
+    status: row.status.toLowerCase().replace(/_/g, "-"),
     addedAt: row.addedAt.toISOString(),
     startedAt: row.startedAt?.toISOString() ?? null,
     completedAt: row.completedAt?.toISOString() ?? null,

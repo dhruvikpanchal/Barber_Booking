@@ -1,8 +1,8 @@
 import type { NextRequest, NextResponse } from "next/server";
-import { withErrorHandler, type RouteHandler } from "@/server/shared/errors/errorHandler";
-import { withAuth } from "@/server/shared/middleware/auth";
-import { withRateLimit, type RateLimitTier } from "@/server/shared/middleware/rateLimit";
-import { adminOnly } from "@/server/shared/middleware/role";
+import { withErrorHandler, type RouteHandler } from "@/server/modules/shared/helpers/errorHandler";
+import { withAuth } from "@/server/modules/shared/middleware/auth";
+import { withRateLimit, type RateLimitTier } from "@/server/modules/shared/middleware/rateLimit";
+import { adminOnly } from "@/server/modules/shared/middleware/role";
 
 export function adminRoute(handler: RouteHandler, tier: RateLimitTier = "relaxed"): RouteHandler {
   return withErrorHandler(withRateLimit(tier)(handler));

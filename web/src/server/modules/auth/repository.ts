@@ -1,9 +1,9 @@
 import { and, eq, gt } from "drizzle-orm";
 import { db, barberRequests, notifications, users } from "@/server/db";
-import { NOTIFICATION_TYPE } from "@/server/shared/constants/notificationTypes";
-import { ROLES } from "@/server/shared/constants/roles";
-import { BARBER_REQUEST_STATUS } from "@/server/shared/constants/statuses";
-import type { Role } from "@/server/shared/constants/roles";
+import { NOTIFICATION_TYPE } from "@/server/modules/shared/constants/notificationTypes";
+import { ROLES } from "@/server/modules/shared/constants/roles";
+import { BARBER_REQUEST_STATUS } from "@/server/modules/shared/constants/statuses";
+import type { Role } from "@/server/modules/shared/constants/roles";
 
 export type CreateUserInput = {
   email: string;

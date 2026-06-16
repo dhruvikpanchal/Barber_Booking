@@ -1,5 +1,5 @@
 import { DAY_NAMES, SERVICE_MARKETING } from "@/server/modules/public/constants";
-import type { PaginationMeta } from "@/server/shared/responses";
+import type { PaginationMeta } from "@/server/modules/shared/responses";
 
 export function centsToDollars(cents: number): number {
   return Math.round(cents) / 100;

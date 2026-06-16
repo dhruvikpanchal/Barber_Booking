@@ -1,9 +1,9 @@
 import type { NextRequest } from "next/server";
 import { appConfig } from "@/server/config";
-import { ok, created, noContent } from "@/server/shared/responses";
-import { parseBody, parseQuery } from "@/server/shared/validation";
-import { ValidationError } from "@/server/shared/errors/AppError";
-import type { AuthedRequest } from "@/server/shared/types/request";
+import { ok, created, noContent } from "@/server/modules/shared/responses";
+import { parseBody, parseQuery } from "@/server/modules/shared/validation";
+import { UnauthorizedError, ValidationError } from "@/server/modules/shared/helpers/AppError";
+import type { AuthedRequest } from "@/server/modules/shared/types/request";
 import {
   barberProfileService,
   barberServicesService,
@@ -16,6 +16,8 @@ import {
   barberNotificationsService,
   barberDashboardService,
 } from "@/server/modules/barber/service";
+import { userSettingsService } from "@/server/modules/shared/settings/service";
+import { updatePasswordSchema } from "@/server/modules/shared/settings/schema";
 import {
   updateProfileSchema,
   addGalleryImageSchema,
@@ -49,7 +51,9 @@ import {
 // SHARED HELPERS
 /** Extract the authenticated userId from the request — set by withAuth middleware. */
 function getUserId(req: NextRequest): string {
-  return (req as AuthedRequest).user!.id;
+  const userId = (req as AuthedRequest).user?.id;
+  if (!userId) throw new UnauthorizedError("Authentication required");
+  return userId;
 }
 
 const ALLOWED_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -106,6 +110,36 @@ export const barberController = {
       photo.mimeType,
     );
     return ok(data);
+  },
+
+  async uploadGalleryPhoto(req: NextRequest) {
+    const userId = getUserId(req);
+    const formData = await req.formData();
+    const file = formData.get("photo");
+    const alt = String(formData.get("alt") ?? "");
+
+    if (!file || !(file instanceof File) || file.size === 0) {
+      throw new ValidationError("No photo file attached");
+    }
+
+    if (file.size > appConfig.auth.maxPhotoBytes) {
+      throw new ValidationError(
+        `Photo must be ${appConfig.auth.maxPhotoBytes / (1024 * 1024)} MB or smaller`,
+      );
+    }
+
+    if (!ALLOWED_PHOTO_TYPES.has(file.type)) {
+      throw new ValidationError("Photo must be JPG, PNG, or WEBP");
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const data = await barberProfileService.uploadGalleryPhoto(
+      userId,
+      buffer,
+      file.type,
+      alt,
+    );
+    return created(data);
   },
 
   async addGalleryImage(req: NextRequest) {
@@ -333,11 +367,31 @@ export const barberController = {
     return ok(data);
   },
 
+  async getUnreadNotificationCount(req: NextRequest) {
+    const userId = getUserId(req);
+    const data = await barberNotificationsService.getUnreadCount(userId);
+    return ok(data);
+  },
+
   // DASHBOARD  ·  /api/v1/barber/dashboard
   async getDashboard(req: NextRequest) {
     const userId = getUserId(req);
     const query = parseQuery(req.nextUrl.searchParams, dashboardQuerySchema);
     const data = await barberDashboardService.getDashboard(userId, query);
     return ok(data);
+  },
+
+  // SETTINGS  ·  /api/v1/barber/settings
+  async updatePassword(req: NextRequest) {
+    const userId = getUserId(req);
+    const input = await parseBody(req, updatePasswordSchema);
+    const data = await userSettingsService.updatePassword(userId, input);
+    return ok(data);
+  },
+
+  async deleteAccount(req: NextRequest) {
+    const userId = getUserId(req);
+    await userSettingsService.deleteAccount(userId);
+    return noContent();
   },
 };

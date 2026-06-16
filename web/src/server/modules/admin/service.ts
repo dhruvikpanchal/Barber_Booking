@@ -1,4 +1,4 @@
-import { hashPassword, verifyPassword } from "@/server/infrastructure/auth/password";
+import { hashPassword, verifyPassword } from "@/server/infra/auth/password";
 import {
   ADMIN_ALERT_PREFERENCE_KEYS,
   ADMIN_APPOINTMENT_ADMIN_TRANSITIONS,
@@ -61,13 +61,13 @@ import type {
   UpdateMaintenanceSettingsInput,
 } from "@/server/modules/admin/schema";
 import { authRepository } from "@/server/modules/auth/repository";
-import { APPOINTMENT_STATUS, CANCELLED_BY } from "@/server/shared/constants/statuses";
-import { NOTIFICATION_TYPE } from "@/server/shared/constants/notificationTypes";
+import { APPOINTMENT_STATUS, CANCELLED_BY } from "@/server/modules/shared/constants/statuses";
+import { NOTIFICATION_TYPE } from "@/server/modules/shared/constants/notificationTypes";
 import {
   BadRequestError,
   NotFoundError,
   UnprocessableError,
-} from "@/server/shared/errors/AppError";
+} from "@/server/modules/shared/helpers/AppError";
 
 function fireAndForget(promise: Promise<unknown>): void {
   promise.catch((err) => console.error("[admin-service] async side-effect failed", err));
@@ -129,10 +129,10 @@ function statusCountsToAppointmentStats(groups: { status: string; _count: { id: 
   return stats;
 }
 
-let maintenanceState: UpdateMaintenanceSettingsInput = {
-  enabled: false,
-  message: "",
-};
+import {
+  getMaintenanceState,
+  setMaintenanceState,
+} from "@/server/modules/shared/settings/maintenanceState";
 
 const defaultAlertPrefs = Object.fromEntries(
   ADMIN_ALERT_PREFERENCE_KEYS.map((k) => [k, true]),
@@ -787,18 +787,18 @@ export const adminService = {
   // Settings
   getSettings() {
     return {
-      maintenance: maintenanceState,
+      maintenance: getMaintenanceState(),
       alerts: alertPreferences,
       digests: digestPreferences,
     };
   },
 
   updateMaintenanceSettings(input: UpdateMaintenanceSettingsInput) {
-    maintenanceState = {
+    const maintenance = setMaintenanceState({
       enabled: input.enabled,
       message: input.message ?? "",
-    };
-    return { maintenance: maintenanceState };
+    });
+    return { maintenance };
   },
 
   updateAlertPreferences(input: UpdateAdminAlertPreferencesInput) {

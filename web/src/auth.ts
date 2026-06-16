@@ -2,7 +2,7 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { eq } from "drizzle-orm";
 import { db, users } from "@/server/db";
-import { ROLES } from "@/server/shared/constants/roles";
+import { ROLES } from "@/server/modules/shared/constants/roles";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,

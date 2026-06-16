@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { signAccessToken, signRefreshToken } from "@/server/infrastructure/auth/jwt";
-import type { Role } from "@/server/shared/constants/roles";
+import { signAccessToken, signRefreshToken } from "@/server/infra/auth/jwt";
+import type { Role } from "@/server/modules/shared/constants/roles";
 
 export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");

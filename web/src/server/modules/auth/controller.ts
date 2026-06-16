@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { appConfig } from "@/server/config";
-import { verifyTurnstile } from "@/server/infrastructure/security/turnstile";
+import { verifyTurnstile } from "@/server/infra/security/turnstile";
 import { authService } from "@/server/modules/auth/service";
 import {
   barberRegisterSchema,
@@ -10,11 +10,12 @@ import {
   loginSchema,
   refreshTokenSchema,
   resetPasswordSchema,
+  validateResetFlowSchema,
   verifyResetTokenSchema,
 } from "@/server/modules/auth/schema";
-import { created, ok } from "@/server/shared/responses";
-import { parseBody } from "@/server/shared/validation";
-import { ValidationError } from "@/server/shared/errors/AppError";
+import { created, ok } from "@/server/modules/shared/responses";
+import { parseBody } from "@/server/modules/shared/validation";
+import { ValidationError } from "@/server/modules/shared/helpers/AppError";
 
 const ALLOWED_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
@@ -131,6 +132,12 @@ export const authController = {
   async verifyResetToken(req: NextRequest) {
     const input = await parseBody(req, verifyResetTokenSchema);
     const data = await authService.verifyResetToken(input);
+    return ok(data);
+  },
+
+  async validateResetFlow(req: NextRequest) {
+    const input = await parseBody(req, validateResetFlowSchema);
+    const data = await authService.validateResetFlow(input);
     return ok(data);
   },
 

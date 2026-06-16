@@ -10,7 +10,7 @@ import {
   type AdminBarberStatusKey,
   type AdminAppointmentStatusKey,
 } from "@/server/modules/admin/constants";
-import { buildPaginationMeta } from "@/server/shared/pagination";
+import { buildPaginationMeta } from "@/server/modules/shared/helpers/pagination";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED HELPERS

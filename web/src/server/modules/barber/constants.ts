@@ -3,21 +3,6 @@ export const BARBER_EXPERIENCE_TIERS = ["0-2", "2-5", "5-10", "10+"] as const;
 
 export type BarberExperienceTier = (typeof BARBER_EXPERIENCE_TIERS)[number];
 
-export const BARBER_EXPERIENCE_LABELS: Record<BarberExperienceTier, string> = {
-  "0-2": "Apprentice (0–2 yrs)",
-  "2-5": "Journeyman (2–5 yrs)",
-  "5-10": "Senior (5–10 yrs)",
-  "10+": "Master (10+ yrs)",
-};
-
-export const BARBER_DISPLAY_ROLES = [
-  "Barber",
-  "Senior Barber",
-  "Master Barber",
-  "Head Barber",
-] as const;
-export type BarberDisplayRole = (typeof BARBER_DISPLAY_ROLES)[number];
-
 export const BARBER_AVAILABILITY = ["full-time", "part-time", "weekends", "flexible"] as const;
 export type BarberAvailability = (typeof BARBER_AVAILABILITY)[number];
 
@@ -47,12 +32,6 @@ export const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as 
 export const BARBER_STATUSES = ["ACTIVE", "INACTIVE", "DISABLED"] as const;
 
 export type BarberStatus = (typeof BARBER_STATUSES)[number];
-
-export const BARBER_STATUS_LABELS: Record<BarberStatus, string> = {
-  ACTIVE: "Active",
-  INACTIVE: "Inactive",
-  DISABLED: "Disabled",
-};
 
 // SERVICES
 export const SERVICE_MIN_DURATION_MINUTES = 5;
@@ -119,7 +98,7 @@ export type AppointmentTabKey = (typeof APPOINTMENT_TABS)[number]["key"];
 
 export const BARBER_STATUS_TRANSITIONS: Record<string, AppointmentStatus[]> = {
   PENDING: ["CONFIRMED", "CANCELLED"],
-  CONFIRMED: ["IN_SERVICE", "CANCELLED", "NO_SHOW"],
+  CONFIRMED: ["IN_SERVICE", "CANCELLED", "NO_SHOW", "COMPLETED"],
   IN_SERVICE: ["COMPLETED"],
   COMPLETED: [],
   CANCELLED: [],
@@ -140,7 +119,7 @@ export const APPOINTMENT_TIMELINE_STEPS = [
 
 export type TimelineStepKey = (typeof APPOINTMENT_TIMELINE_STEPS)[number]["key"];
 
-export const TIMELINE_STEP_STATES = ["done", "current", "upcoming", "cancelled"] as const;
+const TIMELINE_STEP_STATES = ["done", "current", "upcoming", "cancelled"] as const;
 
 export type TimelineStepState = (typeof TIMELINE_STEP_STATES)[number];
 
@@ -151,6 +130,8 @@ export const SERVICE_CHANGE_STATUSES = ["PENDING", "ACCEPTED", "REJECTED"] as co
 export type ServiceChangeStatus = (typeof SERVICE_CHANGE_STATUSES)[number];
 
 // QUEUE
+export const DEFAULT_BARBER_CHAIR_LABELS = ["Chair 1", "Chair 2", "Chair 3"] as const;
+
 export const QUEUE_STATUSES = ["WAITING", "IN_SERVICE", "DONE", "CANCELLED"] as const;
 
 export type QueueStatus = (typeof QUEUE_STATUSES)[number];
@@ -181,14 +162,6 @@ export const WALKIN_STATUSES = ["WAITING", "IN_SERVICE", "DONE", "CANCELLED"] as
 
 export type WalkInStatus = (typeof WALKIN_STATUSES)[number];
 
-export const DEFAULT_WALKIN_SERVICES = [
-  { name: "Signature Cut", duration: 45 },
-  { name: "Skin Fade", duration: 40 },
-  { name: "Beard Sculpt", duration: 25 },
-  { name: "Hot Towel Shave", duration: 30 },
-  { name: "Kids Cut", duration: 25 },
-] as const;
-
 // REVIEWS
 export const REVIEW_RATING_MIN = 1;
 
@@ -196,7 +169,7 @@ export const REVIEW_RATING_MAX = 5;
 
 export const REVIEW_REPLY_MAX_LENGTH = 500;
 
-export const REVIEW_CATEGORY_LABELS = {
+const REVIEW_CATEGORY_LABELS = {
   service: "Service quality",
   ambiance: "Shop ambiance",
   professionalism: "Professionalism",
@@ -227,22 +200,10 @@ export type ReviewStarFilterKey = (typeof REVIEW_STAR_FILTERS)[number]["key"];
 
 export const REVIEWS_PAGE_SIZE = 6;
 
-export const REVIEW_HISTORY_TYPES = ["review", "reply"] as const;
-
-export type ReviewHistoryType = (typeof REVIEW_HISTORY_TYPES)[number];
-
 // ANALYTICS
 export const ANALYTICS_PERIODS = ["today", "week", "month", "year", "custom"] as const;
 
 export type AnalyticsPeriod = (typeof ANALYTICS_PERIODS)[number];
-
-export const ANALYTICS_PERIOD_LABELS: Record<AnalyticsPeriod, string> = {
-  today: "Today",
-  week: "This Week",
-  month: "This Month",
-  year: "This Year",
-  custom: "Custom Range",
-};
 
 export const ANALYTICS_STAT_KEYS = [
   "totalRevenue",

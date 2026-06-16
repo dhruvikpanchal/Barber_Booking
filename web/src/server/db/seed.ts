@@ -1,10 +1,10 @@
 import "dotenv/config";
 
 import { eq } from "drizzle-orm";
-import { hashPassword } from "@/server/infrastructure/auth/password";
+import { hashPassword } from "@/server/infra/auth/password";
 import { closeDb, db } from "@/server/db";
 import { users } from "@/server/db/schema";
-import { ROLES } from "@/server/shared/constants/roles";
+import { ROLES } from "@/server/modules/shared/constants/roles";
 
 const ADMIN_EMAIL = "admin@test.com";
 const ADMIN_PASSWORD = "D1234567";

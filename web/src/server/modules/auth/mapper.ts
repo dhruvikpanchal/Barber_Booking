@@ -1,4 +1,4 @@
-import type { Role } from "@/server/shared/constants/roles";
+import type { Role } from "@/server/modules/shared/constants/roles";
 import type { User } from "@/server/db";
 
 export type AuthUserDto = {

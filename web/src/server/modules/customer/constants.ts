@@ -1,4 +1,4 @@
-import { NOTIFICATION_TYPE } from "@/server/shared/constants/notificationTypes";
+import { NOTIFICATION_TYPE } from "@/server/modules/shared/constants/notificationTypes";
 
 // Re-export shared appointment / service-change enums used across roles
 export {
@@ -117,6 +117,7 @@ export const CUSTOMER_NOTIFICATION_TYPES = [
   NOTIFICATION_TYPE.BOOKING_CONFIRMED,
   NOTIFICATION_TYPE.BOOKING_CANCELLED,
   NOTIFICATION_TYPE.BOOKING_REMINDER,
+  NOTIFICATION_TYPE.BOOKING_MODIFICATION_REQUEST,
   NOTIFICATION_TYPE.SERVICE_CHANGE_ACCEPTED,
   NOTIFICATION_TYPE.SERVICE_CHANGE_REJECTED,
   NOTIFICATION_TYPE.REVIEW_REQUEST,
@@ -130,6 +131,7 @@ export const CUSTOMER_NOTIFICATION_CLIENT_TYPES: Record<CustomerNotificationType
   BOOKING_CONFIRMED: "booking_confirmed",
   BOOKING_CANCELLED: "booking_cancelled",
   BOOKING_REMINDER: "booking_reminder",
+  BOOKING_MODIFICATION_REQUEST: "booking_rescheduled",
   SERVICE_CHANGE_ACCEPTED: "service_change",
   SERVICE_CHANGE_REJECTED: "service_change",
   REVIEW_REQUEST: "review_request",
@@ -152,6 +154,7 @@ export const CUSTOMER_APPOINTMENT_NOTIFICATION_CLIENT_TYPES = [
   "booking_confirmed",
   "booking_reminder",
   "booking_cancelled",
+  "booking_rescheduled",
 ] as const;
 
 // DASHBOARD  ·  /customer/dashboard

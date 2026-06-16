@@ -1,4 +1,4 @@
-import { NOTIFICATION_TYPE } from "@/server/shared/constants/notificationTypes";
+import { NOTIFICATION_TYPE } from "@/server/modules/shared/constants/notificationTypes";
 
 // Re-export shared enums used across admin operations
 export {
@@ -21,9 +21,6 @@ export type {
 // PAGINATION & LIMITS
 // Matches PAGE_SIZE in client/modules/admin/constants/admin.js & barber.js
 // ─────────────────────────────────────────────────────────────────────────────
-
-export const ADMIN_UI_PAGE_SIZE = 6;
-
 export const ADMIN_DEFAULT_LIST_LIMIT = 20;
 
 export const ADMIN_MAX_LIST_LIMIT = 100;
@@ -123,14 +120,6 @@ export const ADMIN_APPOINTMENT_STATUS_FILTER_ORDER = [
   "cancelled",
 ] as const;
 
-export const ADMIN_APPOINTMENT_STATUS_LABELS: Record<AdminAppointmentStatusKey, string> = {
-  pending: "Pending",
-  confirmed: "Confirmed",
-  "in-service": "In Service",
-  completed: "Completed",
-  cancelled: "Cancelled",
-};
-
 export const ADMIN_APPOINTMENT_DATE_RANGES = [
   { key: "all", label: "All dates" },
   { key: "today", label: "Today" },
@@ -169,12 +158,6 @@ export const BARBER_REQUEST_TABS = [
 
 export type BarberRequestTabKey = (typeof BARBER_REQUEST_TABS)[number]["key"];
 
-export const BARBER_REQUEST_STATUS_LABELS: Record<BarberRequestStatus, string> = {
-  PENDING: "Pending",
-  APPROVED: "Approved",
-  REJECTED: "Rejected",
-};
-
 // ─────────────────────────────────────────────────────────────────────────────
 // BARBERS  ·  /admin/barbers, /admin/barbers/[id]
 // client: constants/barber.js STATUS_CONFIG, SORT_OPTIONS
@@ -183,12 +166,6 @@ export const BARBER_REQUEST_STATUS_LABELS: Record<BarberRequestStatus, string> =
 export const ADMIN_BARBER_STATUS_KEYS = ["active", "inactive", "disabled"] as const;
 
 export type AdminBarberStatusKey = (typeof ADMIN_BARBER_STATUS_KEYS)[number];
-
-export const ADMIN_BARBER_STATUS_LABELS: Record<AdminBarberStatusKey, string> = {
-  active: "Active",
-  inactive: "Inactive",
-  disabled: "Disabled",
-};
 
 export const ADMIN_BARBER_SORT_OPTIONS = [
   { key: "name_asc", label: "Name A–Z" },
@@ -212,12 +189,6 @@ export const ADMIN_USER_STATUS_KEYS = ["active", "inactive", "disabled"] as cons
 
 export type AdminUserStatusKey = (typeof ADMIN_USER_STATUS_KEYS)[number];
 
-export const ADMIN_USER_STATUS_LABELS: Record<AdminUserStatusKey, string> = {
-  active: "Active",
-  inactive: "Inactive",
-  disabled: "Disabled",
-};
-
 export const ADMIN_USER_ACTIVITY_LEVELS = ["high", "medium", "low"] as const;
 
 export type AdminUserActivityLevel = (typeof ADMIN_USER_ACTIVITY_LEVELS)[number];
@@ -235,12 +206,6 @@ export const ADMIN_USER_SORT_OPTIONS = [
 ] as const;
 
 export type AdminUserSortKey = (typeof ADMIN_USER_SORT_OPTIONS)[number]["key"];
-
-export const ADMIN_USER_ACTIVITY_ORDER: Record<AdminUserActivityLevel, number> = {
-  high: 0,
-  medium: 1,
-  low: 2,
-};
 
 export const ADMIN_USER_ROLES = ["CUSTOMER", "BARBER", "ADMIN"] as const;
 
@@ -262,9 +227,6 @@ export const CONTACT_MESSAGE_TABS = [
 
 export type ContactMessageTabKey = (typeof CONTACT_MESSAGE_TABS)[number]["key"];
 
-/** Client replyStatus values in contactMessagesData.js */
-export const CONTACT_REPLY_CLIENT_KEYS = ["unreplied", "replied"] as const;
-
 // ─────────────────────────────────────────────────────────────────────────────
 // NOTIFICATIONS  ·  /admin/notifications
 // client: constants/admin.js NOTIFICATION_TABS, NOTIFICATION_VARIANT_CONFIG
@@ -283,7 +245,7 @@ export const ADMIN_NOTIFICATION_TYPES = [
 export type AdminNotificationType = (typeof ADMIN_NOTIFICATION_TYPES)[number];
 
 /** UI variant keys in NOTIFICATION_VARIANT_CONFIG (admin.js) */
-export const ADMIN_NOTIFICATION_VARIANTS = [
+const ADMIN_NOTIFICATION_VARIANTS = [
   "barber_request",
   "barber_approved",
   "booking",
@@ -317,16 +279,6 @@ export const ADMIN_NOTIFICATION_TYPE_TO_VARIANT: Partial<
   NEW_CONTACT_MESSAGE: "contact",
   BOOKING_CONFIRMED: "booking",
   BOOKING_CANCELLED: "cancellation",
-};
-
-/** Filter chip “type” column in admin notifications list */
-export const ADMIN_NOTIFICATION_TAB_TYPES: Record<AdminNotificationTabKey, string[] | null> = {
-  all: null,
-  unread: null,
-  system: ["system_info", "system_warning", "security", "user_signup"],
-  appointments: ["booking", "cancellation"],
-  barber: ["barber_request", "barber_approved"],
-  contact: ["contact"],
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

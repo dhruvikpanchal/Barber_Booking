@@ -24,10 +24,10 @@ import {
   updateContactMessageSchema,
   updateMaintenanceSettingsSchema,
 } from "@/server/modules/admin/schema";
-import { created, ok, paginated } from "@/server/shared/responses";
-import type { AuthedRequest } from "@/server/shared/types/request";
-import { parseBody, parseBodyOrEmpty, parseQuery } from "@/server/shared/validation";
-import { ValidationError } from "@/server/shared/errors/AppError";
+import { created, ok, paginated } from "@/server/modules/shared/responses";
+import type { AuthedRequest } from "@/server/modules/shared/types/request";
+import { parseBody, parseBodyOrEmpty, parseQuery } from "@/server/modules/shared/validation";
+import { ValidationError } from "@/server/modules/shared/helpers/AppError";
 
 function getUserId(req: NextRequest): string {
   const user = (req as AuthedRequest).user;

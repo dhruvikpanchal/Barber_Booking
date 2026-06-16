@@ -41,8 +41,8 @@ import {
   CUSTOMER_UPCOMING_STATUSES,
 } from "@/server/modules/customer/constants";
 import type { CustomerAppointmentsQuery } from "@/server/modules/customer/schema";
-import { contains } from "@/server/shared/drizzle/helpers";
-import { getPrismaSkipTake } from "@/server/shared/pagination";
+import { contains } from "@/server/db/helpers";
+import { getPrismaSkipTake } from "@/server/modules/shared/helpers/pagination";
 
 type NotificationType = typeof notifications.$inferSelect.type;
 

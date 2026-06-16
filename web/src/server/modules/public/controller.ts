@@ -8,8 +8,9 @@ import {
   shopsListQuerySchema,
   testimonialsQuerySchema,
 } from "@/server/modules/public/schema";
-import { created, ok } from "@/server/shared/responses";
-import { parseBody, parseQuery } from "@/server/shared/validation";
+import { created, ok } from "@/server/modules/shared/responses";
+import { getMaintenanceState } from "@/server/modules/shared/settings/maintenanceState";
+import { parseBody, parseQuery } from "@/server/modules/shared/validation";
 
 export const publicController = {
   async home(_req: NextRequest) {
@@ -57,5 +58,9 @@ export const publicController = {
     const input = await parseBody(req, contactMessageSchema);
     const data = await publicService.submitContact(input);
     return created(data);
+  },
+
+  async maintenanceStatus(_req: NextRequest) {
+    return ok(getMaintenanceState());
   },
 };

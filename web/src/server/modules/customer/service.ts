@@ -1,6 +1,5 @@
-
 import { appConfig } from "@/server/config";
-import { uploadImage } from "@/server/infrastructure/storage/cloudinary";
+import { uploadImage } from "@/server/infra/storage/cloudinary";
 import {
   BOOKING_MIN_LEAD_MINUTES,
   BOOKING_SLOT_INTERVAL_MINUTES,
@@ -26,6 +25,9 @@ import {
   toFavoriteToggleResultDto,
 } from "@/server/modules/customer/mapper";
 import { customerRepository } from "@/server/modules/customer/repository";
+import {
+  syncOnlineAppointmentQueueEntry,
+} from "@/server/modules/barber/repository";
 import type {
   AvailableSlotsQuery,
   BookingBarbersQuery,
@@ -47,9 +49,9 @@ import {
   ForbiddenError,
   NotFoundError,
   UnprocessableError,
-} from "@/server/shared/errors/AppError";
-import { NOTIFICATION_TYPE } from "@/server/shared/constants/notificationTypes";
-import { ROLES } from "@/server/shared/constants/roles";
+} from "@/server/modules/shared/helpers/AppError";
+import { NOTIFICATION_TYPE } from "@/server/modules/shared/constants/notificationTypes";
+import { ROLES } from "@/server/modules/shared/constants/roles";
 
 function fireAndForget(promise: Promise<unknown>): void {
   promise.catch((err) => console.error("[customer] async side-effect failed", err));
@@ -294,6 +296,8 @@ export const customerService = {
       }),
     );
 
+    fireAndForget(syncOnlineAppointmentQueueEntry(barber.id, row.id));
+
     return toCreateAppointmentResultDto(row);
   },
 
@@ -325,6 +329,8 @@ export const customerService = {
         },
       }),
     );
+
+    fireAndForget(syncOnlineAppointmentQueueEntry(row.barber.id, row.id));
 
     return toCustomerAppointmentListItemDto(row);
   },

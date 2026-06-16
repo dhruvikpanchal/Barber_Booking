@@ -17,10 +17,12 @@ import {
   updateCustomerProfileSchema,
   updateReviewSchema,
 } from "@/server/modules/customer/schema";
-import { created, noContent, ok, paginated } from "@/server/shared/responses";
-import type { AuthedRequest } from "@/server/shared/types/request";
-import { parseBody, parseQuery } from "@/server/shared/validation";
-import { ValidationError } from "@/server/shared/errors/AppError";
+import { created, noContent, ok, paginated } from "@/server/modules/shared/responses";
+import type { AuthedRequest } from "@/server/modules/shared/types/request";
+import { parseBody, parseQuery } from "@/server/modules/shared/validation";
+import { ValidationError } from "@/server/modules/shared/helpers/AppError";
+import { userSettingsService } from "@/server/modules/shared/settings/service";
+import { updatePasswordSchema } from "@/server/modules/shared/settings/schema";
 
 const ALLOWED_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
@@ -195,6 +197,18 @@ export const customerController = {
 
   async deleteNotification(req: NextRequest, notificationId: string) {
     await customerService.deleteNotification(getUserId(req), notificationId);
+    return noContent();
+  },
+
+  // Settings  ·  /customer/settings
+  async updatePassword(req: NextRequest) {
+    const input = await parseBody(req, updatePasswordSchema);
+    const data = await userSettingsService.updatePassword(getUserId(req), input);
+    return ok(data);
+  },
+
+  async deleteAccount(req: NextRequest) {
+    await userSettingsService.deleteAccount(getUserId(req));
     return noContent();
   },
 };

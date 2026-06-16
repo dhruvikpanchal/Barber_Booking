@@ -24,6 +24,9 @@ const envSchema = z.object({
 
   /** Google OAuth client ID (required for POST /auth/google) */
   GOOGLE_CLIENT_ID: z.string().optional(),
+
+  /** Public Google client ID for browser sign-in (falls back to GOOGLE_CLIENT_ID) */
+  NEXT_PUBLIC_GOOGLE_CLIENT_ID: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

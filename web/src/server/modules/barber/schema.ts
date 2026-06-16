@@ -53,6 +53,7 @@ export const updateProfileSchema = z.object({
   shopName: z.string().trim().min(1, "Shop name is required").max(120).optional(),
   shopAddress: z.string().trim().max(200).optional().or(z.literal("")),
   shopPhone: phoneField,
+  shopHours: z.string().trim().max(120).optional().or(z.literal("")),
   shopAbout: z.string().trim().max(500).optional().or(z.literal("")),
 
   // Barber personal section
@@ -77,7 +78,14 @@ export const updateProfileSchema = z.object({
     .max(BARBER_SPECIALTIES.length, "Too many specialties selected")
     .optional()
     .default([]),
-  portfolioUrl: z.string().url("Invalid portfolio URL").optional().or(z.literal("")),
+  portfolioUrl: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(""))
+    .refine((value) => !value || /^https?:\/\//i.test(value), {
+      message: "Invalid portfolio URL",
+    }),
   availability: z
     .union([z.enum(BARBER_AVAILABILITY), z.literal("")])
     .optional()

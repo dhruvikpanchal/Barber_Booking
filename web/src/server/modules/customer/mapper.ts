@@ -1,4 +1,4 @@
-import { buildPaginationMeta } from "@/server/shared/pagination";
+import { buildPaginationMeta } from "@/server/modules/shared/helpers/pagination";
 import {
   CUSTOMER_APPOINTMENT_NOTIFICATION_CLIENT_TYPES,
   CUSTOMER_NOTIFICATION_CLIENT_TYPES,
@@ -867,7 +867,12 @@ export function toCustomerNotificationDto(row: CustomerNotificationDbRow): Custo
       : null,
     service: (meta.service as string) ?? null,
     date: (meta.date as string) ?? null,
-    outcome: (meta.outcome as string) ?? null,
+    outcome:
+      row.type === "SERVICE_CHANGE_ACCEPTED"
+        ? "accepted"
+        : row.type === "SERVICE_CHANGE_REJECTED"
+          ? "rejected"
+          : ((meta.outcome as string) ?? null),
     previousServices: (meta.previousServices as string) ?? null,
     updatedServices: (meta.updatedServices as string) ?? null,
     cancelledBy: (meta.cancelledBy as string) ?? null,

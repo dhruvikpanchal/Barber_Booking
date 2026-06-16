@@ -17,7 +17,7 @@ import type {
   ShopsListQuery,
   TestimonialsQuery,
 } from "@/server/modules/public/schema";
-import { NotFoundError } from "@/server/shared/errors/AppError";
+import { NotFoundError } from "@/server/modules/shared/helpers/AppError";
 
 export const publicService = {
   async getHome() {

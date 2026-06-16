@@ -1,6 +1,6 @@
 import type { NextRequest, NextResponse } from "next/server";
-import { withErrorHandler, type RouteHandler } from "@/server/shared/errors/errorHandler";
-import { withRateLimit, type RateLimitTier } from "@/server/shared/middleware/rateLimit";
+import { withErrorHandler, type RouteHandler } from "@/server/modules/shared/helpers/errorHandler";
+import { withRateLimit, type RateLimitTier } from "@/server/modules/shared/middleware/rateLimit";
 
 export function publicAuthRoute(
   handler: RouteHandler,

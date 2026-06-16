@@ -1,6 +1,9 @@
 import { z } from "zod";
-import { BARBER_AVAILABILITY, BARBER_EXPERIENCE_TIERS } from "@/server/shared/constants/barber";
-import { BARBER_SPECIALTIES_VALUES } from "@/server/shared/constants/barberSpecialties";
+import {
+  BARBER_AVAILABILITY,
+  BARBER_EXPERIENCE_TIERS,
+} from "@/server/modules/shared/constants/barber";
+import { BARBER_SPECIALTIES_VALUES } from "@/server/modules/shared/constants/barberSpecialties";
 
 const PHONE_REGEX = /^\+?[\d\s\-().]{7,20}$/;
 
@@ -87,6 +90,10 @@ export const verifyResetTokenSchema = z.object({
   token: z.string().min(1, "Reset token is required"),
 });
 
+export const validateResetFlowSchema = z.object({
+  resetFlowToken: z.string().min(1, "Reset flow token is required"),
+});
+
 export const refreshTokenSchema = z.object({
   refreshToken: z.string().min(1, "Refresh token is required"),
 });
@@ -101,5 +108,6 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type VerifyResetTokenInput = z.infer<typeof verifyResetTokenSchema>;
+export type ValidateResetFlowInput = z.infer<typeof validateResetFlowSchema>;
 export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;
 export type GoogleAuthInput = z.infer<typeof googleAuthSchema>;

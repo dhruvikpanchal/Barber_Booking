@@ -1,20 +1,24 @@
-import { uploadImage, deleteImage } from "@/server/infrastructure/storage/cloudinary";
+import { uploadImage, deleteImage } from "@/server/infra/storage/cloudinary";
 import { appConfig, env } from "@/server/config";
 import {
   BadRequestError,
   NotFoundError,
   ConflictError,
   UnprocessableError,
-} from "@/server/shared/errors/AppError";
-import { APPOINTMENT_STATUS, SERVICE_CHANGE_STATUS } from "@/server/shared/constants/statuses";
-import { NOTIFICATION_TYPE } from "@/server/shared/constants/notificationTypes";
-import { buildPaginationMeta } from "@/server/shared/pagination";
+} from "@/server/modules/shared/helpers/AppError";
+import {
+  APPOINTMENT_STATUS,
+  SERVICE_CHANGE_STATUS,
+} from "@/server/modules/shared/constants/statuses";
+import { NOTIFICATION_TYPE } from "@/server/modules/shared/constants/notificationTypes";
+import { buildPaginationMeta } from "@/server/modules/shared/helpers/pagination";
 import {
   barberProfileRepository,
   barberServicesRepository,
   barberScheduleRepository,
   barberAppointmentsRepository,
   barberQueueRepository,
+  syncOnlineAppointmentQueueEntry,
   barberWalkInsRepository,
   barberReviewsRepository,
   barberAnalyticsRepository,
@@ -24,6 +28,7 @@ import {
 import {
   toBarberProfileDto,
   toGalleryImageDto,
+  experienceTierToYears,
   toBarberServiceDto,
   toServicesStatsDto,
   toScheduleDto,
@@ -106,15 +111,15 @@ export const barberProfileService = {
   async updateProfile(userId: string, input: UpdateProfileInput) {
     const barberId = await requireBarberProfile(userId);
 
-    // Build profile update
     const profileData: Record<string, unknown> = {};
-    if (input.experience !== undefined) profileData.experience = input.experience;
+    if (input.experience !== undefined) {
+      profileData.experience = experienceTierToYears(input.experience);
+    }
     if (input.bio !== undefined) profileData.bio = input.bio || null;
     if (input.portfolioUrl !== undefined) profileData.portfolioUrl = input.portfolioUrl || null;
-    if (input.availability !== undefined) profileData.availability = input.availability || null;
+    if (input.shopAbout !== undefined) profileData.availability = input.shopAbout || null;
     if (input.availableToday !== undefined) profileData.isAvailable = input.availableToday;
 
-    // Build user update
     const userData: Record<string, unknown> = {};
     if (input.firstName !== undefined) {
       userData.firstName = input.firstName;
@@ -125,14 +130,44 @@ export const barberProfileService = {
     if (input.phone !== undefined) userData.phone = input.phone || null;
     if (input.city !== undefined) userData.city = input.city || null;
 
-    await barberProfileRepository.updateProfile(barberId, {
-      profile: profileData,
-      user: userData,
-    });
+    if (Object.keys(profileData).length > 0 || Object.keys(userData).length > 0) {
+      await barberProfileRepository.updateProfile(barberId, {
+        profile: profileData,
+        user: userData,
+      });
+    }
 
-    // Sync specialties if provided
     if (input.specialties !== undefined) {
       await barberProfileRepository.syncSpecialties(barberId, input.specialties);
+    }
+
+    const hasShopFields =
+      input.shopName !== undefined ||
+      input.shopAddress !== undefined ||
+      input.shopHours !== undefined;
+
+    if (hasShopFields) {
+      const shopPayload = {
+        name: input.shopName?.trim() || undefined,
+        address: input.shopAddress ?? null,
+        city: input.city?.trim() || undefined,
+        openHoursSummary: input.shopHours ?? null,
+      };
+
+      if (shopPayload.name) {
+        await barberProfileRepository.ensureShopForBarber(barberId, {
+          name: shopPayload.name,
+          address: shopPayload.address,
+          city: shopPayload.city,
+          openHoursSummary: shopPayload.openHoursSummary,
+        });
+      } else {
+        await barberProfileRepository.updateShopForBarber(barberId, {
+          address: shopPayload.address,
+          openHoursSummary: shopPayload.openHoursSummary,
+          city: shopPayload.city,
+        });
+      }
     }
 
     return barberProfileService.getProfile(userId);
@@ -152,6 +187,37 @@ export const barberProfileService = {
 
     await barberProfileRepository.updatePhoto(barberId, uploaded.url);
     return { photoUrl: uploaded.url };
+  },
+
+  async uploadGalleryPhoto(
+    userId: string,
+    buffer: Buffer,
+    mimeType: string,
+    alt = "",
+  ) {
+    if (!(ALLOWED_IMAGE_TYPES as readonly string[]).includes(mimeType)) {
+      throw new BadRequestError(`Unsupported image type: ${mimeType}`);
+    }
+
+    const barberId = await requireBarberProfile(userId);
+
+    const count = await barberProfileRepository.countGalleryImages(barberId);
+    if (count >= MAX_GALLERY_IMAGES) {
+      throw new UnprocessableError(`Gallery limit reached (max ${MAX_GALLERY_IMAGES} images)`);
+    }
+
+    const uploaded = await uploadImage(buffer, `${appConfig.cloudinary.defaultFolder}/gallery`, {
+      resource_type: "image",
+      transformation: [{ width: 1200, height: 1200, crop: "limit" }],
+    });
+
+    const row = await barberProfileRepository.addGalleryImage(barberId, {
+      src: uploaded.url,
+      alt: alt.trim() || undefined,
+      sortOrder: count,
+    });
+
+    return toGalleryImageDto(row);
   },
 
   async addGalleryImage(userId: string, input: AddGalleryImageInput) {
@@ -411,7 +477,12 @@ export const barberAppointmentsService = {
       }
     }
 
-    return { id: appointmentId, status: newStatus.toLowerCase() };
+    fireAndForget(
+      syncOnlineAppointmentQueueEntry(barberId, appointmentId),
+      "online appointment queue sync",
+    );
+
+    return { id: appointmentId, status: newStatus.toLowerCase().replace(/_/g, "-") };
   },
 
   async rescheduleAppointment(
@@ -507,6 +578,55 @@ export const barberAppointmentsService = {
   },
 };
 
+function mapQueueStatusToAppointmentStatus(queueStatus: string): AppointmentStatus | null {
+  switch (queueStatus.toUpperCase()) {
+    case "IN_SERVICE":
+      return APPOINTMENT_STATUS.IN_SERVICE;
+    case "DONE":
+      return APPOINTMENT_STATUS.COMPLETED;
+    case "CANCELLED":
+      return APPOINTMENT_STATUS.CANCELLED;
+    default:
+      return null;
+  }
+}
+
+async function syncAppointmentFromQueue(
+  barberId: string,
+  appointmentId: string,
+  queueStatus: string,
+) {
+  const targetStatus = mapQueueStatusToAppointmentStatus(queueStatus);
+  if (!targetStatus) return;
+
+  const row = await barberAppointmentsRepository.findAppointmentDetail(appointmentId, barberId);
+  if (!row) return;
+
+  const currentStatus = row.status.toUpperCase() as AppointmentStatus;
+  if (currentStatus === targetStatus) return;
+
+  const allowed = BARBER_STATUS_TRANSITIONS[currentStatus] ?? [];
+  if (!allowed.includes(targetStatus)) return;
+
+  const timestamps: Partial<{ confirmedAt: Date; arrivedAt: Date; completedAt: Date }> = {};
+  if (targetStatus === APPOINTMENT_STATUS.IN_SERVICE) timestamps.arrivedAt = new Date();
+  if (targetStatus === APPOINTMENT_STATUS.COMPLETED) timestamps.completedAt = new Date();
+
+  await barberAppointmentsRepository.updateStatus(appointmentId, barberId, {
+    status: targetStatus,
+    timestamps,
+  });
+
+  await barberAppointmentsRepository.addModification({
+    appointmentId,
+    actor: "Barber",
+    field: "Status",
+    previousValue: currentStatus,
+    updatedValue: targetStatus,
+    summary: "Status updated from queue",
+  });
+}
+
 // QUEUE
 export const barberQueueService = {
   async getQueue(userId: string, query: QueueQuery) {
@@ -535,8 +655,24 @@ export const barberQueueService = {
 
   async updateQueueStatus(userId: string, entryId: string, input: UpdateQueueStatusInput) {
     const barberId = await requireBarberProfile(userId);
-    const entry = await barberQueueRepository.updateQueueStatus(entryId, barberId, input.status);
-    return entry;
+    const entry = await barberQueueRepository.findQueueEntry(entryId, barberId);
+    if (!entry) throw new NotFoundError("Queue entry");
+
+    await barberQueueRepository.updateQueueStatus(entryId, barberId, input.status);
+
+    if (entry.appointmentId) {
+      await syncAppointmentFromQueue(barberId, entry.appointmentId, input.status);
+    }
+
+    if (entry.walkInId) {
+      const walkInStatus = input.status.toUpperCase();
+      if (["WAITING", "IN_SERVICE", "DONE", "CANCELLED"].includes(walkInStatus)) {
+        await barberWalkInsRepository.updateWalkInStatus(entry.walkInId, barberId, walkInStatus);
+      }
+    }
+
+    const updated = await barberQueueRepository.findQueueEntry(entryId, barberId);
+    return updated;
   },
 
   async assignChair(userId: string, entryId: string, input: AssignChairInput) {
@@ -564,18 +700,15 @@ export const barberWalkInsService = {
     const barberId = await requireBarberProfile(userId);
     const row = await barberWalkInsRepository.createWalkIn(barberId, input);
 
-    // Auto-create a queue entry so the walk-in appears in the live queue
-    fireAndForget(
-      barberQueueRepository.addToQueue(barberId, {
-        source: "WALK_IN",
-        customerName: input.customerName,
-        phone: input.phone,
-        serviceName: input.serviceName,
-        duration: input.duration,
-        notes: input.notes,
-      }),
-      "walk-in queue entry creation",
-    );
+    await barberQueueRepository.addToQueue(barberId, {
+      source: "WALK_IN",
+      customerName: input.customerName,
+      phone: input.phone,
+      serviceName: input.serviceName,
+      duration: input.duration,
+      notes: input.notes,
+      walkInId: row.id,
+    });
 
     return toWalkInDto(row);
   },
@@ -604,6 +737,9 @@ export const barberWalkInsService = {
       barberId,
       input.status,
     );
+
+    await barberQueueRepository.syncQueueEntryStatus(walkInId, barberId, input.status);
+
     return toWalkInDto(updated);
   },
 };
@@ -648,6 +784,19 @@ export const barberReviewsService = {
 };
 
 // ANALYTICS
+function sqlRows<T>(result: unknown): T[] {
+  if (Array.isArray(result)) return result as T[];
+  if (
+    result &&
+    typeof result === "object" &&
+    "rows" in result &&
+    Array.isArray((result as { rows: unknown }).rows)
+  ) {
+    return (result as { rows: T[] }).rows;
+  }
+  return [];
+}
+
 /** Compute period window dates from a validated query */
 function resolvePeriodWindow(query: AnalyticsQuery): {
   start: Date;
@@ -758,11 +907,11 @@ export const barberAnalyticsService = {
       label,
       ...currentStats,
       ...prevStats,
-      revenueTrend,
-      appointmentTrend,
-      servicePopularity,
-      customerGrowth,
-      monthlySummary,
+      revenueTrend: sqlRows(revenueTrend),
+      appointmentTrend: sqlRows(appointmentTrend),
+      servicePopularity: sqlRows(servicePopularity),
+      customerGrowth: sqlRows(customerGrowth),
+      monthlySummary: sqlRows(monthlySummary),
       insights,
       periodStart: start,
       periodEnd: end,
@@ -792,6 +941,11 @@ export const barberNotificationsService = {
   async markAllRead(userId: string) {
     const result = await barberNotificationsRepository.markAllRead(userId);
     return { updated: result.count };
+  },
+
+  async getUnreadCount(userId: string) {
+    const count = await barberNotificationsRepository.countUnread(userId);
+    return { count };
   },
 };
 

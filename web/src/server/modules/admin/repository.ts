@@ -33,12 +33,16 @@ import {
   users,
   type Appointment,
 } from "@/server/db";
-import { contains } from "@/server/shared/drizzle/helpers";
-import { getPrismaSkipTake } from "@/server/shared/pagination";
-import { NOTIFICATION_TYPE } from "@/server/shared/constants/notificationTypes";
-import { ROLES } from "@/server/shared/constants/roles";
-import { BARBER_REQUEST_STATUS, CONTACT_REPLY_STATUS } from "@/server/shared/constants/statuses";
+import { contains } from "@/server/db/helpers";
+import { getPrismaSkipTake } from "@/server/modules/shared/helpers/pagination";
+import { NOTIFICATION_TYPE } from "@/server/modules/shared/constants/notificationTypes";
+import { ROLES } from "@/server/modules/shared/constants/roles";
+import {
+  BARBER_REQUEST_STATUS,
+  CONTACT_REPLY_STATUS,
+} from "@/server/modules/shared/constants/statuses";
 import { parseExperienceYears, slugFromName } from "@/server/modules/admin/helpers";
+import { ensureDefaultBarberChairs } from "@/server/modules/barber/repository";
 import type { AdminNotificationTabKey } from "@/server/modules/admin/constants";
 import type {
   AdminAppointmentsQuery,
@@ -801,6 +805,8 @@ export const adminBarberRequestsRepository = {
             })),
           );
         }
+
+        await ensureDefaultBarberChairs(barberId, tx);
       } else {
         await tx
           .update(barberProfiles)

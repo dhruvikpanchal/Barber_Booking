@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, exists, gte, inArray, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, or } from "drizzle-orm";
 import {
   barberProfiles,
   barberServices,
@@ -17,7 +17,7 @@ import type {
   ServicesListQuery,
   ShopsListQuery,
 } from "@/server/modules/public/schema";
-import { contains } from "@/server/shared/drizzle/helpers";
+import { contains } from "@/server/db/helpers";
 
 const barberListWith = {
   user: { columns: { fullName: true, photoUrl: true, city: true } },
@@ -83,11 +83,9 @@ function normalizeBarberDetail<
 function activeBarberWhere() {
   return and(
     eq(barberProfiles.barberStatus, "ACTIVE"),
-    exists(
-      db
-        .select({ id: sql<number>`1` })
-        .from(users)
-        .where(and(eq(users.id, barberProfiles.userId), eq(users.isActive, true))),
+    inArray(
+      barberProfiles.userId,
+      db.select({ id: users.id }).from(users).where(eq(users.isActive, true)),
     ),
   );
 }
@@ -101,14 +99,14 @@ function activeBarberIdsSubquery() {
 }
 
 function barberHasServiceCondition(serviceSlug: string) {
-  return exists(
+  return inArray(
+    barberProfiles.id,
     db
-      .select({ id: sql<number>`1` })
+      .select({ id: barberServices.barberId })
       .from(barberServices)
       .innerJoin(services, eq(barberServices.serviceId, services.id))
       .where(
         and(
-          eq(barberServices.barberId, barberProfiles.id),
           eq(barberServices.isActive, true),
           eq(services.slug, serviceSlug),
           eq(services.isActive, true),
@@ -131,23 +129,20 @@ function barberTextSearchCondition(q: string) {
         .from(shops)
         .where(or(contains(shops.name, q), contains(shops.city, q))),
     ),
-    exists(
+    inArray(
+      barberProfiles.id,
       db
-        .select({ id: sql<number>`1` })
+        .select({ id: barberSpecialties.barberId })
         .from(barberSpecialties)
-        .where(
-          and(
-            eq(barberSpecialties.barberId, barberProfiles.id),
-            contains(barberSpecialties.name, q),
-          ),
-        ),
+        .where(contains(barberSpecialties.name, q)),
     ),
-    exists(
+    inArray(
+      barberProfiles.id,
       db
-        .select({ id: sql<number>`1` })
+        .select({ id: barberServices.barberId })
         .from(barberServices)
         .innerJoin(services, eq(barberServices.serviceId, services.id))
-        .where(and(eq(barberServices.barberId, barberProfiles.id), contains(services.name, q))),
+        .where(contains(services.name, q)),
     ),
   );
 }

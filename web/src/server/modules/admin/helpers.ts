@@ -49,20 +49,3 @@ export function analyticsDateRange(query: AdminAnalyticsQuery): { gte: Date; lte
     end: query.end,
   });
 }
-
-export function dayLabelsForRange(gte: Date, lte: Date): string[] {
-  const labels: string[] = [];
-  const cursor = new Date(gte);
-  cursor.setHours(0, 0, 0, 0);
-  const end = new Date(lte);
-  end.setHours(23, 59, 59, 999);
-
-  while (cursor <= end && labels.length < 14) {
-    labels.push(
-      cursor.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }),
-    );
-    cursor.setDate(cursor.getDate() + 1);
-  }
-
-  return labels.length > 0 ? labels : ["—"];
-}

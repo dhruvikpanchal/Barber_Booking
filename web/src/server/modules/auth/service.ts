@@ -1,16 +1,17 @@
 import { randomInt } from "node:crypto";
-import type { Role } from "@/server/shared/constants/roles";
+import type { Role } from "@/server/modules/shared/constants/roles";
 import { OAuth2Client } from "google-auth-library";
 import { appConfig, env } from "@/server/config";
-import { hashPassword, verifyPassword } from "@/server/infrastructure/auth/password";
-import { verifyRefreshToken } from "@/server/infrastructure/auth/jwt";
+import { hashPassword, verifyPassword } from "@/server/infra/auth/password";
+import { verifyRefreshToken } from "@/server/infra/auth/jwt";
+import { signResetFlowToken, verifyResetFlowToken } from "@/server/infra/auth/resetFlowToken";
 import {
   sendBarberApplicationReceived,
   sendGoogleAccountConflict,
   sendMail,
   sendPasswordReset,
-} from "@/server/infrastructure/mail/mailtrap";
-import { uploadImage } from "@/server/infrastructure/storage/cloudinary";
+} from "@/server/infra/mail/mailtrap";
+import { uploadImage } from "@/server/infra/storage/cloudinary";
 import { authRepository } from "@/server/modules/auth/repository";
 import { toAuthResponse } from "@/server/modules/auth/mapper";
 import { getRefreshTokenExpiry, hashToken, issueTokenPair } from "@/server/modules/auth/tokens";
@@ -22,12 +23,17 @@ import type {
   LoginInput,
   RefreshTokenInput,
   ResetPasswordInput,
+  ValidateResetFlowInput,
   VerifyResetTokenInput,
 } from "@/server/modules/auth/schema";
-import { BadRequestError, ConflictError, UnauthorizedError } from "@/server/shared/errors/AppError";
-import { ROLES } from "@/server/shared/constants/roles";
-import { BARBER_REQUEST_STATUS } from "@/server/shared/constants/statuses";
-import { ok } from "@/server/shared/responses";
+import {
+  BadRequestError,
+  ConflictError,
+  UnauthorizedError,
+} from "@/server/modules/shared/helpers/AppError";
+import { ROLES } from "@/server/modules/shared/constants/roles";
+import { BARBER_REQUEST_STATUS } from "@/server/modules/shared/constants/statuses";
+import { ok } from "@/server/modules/shared/responses";
 
 function fireAndForget(promise: Promise<unknown>): void {
   promise.catch((err) => console.error("[auth] async side-effect failed", err));
@@ -192,9 +198,10 @@ export const authService = {
   },
 
   async forgotPassword(input: ForgotPasswordInput) {
+    const resetFlowToken = signResetFlowToken(input.email);
     const user = await authRepository.findByEmail(input.email);
     if (!user) {
-      return { message: "If that email exists, a reset link has been sent" };
+      return { message: "If that email exists, a reset link has been sent", resetFlowToken };
     }
 
     if (!user.passwordHash) {
@@ -205,7 +212,7 @@ export const authService = {
           html: `<p>Hi ${user.fullName},</p><p>This account uses Google sign-in. Please use the Google button on the login page instead of resetting a password.</p>`,
         }),
       );
-      return { message: "If that email exists, a reset link has been sent" };
+      return { message: "If that email exists, a reset link has been sent", resetFlowToken };
     }
 
     const otp = randomInt(100000, 1_000_000).toString();
@@ -216,8 +223,13 @@ export const authService = {
       passwordResetExpires: expires,
     });
 
-    fireAndForget(sendPasswordReset(user.email, otp));
-    return { message: "If that email exists, a reset link has been sent" };
+    fireAndForget(sendPasswordReset(user.email, otp, resetFlowToken));
+    return { message: "If that email exists, a reset link has been sent", resetFlowToken };
+  },
+
+  async validateResetFlow(input: ValidateResetFlowInput) {
+    const { email } = verifyResetFlowToken(input.resetFlowToken);
+    return { email, valid: true };
   },
 
   async verifyResetToken(input: VerifyResetTokenInput) {
@@ -234,7 +246,9 @@ export const authService = {
   async resetPassword(input: ResetPasswordInput) {
     const tokenHash = hashToken(input.token);
     const user = await authRepository.findByPasswordResetToken(tokenHash);
-    if (!user) throw new BadRequestError("Invalid or expired reset token");
+    if (!user || !user.passwordResetExpires || user.passwordResetExpires < new Date()) {
+      throw new BadRequestError("Invalid or expired reset token");
+    }
 
     const passwordHash = await hashPassword(input.password);
     await authRepository.updateUser(user.id, {

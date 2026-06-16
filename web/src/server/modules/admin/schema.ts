@@ -264,10 +264,6 @@ export const updateAdminProfileSchema = z.object({
 
 // SETTINGS  ·  GET/PATCH /api/v1/admin/settings
 
-export const adminSettingsQuerySchema = z.object({
-  section: z.enum(ADMIN_SETTINGS_SECTIONS).optional(),
-});
-
 export const updateMaintenanceSettingsSchema = z.object({
   enabled: z.boolean(),
   message: z.string().trim().max(500).optional().or(z.literal("")),
