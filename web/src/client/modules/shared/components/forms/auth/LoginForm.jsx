@@ -53,6 +53,7 @@ export default function LoginForm({
 
   return (
     <form className="space-y-6" onSubmit={handleSubmit} noValidate>
+
       <div>
         <label htmlFor="login-email" className="mb-2 block text-xs tracking-[0.1em] text-[#d8c2b7]">
           EMAIL ADDRESS

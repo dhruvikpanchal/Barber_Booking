@@ -118,15 +118,17 @@ export default function Login() {
 
       if (!portalRole) {
         clearAuthSession();
-        setFieldErrors({ form: "Unable to sign in with this account." });
+        const message = "Unable to sign in with this account.";
+        setFieldErrors({ form: message });
+        toast.error(message);
         return;
       }
 
       if (portalRole !== role) {
         clearAuthSession();
-        setFieldErrors({
-          form: `This account belongs to the ${ROLE_CONFIG[portalRole].portalLabel}. Switch portals and try again.`,
-        });
+        const message = `This account belongs to the ${ROLE_CONFIG[portalRole].portalLabel}. Switch portals and try again.`;
+        setFieldErrors({ form: message });
+        toast.error(message);
         return;
       }
 
