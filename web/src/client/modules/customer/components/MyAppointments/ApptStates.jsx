@@ -3,6 +3,7 @@
 import Link from "@/lib/AppLink";
 import { CalendarX, Wifi, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { routes } from "@/client/config/routes/routes.js";
+import { SectionLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 // ── Empty state ───────────────────────────────────────────────────────────────
 
@@ -54,28 +55,8 @@ export function EmptyState({ tab }) {
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
 
-function SkeletonRow() {
-  return (
-    <div className="flex animate-pulse items-start gap-3.5 rounded-xl border border-outline-variant/40 bg-surface-container-low p-4">
-      <div className="h-12 w-12 shrink-0 rounded-xl bg-surface-container-highest" />
-      <div className="flex-1 space-y-2 pt-1">
-        <div className="h-3.5 w-1/3 rounded bg-surface-container-highest" />
-        <div className="h-3 w-1/4 rounded bg-surface-container-highest/70" />
-        <div className="mt-2 h-3 w-2/3 rounded bg-surface-container-highest/50" />
-      </div>
-      <div className="h-6 w-16 rounded-full bg-surface-container-highest/60" />
-    </div>
-  );
-}
-
-export function LoadingSkeleton() {
-  return (
-    <div className="space-y-3">
-      {[1, 2, 3].map((i) => (
-        <SkeletonRow key={i} />
-      ))}
-    </div>
-  );
+export function LoadingSkeleton({ label = "Loading appointments..." }) {
+  return <SectionLoader label={label} />;
 }
 
 // ── Error state ───────────────────────────────────────────────────────────────

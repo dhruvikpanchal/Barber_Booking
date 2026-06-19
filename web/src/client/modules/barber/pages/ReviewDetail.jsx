@@ -25,6 +25,7 @@ import { StarRow } from "@/client/modules/shared/components/ui/StarRow.jsx";
 import RatingBreakdown from "@/client/modules/barber/components/Reviews/RatingBreakdown.jsx";
 import ReviewHistory from "@/client/modules/barber/components/Reviews/ReviewHistory.jsx";
 import { barberHook } from "@/client/modules/barber/hooks/barberQuery.jsx";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 function InfoLine({ icon: Icon, label, value }) {
   if (!value) return null;
@@ -91,12 +92,7 @@ export default function ReviewDetail({ reviewId }) {
   );
 
   if (isPending && !review) {
-    return (
-      <div className="text-on-surface mx-auto w-full max-w-6xl min-w-0 space-y-6 pb-28 md:pb-8">
-        <div className="bg-surface-container h-32 animate-pulse rounded-xl" />
-        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageLoader label="Loading review..." className="mx-auto max-w-6xl" />;
   }
 
   if (!review) {

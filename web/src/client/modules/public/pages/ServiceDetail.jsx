@@ -23,6 +23,7 @@ import {
 import { routes } from "@/client/config/routes/routes";
 import { CATEGORY_ICONS } from "@/client/modules/public/constants/serviceConstants.js";
 import { attachIcon } from "@/client/modules/public/helpers/serviceHelpers.js";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 // Sub-components
 // ---------------------------------------------------------------------------
@@ -359,11 +360,7 @@ export default function ServiceDetail({ id, initialData }) {
   }, [isPending, isError, service]);
 
   if (isPending && !service) {
-    return (
-      <div className="text-on-surface-variant mx-auto max-w-6xl px-4 py-24 text-center text-sm md:px-16">
-        Loading service…
-      </div>
-    );
+    return <PageLoader label="Loading service..." className="mx-auto max-w-6xl" />;
   }
 
   if (!service) notFound();

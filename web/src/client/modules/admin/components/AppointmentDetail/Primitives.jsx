@@ -11,6 +11,7 @@ import {
   Home,
 } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";
+import { SectionLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export function fullDateTime(iso) {
   return new Date(iso).toLocaleString(undefined, {
@@ -63,18 +64,8 @@ export function Breadcrumb({ appt }) {
   );
 }
 
-export function LoadingSkeleton() {
-  return (
-    <div className="mx-auto max-w-6xl space-y-6 animate-pulse">
-      <div className="h-4 w-56 rounded bg-surface-container-high" />
-      <div className="h-32 rounded-xl bg-surface-container-high" />
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="h-48 rounded-xl bg-surface-container-high" />
-        <div className="h-48 rounded-xl bg-surface-container-high" />
-      </div>
-      <div className="h-64 rounded-xl bg-surface-container-high" />
-    </div>
-  );
+export function LoadingSkeleton({ label = "Loading appointment..." }) {
+  return <SectionLoader label={label} />;
 }
 
 export function PaymentBadge({ status }) {

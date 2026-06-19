@@ -37,10 +37,10 @@ import {
   StatCard,
   DetailRow,
   Breadcrumb,
-  LoadingSkeleton,
   BookingStatusPill,
   PaymentPill,
 } from "@/client/modules/admin/components/UserDetail/Primitives.jsx";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 import { UserDetail_ACTIVITY_ICONS } from "@/client/modules/admin/constants/adminConstants.js";
 
 /**
@@ -93,15 +93,7 @@ export default function UserDetail({ id }) {
   }
 
   if (isPending && !user) {
-    return (
-      <div className="mx-auto max-w-6xl space-y-6">
-        <div className="text-on-surface-variant flex items-center gap-2 text-sm">
-          <Loader2 className="text-primary h-4 w-4 animate-spin" aria-hidden />
-          Loading customer profile…
-        </div>
-        <LoadingSkeleton />
-      </div>
-    );
+    return <PageLoader label="Loading customer profile..." className="mx-auto max-w-6xl" />;
   }
 
   if (isError || !user) {

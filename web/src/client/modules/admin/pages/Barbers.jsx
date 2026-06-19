@@ -23,6 +23,7 @@ import { mapAdminBarberListItem } from "@/client/modules/admin/helpers/adminMapp
 import BarberTableRow from "@/client/modules/admin/components/Barbers/BarberTableRow.jsx";
 import BarberCard from "@/client/modules/admin/components/Barbers/BarberCard.jsx";
 import ConfirmModal from "@/client/modules/admin/components/Barbers/ConfirmModal.jsx";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export default function AdminBarbers() {
   const router = useRouter();
@@ -136,12 +137,7 @@ export default function AdminBarbers() {
   }, [listQuery.data]);
 
   if (listQuery.isPending && barbers.length === 0) {
-    return (
-      <div className="mx-auto max-w-7xl space-y-8 pb-4">
-        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
-        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageLoader label="Loading barbers..." className="mx-auto max-w-7xl" />;
   }
 
   if (listQuery.isError && barbers.length === 0) {

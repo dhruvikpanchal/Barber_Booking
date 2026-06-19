@@ -21,6 +21,7 @@ import {
 } from "@/client/modules/admin/helpers/adminMappers.js";
 import { buildStatusCounts } from "@/client/modules/admin/components/Appointments/helpers.jsx";
 import { APPOINTMENTS_PAGE_SIZE } from "@/client/modules/admin/constants/adminConstants.js";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export default function Appointments() {
   const router = useRouter();
@@ -119,12 +120,7 @@ export default function Appointments() {
   };
 
   if (listQuery.isPending && appointments.length === 0) {
-    return (
-      <div className="mx-auto max-w-7xl space-y-8 pb-4">
-        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
-        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageLoader label="Loading appointments..." className="mx-auto max-w-7xl" />;
   }
 
   if (listQuery.isError && appointments.length === 0) {

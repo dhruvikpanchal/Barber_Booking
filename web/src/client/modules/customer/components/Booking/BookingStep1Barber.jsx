@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Star, Clock, Scissors, CheckCircle, Search, MapPin } from "lucide-react";
+import { SectionLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export default function BookingStep1Barber({
   booking,
@@ -45,13 +46,7 @@ export default function BookingStep1Barber({
   }, [query, serviceFilter, barbers]);
 
   if (loading) {
-    return (
-      <div className="space-y-3">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-surface-container h-24 animate-pulse rounded-xl" />
-        ))}
-      </div>
-    );
+    return <SectionLoader label="Loading barbers..." />;
   }
 
   return (

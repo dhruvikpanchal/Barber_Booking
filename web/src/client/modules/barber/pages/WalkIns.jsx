@@ -14,6 +14,7 @@ import {
 import { EMPTY_WALK_IN_FORM } from "@/client/modules/shared/constants/empty_form.js";
 import { barberHook, useBarberInvalidation } from "@/client/modules/barber/hooks/barberQuery.jsx";
 import { mapWalkIn, mapWalkInToApi, mapServiceFromApi } from "@/client/modules/barber/helpers/barberMappers.js";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export default function WalkIns() {
   const [tab, setTab] = useState("active");
@@ -177,12 +178,7 @@ export default function WalkIns() {
   }
 
   if (listQuery.isPending && entries.length === 0) {
-    return (
-      <div className="mx-auto max-w-6xl space-y-8 pb-4">
-        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
-        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageLoader label="Loading walk-ins..." className="mx-auto max-w-6xl" />;
   }
 
   return (

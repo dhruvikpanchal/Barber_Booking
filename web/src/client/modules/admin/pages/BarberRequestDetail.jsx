@@ -30,10 +30,10 @@ import {
   SectionCard,
   DetailRow,
   Breadcrumb,
-  LoadingSkeleton,
   ProfilePhoto,
   DocumentList,
 } from "@/client/modules/admin/components/BarberRequestDetail/Primitives.jsx";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 /**
  * @param {{ id: string }} props
@@ -97,15 +97,7 @@ export default function BarberRequestDetail({ id }) {
   }
 
   if (isPending) {
-    return (
-      <div className="mx-auto max-w-5xl space-y-6">
-        <div className="text-on-surface-variant flex items-center gap-2 text-sm">
-          <Loader2 className="text-primary h-4 w-4 animate-spin" aria-hidden />
-          Loading application…
-        </div>
-        <LoadingSkeleton />
-      </div>
-    );
+    return <PageLoader label="Loading application..." className="mx-auto max-w-5xl" />;
   }
 
   if (isError || !request) {

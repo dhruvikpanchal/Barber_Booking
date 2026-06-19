@@ -10,6 +10,7 @@ import SavedBarberCard from "@/client/modules/customer/components/Favorites/Save
 import FavoritesEmpty from "@/client/modules/customer/components/Favorites/FavoritesEmpty.jsx";
 import { BARBER_SORTS } from "@/client/modules/customer/constants/favoritesConstants.js";
 import { routes } from "@/client/config/routes/routes.js";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 function sortBarbers(list, key) {
   return [...list].sort((a, b) => {
@@ -122,6 +123,10 @@ export default function Favorites() {
 
   const sortedBarbers = useMemo(() => sortBarbers(barbers, barberSort), [barbers, barberSort]);
 
+  if (isPending && barbers.length === 0) {
+    return <PageLoader label="Loading favorites..." className="mx-auto max-w-6xl" />;
+  }
+
   return (
     <div className="mx-auto max-w-6xl">
       <header className="mb-6">
@@ -156,13 +161,7 @@ export default function Favorites() {
         )}
       </div>
 
-      {isPending ? (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-surface-container h-72 animate-pulse rounded-2xl" />
-          ))}
-        </div>
-      ) : barbers.length === 0 ? (
+      {barbers.length === 0 ? (
         <FavoritesEmpty tab="barbers" />
       ) : (
         <>

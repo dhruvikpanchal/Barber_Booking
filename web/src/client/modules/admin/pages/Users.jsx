@@ -28,6 +28,7 @@ import {
 } from "@/client/modules/admin/constants/adminConstants.js";
 import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
 import { mapAdminUserListItem } from "@/client/modules/admin/helpers/adminMappers.js";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export default function AdminUsers() {
   const router = useRouter();
@@ -142,12 +143,7 @@ export default function AdminUsers() {
   }, [listQuery.data]);
 
   if (listQuery.isPending && users.length === 0) {
-    return (
-      <div className="mx-auto max-w-7xl space-y-8 pb-4">
-        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
-        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageLoader label="Loading users..." className="mx-auto max-w-7xl" />;
   }
 
   if (listQuery.isError && users.length === 0) {

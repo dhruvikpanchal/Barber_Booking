@@ -31,6 +31,7 @@ import ServiceChangeRequestsSection from "@/client/modules/barber/components/App
 import AppointmentProgressTracker from "@/client/modules/customer/components/MyAppointments/AppointmentProgressTracker.jsx";
 import { customerInitials } from "@/client/lib/format/formatInitials.js";
 import { barberHook, useBarberInvalidation } from "@/client/modules/barber/hooks/barberQuery.jsx";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 function InfoRow({ Icon, label, value }) {
   if (value == null || value === "") return null;
@@ -111,12 +112,7 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
   );
 
   if (isPending && !appt) {
-    return (
-      <div className="text-on-surface mx-auto w-full max-w-6xl min-w-0 space-y-6 pb-28 md:pb-8">
-        <div className="bg-surface-container h-32 animate-pulse rounded-xl" />
-        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageLoader label="Loading appointment..." className="mx-auto max-w-6xl" />;
   }
 
   if (!appt) {

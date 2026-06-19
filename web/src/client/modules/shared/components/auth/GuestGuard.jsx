@@ -10,14 +10,7 @@ import {
   isTokenExpired,
 } from "@/client/lib/auth/session.js";
 import { getAccessToken } from "@/lib/axios";
-
-function AuthLoading() {
-  return (
-    <div className="bg-background text-on-surface flex min-h-dvh items-center justify-center">
-      <p className="text-on-surface-variant text-sm">Loading…</p>
-    </div>
-  );
-}
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 function canShowGuestPageImmediately() {
   if (typeof window === "undefined") return false;
@@ -58,6 +51,6 @@ export default function GuestGuard({ children }) {
     setReady(true);
   }, [router]);
 
-  if (!ready) return <AuthLoading />;
+  if (!ready) return <PageLoader fullScreen label="Loading..." />;
   return children;
 }

@@ -17,6 +17,7 @@ import NextAppointmentCard from "@/client/modules/customer/components/Dashboard/
 import UpcomingBookingsWidget from "@/client/modules/customer/components/Dashboard/UpcomingBookingsWidget.jsx";
 import RecentActivity from "@/client/modules/customer/components/Dashboard/RecentActivity.jsx";
 import NotificationsPreview from "@/client/modules/customer/components/Dashboard/NotificationsPreview.jsx";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export default function Dashboard() {
   const hydrated = useHydrated();
@@ -50,16 +51,7 @@ export default function Dashboard() {
   const unreadCount = data?.notifications?.unreadCount ?? 0;
 
   if (isPending) {
-    return (
-      <div className="text-on-surface mx-auto w-full max-w-6xl min-w-0 space-y-6 md:space-y-8">
-        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-surface-container h-24 animate-pulse rounded-xl" />
-          ))}
-        </div>
-      </div>
-    );
+    return <PageLoader label="Loading dashboard..." className="mx-auto max-w-6xl" />;
   }
 
   if (isError) {

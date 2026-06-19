@@ -16,7 +16,7 @@ import {
   ArrowDownRight,
 } from "lucide-react";
 import { toast } from "sonner";
-import { SkeletonLoader } from "@/client/modules/admin/components/Analytics/SkeletonLoader.jsx";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 import AreaSeriesPanel from "@/client/modules/shared/components/charts/AreaSeriesPanel.jsx";
 import VerticalBarChart from "@/client/modules/shared/components/charts/VerticalBarChart.jsx";
 import { rowsToCsv, downloadFile } from "@/client/modules/admin/components/Reports/MockDataBuilder";
@@ -146,7 +146,7 @@ export default function AdminAnalytics() {
             </h1>
           </div>
         </header>
-        <SkeletonLoader />
+        <PageLoader label="Loading analytics..." className="mx-auto max-w-7xl" />
       </div>
     );
   }
@@ -271,7 +271,7 @@ export default function AdminAnalytics() {
             </button>
           </div>
         ) : isPending ? (
-          <SkeletonLoader />
+          <PageLoader label="Loading analytics..." className="mx-auto max-w-7xl" />
         ) : showCustomPrompt ? (
           <div className="border-outline-variant bg-surface-container-low flex flex-col items-center justify-center rounded-xl border border-dashed p-12 text-center">
             <Filter className="text-primary/40 mb-4 h-12 w-12 animate-bounce" />
@@ -306,7 +306,7 @@ export default function AdminAnalytics() {
         ) : currentData ? (
           <div className="space-y-8">
             <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
-              {currentData.stats.map((stat, i) => {
+              {currentData.stats.map((stat) => {
                 let Icon = Users;
                 let accent = "text-primary bg-primary/10";
 
@@ -332,7 +332,7 @@ export default function AdminAnalytics() {
 
                 return (
                   <div
-                    key={i}
+                    key={stat.label}
                     className="border-outline-variant/50 bg-surface-container-low relative overflow-hidden rounded-xl border p-4 transition-all hover:-translate-y-0.5 hover:shadow"
                   >
                     <div className="flex items-start justify-between">

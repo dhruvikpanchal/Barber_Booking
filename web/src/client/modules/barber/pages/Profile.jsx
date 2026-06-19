@@ -38,6 +38,7 @@ import {
   syncProfilePhotoEverywhere,
 } from "@/client/modules/shared/helpers/profilePhotoHelpers.js";
 import { getProfileQueryKey } from "@/client/lib/auth/profileCache.js";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 const PORTAL_ROLE = "barber";
 const PROFILE_QUERY_KEY = getProfileQueryKey(PORTAL_ROLE);
@@ -356,12 +357,7 @@ export default function BarberProfile() {
   }
 
   if (isPending && !profile) {
-    return (
-      <div className="mx-auto max-w-6xl space-y-6 pb-28">
-        <div className="bg-surface-container h-32 animate-pulse rounded-xl" />
-        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageLoader label="Loading profile..." className="mx-auto max-w-6xl" />;
   }
 
   if (!profile) {

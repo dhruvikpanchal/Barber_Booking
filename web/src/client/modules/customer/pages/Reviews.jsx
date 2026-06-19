@@ -17,6 +17,7 @@ import { DeleteModal } from "@/client/modules/customer/components/Reviews/Delete
 import { CUSTOMER_NAV_SECTIONS } from "@/client/modules/customer/constants/customerNavSeenConstants.js";
 import { useMarkCustomerNavSeen } from "@/client/modules/customer/hooks/useMarkCustomerNavSeen.js";
 import { routes } from "@/client/config/routes/routes.js";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export default function Reviews() {
   const router = useRouter();
@@ -129,6 +130,10 @@ export default function Reviews() {
     }
   }
 
+  if (isPending && reviews.length === 0) {
+    return <PageLoader label="Loading reviews..." className="mx-auto max-w-6xl" />;
+  }
+
   return (
     <div className="text-on-surface mx-auto w-full max-w-6xl min-w-0 space-y-6 md:space-y-8">
       <header className="mb-6">
@@ -146,14 +151,7 @@ export default function Reviews() {
         </p>
       </header>
 
-      {isPending && reviews.length === 0 ? (
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-surface-container h-40 animate-pulse rounded-2xl" />
-          ))}
-        </div>
-      ) : (
-        <>
+      <>
           {reviewable.length > 0 && (
             <section className="mb-6 space-y-3">
               <div className="flex items-center gap-2">
@@ -241,8 +239,7 @@ export default function Reviews() {
               )}
             </>
           )}
-        </>
-      )}
+      </>
 
       {(writeTarget || editTarget) && (
         <ReviewFormModal

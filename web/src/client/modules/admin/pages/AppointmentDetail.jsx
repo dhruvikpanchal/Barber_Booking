@@ -12,7 +12,6 @@ import {
   Clock,
   CreditCard,
   IndianRupee,
-  Loader2,
   Mail,
   MapPin,
   Phone,
@@ -29,12 +28,12 @@ import { APPOINTMENT_STATUSES } from "@/client/modules/admin/constants/adminCons
 import { formatWhen } from "@/client/modules/admin/components/Appointments/AppointmentTableRow.jsx";
 import { formatMoney } from "@/client/lib/format/formatMoney.js";
 import ModificationHistorySection from "@/client/modules/admin/components/Appointments/ModificationHistorySection.jsx";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 import {
   fullDateTime,
   SectionCard,
   DetailRow,
   Breadcrumb,
-  LoadingSkeleton,
   PaymentBadge,
   TIMELINE_ICONS,
   StatusHistoryTrack,
@@ -55,15 +54,7 @@ export default function AppointmentDetail({ id }) {
   const appt = useMemo(() => (data ? mapAdminAppointmentDetail(data) : null), [data]);
 
   if (isPending) {
-    return (
-      <div className="mx-auto max-w-6xl space-y-6">
-        <div className="text-on-surface-variant flex items-center gap-2 text-sm">
-          <Loader2 className="text-primary h-4 w-4 animate-spin" aria-hidden />
-          Loading appointment…
-        </div>
-        <LoadingSkeleton />
-      </div>
-    );
+    return <PageLoader label="Loading appointment..." className="mx-auto max-w-6xl" />;
   }
 
   if (isError || !appt) {

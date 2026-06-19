@@ -14,6 +14,7 @@ import RejectModal from "@/client/modules/admin/components/BarberRequests/Reject
 import { BARBER_REQUEST_TABS } from "@/client/modules/admin/constants/adminConstants.js";
 import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
 import { useAdminInvalidation } from "@/client/modules/admin/hooks/useAdminInvalidation.js";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export default function BarberRequests() {
   const router = useRouter();
@@ -125,12 +126,7 @@ export default function BarberRequests() {
   };
 
   if (listQuery.isPending && requests.length === 0) {
-    return (
-      <div className="mx-auto max-w-7xl space-y-8 pb-4">
-        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
-        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageLoader label="Loading barber requests..." className="mx-auto max-w-7xl" />;
   }
 
   if (listQuery.isError && requests.length === 0) {

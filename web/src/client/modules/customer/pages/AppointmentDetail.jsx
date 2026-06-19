@@ -41,6 +41,7 @@ import { customerHook } from "@/client/modules/customer/hooks/customerQuery.jsx"
 import { routes } from "@/client/config/routes/routes.js";
 import { CUSTOMER_NAV_SECTIONS } from "@/client/modules/customer/constants/customerNavSeenConstants.js";
 import { useMarkCustomerNavSeen } from "@/client/modules/customer/hooks/useMarkCustomerNavSeen.js";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 function InfoLine({ icon: Icon, label, value }) {
   return (
@@ -112,13 +113,7 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
   }, [isError, error]);
 
   if (isPending && !appt) {
-    return (
-      <div className="mx-auto max-w-6xl space-y-4">
-        <div className="bg-surface-container h-8 w-48 animate-pulse rounded" />
-        <div className="bg-surface-container h-40 animate-pulse rounded-xl" />
-        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageLoader label="Loading appointment..." className="mx-auto max-w-6xl" />;
   }
 
   if ((isError || !appt) && !isPending) {

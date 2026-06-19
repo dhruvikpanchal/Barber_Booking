@@ -21,6 +21,7 @@ import { barberServices } from "@/client/modules/barber/services/barberServices.
 import { mapAppointmentListItem } from "@/client/modules/barber/helpers/barberMappers.js";
 import { shouldRetryQuery } from "@/client/lib/query/retryPolicy.js";
 import { filterAppointmentsBySearch } from "@/client/modules/barber/helpers/appointmentListHelpers.js";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 const APPOINTMENTS_PAGE_SIZE = 20;
 const LIST_STALE_TIME = 60_000;
@@ -155,12 +156,7 @@ export default function Appointments() {
   };
 
   if (listQuery.isPending && appointments.length === 0) {
-    return (
-      <div className="mx-auto max-w-6xl space-y-8 pb-4">
-        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
-        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageLoader label="Loading appointments..." className="mx-auto max-w-6xl" />;
   }
 
   if (listQuery.isError && appointments.length === 0) {

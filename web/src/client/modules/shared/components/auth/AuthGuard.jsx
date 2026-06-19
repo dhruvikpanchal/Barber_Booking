@@ -8,14 +8,7 @@ import {
   ensureAuthenticated,
   hasValidSession,
 } from "@/client/lib/auth/session.js";
-
-function AuthLoading() {
-  return (
-    <div className="bg-background text-on-surface flex min-h-dvh items-center justify-center">
-      <p className="text-on-surface-variant text-sm">Checking your session…</p>
-    </div>
-  );
-}
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 /**
  * Blocks dashboard routes until a valid access token exists for the required portal role.
@@ -66,6 +59,6 @@ export default function AuthGuard({ role, children }) {
     };
   }, [role, pathname, router]);
 
-  if (!allowed) return <AuthLoading />;
+  if (!allowed) return <PageLoader fullScreen label="Checking your session..." />;
   return children;
 }

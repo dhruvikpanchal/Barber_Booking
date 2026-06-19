@@ -25,6 +25,7 @@ import { mapAdminDashboard } from "@/client/modules/admin/helpers/adminMappers.j
 import { getGreeting, getTodayDateLabel } from "@/client/lib/format/formatDateTime.js";
 import { useHydrated } from "@/client/modules/shared/hooks/useHydrated.js";
 import { useHeaderProfile } from "@/client/modules/shared/hooks/useHeaderProfile.js";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export default function Dashboard() {
   const hydrated = useHydrated();
@@ -48,17 +49,7 @@ export default function Dashboard() {
   );
 
   if (isPending && !dashboard) {
-    return (
-      <div className="mx-auto max-w-7xl space-y-6 pb-4">
-        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="bg-surface-container h-28 animate-pulse rounded-xl" />
-          ))}
-        </div>
-        <div className="bg-surface-container h-72 animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageLoader label="Loading dashboard..." className="mx-auto max-w-7xl" />;
   }
 
   if (isError && !dashboard) {

@@ -26,6 +26,7 @@ import { barberHook } from "@/client/modules/barber/hooks/barberQuery.jsx";
 import { useBarberInvalidation } from "@/client/modules/barber/hooks/useBarberInvalidation.js";
 import { buildPaginationRange } from "@/client/modules/shared/helpers/paginationRange.js";
 import { mapReview, mapServiceFromApi } from "@/client/modules/barber/helpers/barberMappers.js";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 const ALL_SERVICES = "All Services";
 
@@ -124,12 +125,7 @@ export default function BarberReviews() {
       : null;
 
   if (reviewsQuery.isPending && reviews.length === 0) {
-    return (
-      <div className="mx-auto max-w-6xl space-y-8 pb-4">
-        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
-        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageLoader label="Loading reviews..." className="mx-auto max-w-6xl" />;
   }
 
   return (

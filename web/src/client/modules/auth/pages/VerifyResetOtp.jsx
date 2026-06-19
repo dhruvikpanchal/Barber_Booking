@@ -3,7 +3,7 @@
 import Link from "@/lib/AppLink";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, KeyRound, Loader2 } from "lucide-react";
+import { ArrowLeft, KeyRound } from "lucide-react";
 import { authHook } from "@/client/modules/auth/hooks/authQuery.jsx";
 import { authServices } from "@/client/modules/auth/services/authServices.jsx";
 import {
@@ -14,6 +14,7 @@ import {
 } from "@/client/lib/auth/passwordResetFlow.js";
 import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
+import { InlineSpinner, PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export default function VerifyResetOtp() {
   const router = useRouter();
@@ -80,11 +81,7 @@ export default function VerifyResetOtp() {
   }
 
   if (!ready) {
-    return (
-      <section className="flex min-h-screen items-center justify-center bg-[#131313] px-4 text-[#e4e2e1]">
-        <Loader2 className="h-8 w-8 animate-spin text-[#ffb68c]" aria-label="Loading" />
-      </section>
-    );
+    return <PageLoader fullScreen label="Loading..." />;
   }
 
   return (
@@ -148,7 +145,7 @@ export default function VerifyResetOtp() {
           >
             {verifyResetTokenMutation.isPending ? (
               <span className="flex items-center justify-center">
-                <Loader2 size={16} className="animate-spin" />
+                <InlineSpinner size="sm" />
               </span>
             ) : (
               "VERIFY TOKEN"

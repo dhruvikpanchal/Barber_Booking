@@ -1,9 +1,11 @@
 import dynamic from "next/dynamic";
-import PageSkeleton from "@/client/modules/shared/components/ui/PageSkeleton.jsx";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export function loadBarberPage(importFn, options = {}) {
   return dynamic(importFn, {
-    loading: () => <PageSkeleton tiles={options.tiles ?? 4} />,
+    loading: () => (
+      <PageLoader label="Loading..." className="mx-auto w-full max-w-6xl min-w-0" />
+    ),
     ...options,
   });
 }

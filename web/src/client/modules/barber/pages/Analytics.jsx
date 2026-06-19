@@ -20,6 +20,7 @@ import StackedGrowthBarChart from "@/client/modules/shared/components/charts/Sta
 import CustomerStatsPanel from "@/client/modules/barber/components/Analytics/CustomerStatsPanel.jsx";
 import MonthlyPerformanceSummary from "@/client/modules/barber/components/Analytics/MonthlyPerformanceSummary.jsx";
 import GrowthInsights from "@/client/modules/barber/components/Analytics/GrowthInsights.jsx";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export default function Analytics() {
   const hydrated = useHydrated();
@@ -62,16 +63,7 @@ export default function Analytics() {
       : 0;
 
   if (!hydrated || (isPending && canFetch) || (!canFetch && period === "custom")) {
-    return (
-      <div className="text-on-surface mx-auto w-full max-w-6xl min-w-0 space-y-6 pb-28 md:pb-8">
-        <div className="bg-surface-container h-28 animate-pulse rounded-xl" />
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="bg-surface-container h-24 animate-pulse rounded-xl" />
-          ))}
-        </div>
-      </div>
-    );
+    return <PageLoader label="Loading analytics..." className="mx-auto max-w-6xl" />;
   }
 
   if (isError) {

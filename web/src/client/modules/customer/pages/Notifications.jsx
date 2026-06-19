@@ -27,6 +27,7 @@ import ReviewRequestCard from "@/client/modules/customer/components/Notification
 import GenericNotificationCard from "@/client/modules/customer/components/Notifications/GenericNotificationCard.jsx";
 import StatsBar from "@/client/modules/customer/components/Notifications/StatsBar.jsx";
 import { useAutoMarkCustomerNotificationsRead } from "@/client/modules/customer/hooks/useAutoMarkCustomerNotificationsRead.js";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export default function Notifications() {
   const queryClient = useQueryClient();
@@ -109,20 +110,24 @@ export default function Notifications() {
   });
 
   const renderCard = (notif) => {
-    const props = { key: notif.id, notif, onRead: markRead, onDelete: deleteNotif };
+    const cardProps = { notif, onRead: markRead, onDelete: deleteNotif };
 
     if (APPOINTMENT_TYPES.includes(notif.type)) {
-      return <AppointmentNotificationCard {...props} />;
+      return <AppointmentNotificationCard key={notif.id} {...cardProps} />;
     }
     switch (notif.type) {
       case "service_change":
-        return <ServiceChangeCard {...props} />;
+        return <ServiceChangeCard key={notif.id} {...cardProps} />;
       case "review_request":
-        return <ReviewRequestCard {...props} />;
+        return <ReviewRequestCard key={notif.id} {...cardProps} />;
       default:
-        return <GenericNotificationCard {...props} />;
+        return <GenericNotificationCard key={notif.id} {...cardProps} />;
     }
   };
+
+  if (isPending && notifications.length === 0) {
+    return <PageLoader label="Loading notifications..." className="mx-auto max-w-6xl" />;
+  }
 
   return (
     <div className="bg-background text-on-surface mx-auto max-w-6xl space-y-8">
@@ -215,13 +220,7 @@ export default function Notifications() {
         })}
       </div>
 
-      {isPending ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-surface-container h-24 animate-pulse rounded-xl" />
-          ))}
-        </div>
-      ) : isError ? (
+      {isError ? (
         <ErrorState
           onRetry={() => refetch()}
           title="Couldn't load notifications"

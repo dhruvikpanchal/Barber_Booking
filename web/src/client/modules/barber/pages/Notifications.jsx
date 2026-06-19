@@ -7,6 +7,7 @@ import { Bell, BellOff, CheckCheck, Search, Scissors } from "lucide-react";
 import { toast } from "sonner";
 import { getNotificationDestination } from "@/client/modules/barber/helpers/notificationNavigation.js";
 import EmptyState from "@/client/modules/shared/components/ui/EmptyState";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 import { TYPE_META, FILTERS } from "@/client/modules/barber/constants/notificationsConstants.js";
 import BookingCard from "@/client/modules/barber/components/Notifications/BookingCard.jsx";
 import ModificationCard from "@/client/modules/barber/components/Notifications/ModificationCard.jsx";
@@ -117,8 +118,7 @@ export default function Notifications() {
   });
 
   const renderCard = (notif) => {
-    const props = {
-      key: notif.id,
+    const cardProps = {
       notif,
       onRead: markRead,
       onDelete: deleteNotif,
@@ -127,25 +127,20 @@ export default function Notifications() {
     };
     switch (notif.type) {
       case "booking_request":
-        return <BookingCard {...props} />;
+        return <BookingCard key={notif.id} {...cardProps} />;
       case "modification":
-        return <ModificationCard {...props} />;
+        return <ModificationCard key={notif.id} {...cardProps} />;
       case "review":
-        return <ReviewCard {...props} />;
+        return <ReviewCard key={notif.id} {...cardProps} />;
       case "cancellation":
-        return <CancellationCard {...props} />;
+        return <CancellationCard key={notif.id} {...cardProps} />;
       default:
-        return <GenericNotificationCard {...props} />;
+        return <GenericNotificationCard key={notif.id} {...cardProps} />;
     }
   };
 
   if (isPending && notifications.length === 0) {
-    return (
-      <div className="bg-background text-on-surface mx-auto max-w-6xl space-y-8 pb-4">
-        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
-        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageLoader label="Loading notifications..." className="mx-auto max-w-6xl" />;
   }
 
   if (isError && notifications.length === 0) {

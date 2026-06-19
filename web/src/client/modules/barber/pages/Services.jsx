@@ -11,6 +11,7 @@ import { formatMoney } from "@/client/lib/format/formatMoney.js";
 import { useQueryClient } from "@tanstack/react-query";
 import { barberHook } from "@/client/modules/barber/hooks/barberQuery.jsx";
 import { mapServiceFromApi, mapServiceToApi } from "@/client/modules/barber/helpers/barberMappers.js";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 function recomputeServiceStats(services) {
   const active = services.filter((s) => s.isActive);
@@ -226,12 +227,7 @@ export default function BarberServices() {
   }, [serviceToDelete, busy, deleteMutation, queryClient, editingId, closeForm]);
 
   if (isPending && services.length === 0) {
-    return (
-      <div className="mx-auto max-w-6xl space-y-8 pb-4">
-        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
-        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageLoader label="Loading services..." className="mx-auto max-w-6xl" />;
   }
 
   if (isError && services.length === 0) {

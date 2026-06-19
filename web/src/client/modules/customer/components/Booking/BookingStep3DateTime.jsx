@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import { customerHook } from "@/client/modules/customer/hooks/customerQuery.jsx";
 import { formatLocalDate, parseLocalDateKey } from "@/client/modules/shared/helpers/formatLocalDate";
 import { getBookingTimezoneOffsetMinutes, normalizeTimeKey } from "@/client/modules/shared/helpers/calendarDate.js";
+import { SectionLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const MONTHS = [
@@ -182,11 +183,7 @@ export default function BookingStep3DateTime({ booking, onSelect, disabled = fal
             </p>
           </div>
         ) : slotsLoading ? (
-          <div className="border-outline-variant bg-surface-container-low space-y-2 rounded-xl border p-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="bg-surface-container h-8 animate-pulse rounded-md" />
-            ))}
-          </div>
+          <SectionLoader label="Loading time slots..." minHeight="min-h-64" />
         ) : (
           <div className="border-outline-variant bg-surface-container-low space-y-4 rounded-xl border p-4">
             <p className="font-label-caps text-on-surface-variant text-xs">Available times</p>

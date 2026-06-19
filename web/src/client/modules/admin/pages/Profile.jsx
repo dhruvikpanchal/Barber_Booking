@@ -27,6 +27,7 @@ import {
   PROFILE_PHOTO_ACCEPT,
   validateProfilePhoto,
 } from "@/client/lib/auth/photoLimits.js";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 const PORTAL_ROLE = "admin";
 
@@ -140,12 +141,7 @@ export default function AdminProfile() {
   );
 
   if (isPending && !profile) {
-    return (
-      <div className="mx-auto max-w-6xl space-y-6 pb-28">
-        <div className="bg-surface-container h-32 animate-pulse rounded-xl" />
-        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageLoader label="Loading profile..." className="mx-auto max-w-6xl" />;
   }
 
   if (!profile) {

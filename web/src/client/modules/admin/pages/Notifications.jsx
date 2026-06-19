@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { BellOff, CheckCheck, ChevronLeft, ChevronRight, Filter } from "lucide-react";
 import { toast } from "sonner";
 import EmptyState from "@/client/modules/shared/components/ui/EmptyState";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
 import { mapAdminNotification } from "@/client/modules/admin/helpers/adminMappers.js";
 import { NOTIFICATIONS_PAGE_SIZE } from "@/client/modules/admin/constants/adminConstants.js";
@@ -129,12 +130,7 @@ export default function Notifications() {
   }
 
   if (isPending && notifications.length === 0) {
-    return (
-      <div className="mx-auto max-w-7xl space-y-8 pb-4">
-        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
-        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageLoader label="Loading notifications..." className="mx-auto max-w-7xl" />;
   }
 
   if (isError && notifications.length === 0) {

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import BarberListCard from "@/client/modules/public/components/Barbers/BarberListCard.jsx";
 import { publicHook } from "@/client/modules/public/hooks/publicQuery.jsx";
 import { ssrQueryOptions } from "@/client/modules/public/helpers/publicQueryHelpers.js";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 function matchesBarberQuery(barber, query) {
   const q = query.toLowerCase();
@@ -84,7 +85,7 @@ export default function BarbersList({ initialBarbers }) {
       </div>
 
       {isPending && !barbers.length ? (
-        <p className="text-on-surface-variant mt-10 text-center text-sm">Loading barbers…</p>
+        <PageLoader label="Loading barbers..." className="mx-auto max-w-6xl mt-10" />
       ) : isError ? (
         <p className="text-error mt-10 text-center text-sm" role="alert">
           {error?.message || "Could not load barbers."}

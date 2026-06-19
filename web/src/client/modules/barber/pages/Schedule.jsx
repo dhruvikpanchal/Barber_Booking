@@ -14,6 +14,7 @@ import { useHydrated } from "@/client/modules/shared/hooks/useHydrated.js";
 import { createId } from "@/client/modules/shared/helpers/createId.js";
 import { barberHook } from "@/client/modules/barber/hooks/barberQuery.jsx";
 import { mapScheduleFromApi, mapScheduleToApi } from "@/client/modules/barber/helpers/barberMappers.js";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export default function BarberSchedule() {
   const hydrated = useHydrated();
@@ -156,12 +157,7 @@ export default function BarberSchedule() {
   }, [days, breaks, busy, saveMutation, refetch]);
 
   if (isPending && !days) {
-    return (
-      <div className="mx-auto max-w-6xl space-y-8 pb-4">
-        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
-        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageLoader label="Loading schedule..." className="mx-auto max-w-6xl" />;
   }
 
   if (!days) {

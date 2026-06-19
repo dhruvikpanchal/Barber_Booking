@@ -19,6 +19,7 @@ import { barberHook, useBarberInvalidation } from "@/client/modules/barber/hooks
 import { seedBarberDashboardQueryCache } from "@/client/modules/barber/helpers/barberCacheHelpers.js";
 import { useStoredUser } from "@/client/modules/shared/hooks/useStoredUser.js";
 import { mapDashboardAppointment } from "@/client/modules/barber/helpers/barberMappers.js";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export default function Dashboard() {
   const hydrated = useHydrated();
@@ -94,16 +95,7 @@ export default function Dashboard() {
   }
 
   if (isPending) {
-    return (
-      <div className="mx-auto w-full max-w-6xl min-w-0 space-y-6 pb-4 sm:space-y-8">
-        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-surface-container h-24 animate-pulse rounded-xl" />
-          ))}
-        </div>
-      </div>
-    );
+    return <PageLoader label="Loading dashboard..." className="mx-auto max-w-6xl" />;
   }
 
   if (isError) {

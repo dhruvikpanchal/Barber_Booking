@@ -14,6 +14,7 @@ import { useAdminInvalidation } from "@/client/modules/admin/hooks/useAdminInval
 import { mapContactMessageListItem } from "@/client/modules/admin/helpers/adminMappers.js";
 import { CONTACT_MESSAGE_TABS } from "@/client/modules/admin/constants/adminConstants.js";
 import { routes } from "@/client/config/routes/routes.js";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export default function ContactMessages() {
   const router = useRouter();
@@ -97,12 +98,7 @@ export default function ContactMessages() {
   };
 
   if (listQuery.isPending && messages.length === 0) {
-    return (
-      <div className="mx-auto max-w-7xl space-y-8 pb-4">
-        <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
-        <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
-      </div>
-    );
+    return <PageLoader label="Loading contact messages..." className="mx-auto max-w-7xl" />;
   }
 
   if (listQuery.isError && messages.length === 0) {

@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { Clock, CheckCircle } from "lucide-react";
 import { customerHook } from "@/client/modules/customer/hooks/customerQuery.jsx";
 import { formatMoney } from "@/client/lib/format/formatMoney.js";
+import { SectionLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export default function BookingStep2Services({ booking, onToggle, disabled = false }) {
   const slug = booking.barber?.slug ?? booking.barber?.id;
@@ -32,13 +33,7 @@ export default function BookingStep2Services({ booking, onToggle, disabled = fal
   }
 
   if (loading) {
-    return (
-      <div className="grid gap-3 sm:grid-cols-2">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-surface-container h-28 animate-pulse rounded-xl" />
-        ))}
-      </div>
-    );
+    return <SectionLoader label="Loading services..." />;
   }
 
   if (services.length === 0) {

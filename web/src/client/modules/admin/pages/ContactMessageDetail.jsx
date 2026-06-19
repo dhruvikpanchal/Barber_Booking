@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo } from "react";
 import Link from "@/lib/AppLink";
-import { ArrowLeft, Loader2, Mail, MailOpen } from "lucide-react";
+import { ArrowLeft, Mail, MailOpen } from "lucide-react";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
 import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
@@ -90,12 +91,7 @@ export default function ContactMessageDetail({ id }) {
   }
 
   if (isPending) {
-    return (
-      <div className="mx-auto max-w-5xl py-16 text-center">
-        <Loader2 className="text-primary mx-auto h-8 w-8 animate-spin" aria-hidden />
-        <p className="text-on-surface-variant mt-4 text-sm">Loading message…</p>
-      </div>
-    );
+    return <PageLoader label="Loading message..." className="mx-auto max-w-5xl" />;
   }
 
   if (isError || !message) {

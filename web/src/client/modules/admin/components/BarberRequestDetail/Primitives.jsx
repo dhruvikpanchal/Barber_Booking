@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "@/lib/AppLink";
 import { ChevronRight, Download, Eye, FileText, Home } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";
+import { SectionLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export function fullDate(iso) {
   return new Date(iso).toLocaleString(undefined, {
@@ -66,19 +67,8 @@ export function Breadcrumb({ request }) {
   );
 }
 
-export function LoadingSkeleton() {
-  return (
-    <div className="mx-auto max-w-5xl space-y-6 animate-pulse">
-      <div className="h-4 w-48 rounded bg-surface-container-high" />
-      <div className="h-10 w-2/3 max-w-md rounded bg-surface-container-high" />
-      <div className="grid gap-5 lg:grid-cols-3">
-        <div className="h-64 rounded-xl bg-surface-container-high lg:col-span-2" />
-        <div className="h-64 rounded-xl bg-surface-container-high" />
-      </div>
-      <div className="h-48 rounded-xl bg-surface-container-high" />
-      <div className="h-48 rounded-xl bg-surface-container-high" />
-    </div>
-  );
+export function LoadingSkeleton({ label = "Loading application..." }) {
+  return <SectionLoader label={label} />;
 }
 
 export function ProfilePhoto({ request }) {

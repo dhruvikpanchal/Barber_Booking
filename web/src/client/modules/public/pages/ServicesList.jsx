@@ -7,6 +7,7 @@ import { publicHook } from "@/client/modules/public/hooks/publicQuery.jsx";
 import { enrichService } from "@/client/modules/public/helpers/serviceHelpers.js";
 import { ssrQueryOptions } from "@/client/modules/public/helpers/publicQueryHelpers.js";
 import ServiceCard from "@/client/modules/public/components/Services/ServiceCard.jsx";
+import { SectionLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -151,9 +152,7 @@ export default function ServicesList({ initialServices }) {
       {/* Services grid */}
       <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
         {isPending ? (
-          <p className="text-on-surface-variant col-span-full text-center text-sm">
-            Loading services…
-          </p>
+          <SectionLoader label="Loading services..." className="col-span-full" />
         ) : filtered.length === 0 ? (
           <EmptyState onReset={() => setActiveCategory("All")} disabled={isPending} />
         ) : (

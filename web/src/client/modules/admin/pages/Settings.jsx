@@ -9,6 +9,7 @@ import {
 } from "@/client/modules/shared/components/settings/TinyPrimitives.jsx";
 import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
 import { ADMIN_ALERTS, DIGEST_OPTIONS } from "@/client/modules/admin/constants/adminConstants.js";
+import { SectionLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 function AlertPreferencesSection() {
   const { data, isPending, isError, refetch } = adminHook.Settings.useSettings();
@@ -63,6 +64,14 @@ function AlertPreferencesSection() {
         >
           Try again
         </button>
+      </Card>
+    );
+  }
+
+  if (isPending && !data) {
+    return (
+      <Card>
+        <SectionLoader label="Loading settings..." minHeight="min-h-40" />
       </Card>
     );
   }

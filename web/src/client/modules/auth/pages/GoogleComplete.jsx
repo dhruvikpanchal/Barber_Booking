@@ -2,15 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "@/lib/AppLink";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { routes } from "@/client/config/routes/routes.js";
 import { persistAuthSession } from "@/client/lib/auth/session.js";
 import { toast } from "sonner";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export default function GoogleComplete() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -45,7 +44,10 @@ export default function GoogleComplete() {
 
         toast.success("Signed in with Google successfully");
 
-        const nextPath = searchParams.get("next");
+        const nextPath =
+          typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search).get("next")
+            : null;
         const fallback = routes.customer.dashboard;
         const isSafeNext =
           nextPath &&
@@ -67,7 +69,7 @@ export default function GoogleComplete() {
     return () => {
       cancelled = true;
     };
-  }, [router, searchParams]);
+  }, [router]);
 
   if (error) {
     return (
@@ -83,10 +85,5 @@ export default function GoogleComplete() {
     );
   }
 
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#131313] text-[#e4e2e1]">
-      <Loader2 className="mb-4 h-8 w-8 animate-spin text-[#ffb68c]" />
-      <p className="text-sm tracking-[0.08em] text-[#d8c2b7]">Completing Google sign-in...</p>
-    </div>
-  );
+  return <PageLoader fullScreen label="Completing Google sign-in..." />;
 }

@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   Calendar,
   CalendarCheck,
-  Loader2,
   Mail,
   MapPin,
   Phone,
@@ -36,9 +35,9 @@ import {
   DetailRow,
   StatCard,
   Breadcrumb,
-  LoadingSkeleton,
   ProfileAvatar,
 } from "@/client/modules/admin/components/BarberDetail/Primitives.jsx";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 /**
  * @param {{ id: string }} props
@@ -72,15 +71,7 @@ export default function BarberDetail({ id }) {
   }
 
   if (isPending) {
-    return (
-      <div className="mx-auto max-w-6xl space-y-6">
-        <div className="text-on-surface-variant flex items-center gap-2 text-sm">
-          <Loader2 className="text-primary h-4 w-4 animate-spin" aria-hidden />
-          Loading barber profile…
-        </div>
-        <LoadingSkeleton />
-      </div>
-    );
+    return <PageLoader label="Loading barber profile..." className="mx-auto max-w-6xl" />;
   }
 
   if (isError || !barber) {

@@ -3,6 +3,7 @@ import Link from "@/lib/AppLink";
 import { ChevronRight, Home } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";
 import { BOOKING_STATUS_CONFIG } from "@/client/modules/admin/constants/adminConstants.js";
+import { SectionLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export function fullDateTime(iso) {
   const d = new Date(iso);
@@ -72,25 +73,8 @@ export function Breadcrumb({ user }) {
   );
 }
 
-export function LoadingSkeleton() {
-  return (
-    <div className="mx-auto max-w-6xl animate-pulse space-y-6">
-      <div className="bg-surface-container-high h-4 w-48 rounded" />
-      <div className="flex gap-4">
-        <div className="bg-surface-container-high h-24 w-24 rounded-xl" />
-        <div className="flex-1 space-y-2">
-          <div className="bg-surface-container-high h-8 w-64 rounded" />
-          <div className="bg-surface-container-high h-4 w-40 rounded" />
-        </div>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[1, 2, 3, 4].map((n) => (
-          <div key={n} className="bg-surface-container-high h-28 rounded-xl" />
-        ))}
-      </div>
-      <div className="bg-surface-container-high h-64 rounded-xl" />
-    </div>
-  );
+export function LoadingSkeleton({ label = "Loading customer profile..." }) {
+  return <SectionLoader label={label} />;
 }
 
 export function BookingStatusPill({ status }) {

@@ -18,6 +18,7 @@ import {
   PUBLIC_DETAIL_STALE_MS,
   ssrQueryOptions,
 } from "@/client/modules/public/helpers/publicQueryHelpers.js";
+import { PageLoader } from "@/client/modules/shared/components/ui/Loader.jsx";
 
 export default function BarberDetail({ slug, initialBarber }) {
   const {
@@ -43,11 +44,7 @@ export default function BarberDetail({ slug, initialBarber }) {
   }, [isPending, isError, barber]);
 
   if (isPending && !barber) {
-    return (
-      <div className="text-on-surface-variant mx-auto max-w-6xl px-4 py-24 text-center text-sm md:px-16">
-        Loading barber profile…
-      </div>
-    );
+    return <PageLoader label="Loading barber profile..." className="mx-auto max-w-6xl" />;
   }
 
   if (!barber) return null;
