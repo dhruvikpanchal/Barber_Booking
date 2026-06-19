@@ -22,19 +22,21 @@ if (!connectionString) {
   throw new Error("DATABASE_URL is not set");
 }
 
+const isNeon = connectionString.includes("neon.tech");
 const useSsl =
-  connectionString.includes("neon.tech") || connectionString.includes("sslmode=require");
+  isNeon || connectionString.includes("sslmode=require");
 
 /**
  * Neon + postgres.js client.
- * `prepare: false` is recommended for serverless / pooled connections.
+ * `prepare: false` is required for pooled / serverless connections.
+ * Short idle lifetime avoids reusing TCP sockets that Neon closed during suspend.
  */
 const client = postgres(connectionString, {
   prepare: false,
-  max: 10,
-  idle_timeout: 20,
-  connect_timeout: 30,
-  max_lifetime: 60 * 30,
+  max: isNeon ? 5 : 10,
+  idle_timeout: isNeon ? 10 : 20,
+  connect_timeout: isNeon ? 60 : 30,
+  max_lifetime: isNeon ? 60 * 4 : 60 * 30,
   ...(useSsl ? { ssl: "require" } : {}),
 });
 

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { routes } from "@/client/config/routes/routes";
 import LandingBarberCard from "@/client/modules/public/components/HomePage/LandingBarberCard";
 

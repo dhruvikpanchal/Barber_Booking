@@ -1,4 +1,5 @@
 import { buildPaginationMeta } from "@/server/modules/shared/helpers/pagination";
+import { regionConfig } from "@/server/config/region";
 import {
   APPOINTMENT_TIMELINE_STEPS,
   BARBER_NOTIFICATION_TYPE_LABELS,
@@ -54,7 +55,7 @@ function formatTime12h(time: string): string {
 
 /** Date → "May 12, 2025" */
 function formatShortDate(date: Date): string {
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString(regionConfig.locale, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -63,9 +64,9 @@ function formatShortDate(date: Date): string {
 
 /** Date → "Mon, 12 May · 2:30 PM" */
 function formatAppointmentDate(date: Date): string {
-  const day = date.toLocaleDateString("en-US", { weekday: "short" });
-  const dmy = date.toLocaleDateString("en-US", { day: "numeric", month: "short" });
-  const time = date.toLocaleTimeString("en-US", {
+  const day = date.toLocaleDateString(regionConfig.locale, { weekday: "short" });
+  const dmy = date.toLocaleDateString(regionConfig.locale, { day: "numeric", month: "short" });
+  const time = date.toLocaleTimeString(regionConfig.locale, {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
@@ -151,9 +152,11 @@ export type BarberProfileDto = {
   slug: string;
   displayRole: string;
   experience: number;
+  experienceTier: BarberExperienceTier;
   bio: string | null;
   portfolioUrl: string | null;
   availability: string | null;
+  shopAbout: string | null;
   isAvailable: boolean;
   barberStatus: string;
   joinedAt: string;
@@ -184,9 +187,11 @@ export function toBarberProfileDto(row: ProfileDbRow): BarberProfileDto {
     slug: row.slug,
     displayRole: row.displayRole,
     experience: row.experience,
+    experienceTier: yearsToExperienceTier(row.experience),
     bio: row.bio,
     portfolioUrl: row.portfolioUrl,
     availability: row.availability,
+    shopAbout: row.availability,
     isAvailable: row.isAvailable,
     barberStatus: row.barberStatus,
     joinedAt: row.joinedAt.toISOString(),
@@ -437,9 +442,10 @@ type AppointmentListDbRow = {
     photoUrl: string | null;
   };
   services: AppointmentServiceSnapshot[];
+  modificationHistory?: { field: string | null }[];
 };
 
-type AppointmentDetailDbRow = AppointmentListDbRow & {
+type AppointmentDetailDbRow = Omit<AppointmentListDbRow, "modificationHistory"> & {
   confirmedAt: Date | null;
   arrivedAt: Date | null;
   completedAt: Date | null;
@@ -570,10 +576,15 @@ export function toAppointmentListItemDto(row: AppointmentListDbRow): Appointment
   const services = toAppointmentServices(row.services);
   const totalPrice = services.reduce((s, sv) => s + sv.price, 0);
   const totalDuration = services.reduce((s, sv) => s + sv.duration, 0);
+  const wasRescheduled = (row.modificationHistory ?? []).some((m) => m.field === "startAt");
+  let status = row.status.toLowerCase().replace(/_/g, "-");
+  if (wasRescheduled && status === "confirmed") {
+    status = "rescheduled";
+  }
 
   return {
     id: row.id,
-    status: row.status.toLowerCase().replace(/_/g, "-"),
+    status,
     startAt: row.startAt.toISOString(),
     dateDisplay: formatAppointmentDate(row.startAt),
     estimatedPrice: centsToDollars(row.estimatedPrice),
@@ -632,6 +643,73 @@ export function toAppointmentDetailDto(row: AppointmentDetailDbRow): Appointment
       reason: m.reason,
       at: m.at.toISOString(),
     })),
+  };
+}
+
+export type ServiceChangeInboxItemDto = {
+  id: string;
+  appointmentId: string;
+  status: string;
+  customerNote: string | null;
+  rejectionNote: string | null;
+  requestedAt: string;
+  resolvedAt: string | null;
+  previousServices: AppointmentServiceDto[];
+  requestedServices: AppointmentServiceDto[];
+  snapshot: {
+    customer: { name: string };
+    startAt: string;
+    services: AppointmentServiceDto[];
+  };
+};
+
+type ServiceChangeInboxDbRow = {
+  id: string;
+  appointmentId: string;
+  status: string;
+  customerNote: string | null;
+  rejectionNote: string | null;
+  requestedAt: Date;
+  resolvedAt: Date | null;
+  items: ServiceChangeItemSnapshot[];
+  appointment: {
+    id: string;
+    startAt: Date;
+    customer: { fullName: string };
+    services: { name: string; price: number; duration: number }[];
+  };
+};
+
+function mapServiceChangeSideItems(
+  items: ServiceChangeItemSnapshot[],
+  side: "original" | "updated",
+): AppointmentServiceDto[] {
+  return items
+    .filter((item) => item.side === side)
+    .map((item) => ({
+      name: item.name,
+      price: centsToDollars(item.price),
+      duration: item.duration,
+    }));
+}
+
+export function toServiceChangeInboxItemDto(row: ServiceChangeInboxDbRow): ServiceChangeInboxItemDto {
+  const currentServices = toAppointmentServices(row.appointment.services);
+  return {
+    id: row.id,
+    appointmentId: row.appointmentId,
+    status: row.status.toLowerCase(),
+    customerNote: row.customerNote,
+    rejectionNote: row.rejectionNote,
+    requestedAt: row.requestedAt.toISOString(),
+    resolvedAt: row.resolvedAt?.toISOString() ?? null,
+    previousServices: mapServiceChangeSideItems(row.items, "original"),
+    requestedServices: mapServiceChangeSideItems(row.items, "updated"),
+    snapshot: {
+      customer: { name: row.appointment.customer.fullName },
+      startAt: row.appointment.startAt.toISOString(),
+      services: currentServices,
+    },
   };
 }
 
@@ -909,7 +987,7 @@ export type ReviewListItemDto = {
 };
 
 export type ReviewDetailDto = ReviewListItemDto & {
-  categoryRatings: Record<ReviewCategoryKey, number>;
+  categoryRatings: Record<ReviewCategoryKey, number> | null;
   history: {
     id: string;
     type: "review" | "reply";
@@ -959,7 +1037,6 @@ export function toReviewListItemDto(row: ReviewDbRow): ReviewListItemDto {
 
 export function toReviewDetailDto(row: ReviewDbRow): ReviewDetailDto {
   const base = toReviewListItemDto(row);
-  const categoryRatings = categoryRatingsFromOverall(row.rating);
 
   const history: ReviewDetailDto["history"] = [
     {
@@ -980,7 +1057,7 @@ export function toReviewDetailDto(row: ReviewDbRow): ReviewDetailDto {
     });
   }
 
-  return { ...base, categoryRatings, history };
+  return { ...base, categoryRatings: null, history };
 }
 
 export function toRatingBreakdownDto(reviews: { rating: number }[]): RatingBreakdownDto {

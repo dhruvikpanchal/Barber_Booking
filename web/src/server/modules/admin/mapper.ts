@@ -11,6 +11,7 @@ import {
   type AdminAppointmentStatusKey,
 } from "@/server/modules/admin/constants";
 import { buildPaginationMeta } from "@/server/modules/shared/helpers/pagination";
+import { regionConfig } from "@/server/config/region";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED HELPERS
@@ -56,7 +57,7 @@ export function toUserStatusKey(isActive: boolean, activity?: string): AdminUser
 }
 
 function formatShortDate(date: Date): string {
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString(regionConfig.locale, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -243,6 +244,7 @@ export type AdminContactMessageListItemDto = {
   submittedAt: string;
   isRead: boolean;
   replyStatus: string;
+  workflowStatus: string;
 };
 
 export type AdminContactMessageDetailDto = AdminContactMessageListItemDto & {
@@ -534,11 +536,20 @@ type AdminContactMessageRow = {
   submittedAt: Date;
   isRead: boolean;
   replyStatus: string;
+  workflowStatus: string;
   replyText: string | null;
   repliedAt: Date | null;
   internalNote: string | null;
   assignedTo: string | null;
 };
+
+export function toContactWorkflowStatusKey(status: string): string {
+  return status.toLowerCase();
+}
+
+export function toContactWorkflowStatusDb(status: string): string {
+  return status.toUpperCase().replace(/-/g, "_");
+}
 
 export function toAdminContactMessageListItemDto(
   row: AdminContactMessageRow,
@@ -552,6 +563,7 @@ export function toAdminContactMessageListItemDto(
     submittedAt: row.submittedAt.toISOString(),
     isRead: row.isRead,
     replyStatus: row.replyStatus.toLowerCase(),
+    workflowStatus: toContactWorkflowStatusKey(row.workflowStatus),
   };
 }
 

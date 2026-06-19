@@ -53,8 +53,8 @@ export default function WalkIns() {
     const inService = entries.filter((e) => e.status === "in-service").length;
     const done = entries.filter((e) => e.status === "done");
     const waits = done
-      .map((e) => Math.max(0, Math.round((Date.now() - e.addedAt) / 60000)))
-      .filter(Boolean);
+      .filter((e) => e.startedAt != null)
+      .map((e) => Math.max(0, Math.round((e.startedAt - e.addedAt) / 60000)));
     const avgWait = waits.length ? Math.round(waits.reduce((a, b) => a + b, 0) / waits.length) : 0;
     return { waiting, inService, done: done.length, avgWait };
   }, [entries]);
@@ -125,7 +125,7 @@ export default function WalkIns() {
         error: "Could not add walk-in",
       });
       await refetch();
-      await invalidate.workflow();
+      await invalidate.walkInFlow();
       setFormOpen(false);
       setForm(EMPTY_WALK_IN_FORM);
     } catch {
@@ -141,7 +141,7 @@ export default function WalkIns() {
         status: nextStatus.toUpperCase().replace("-", "_"),
       });
       await refetch();
-      await invalidate.workflow();
+      await invalidate.walkInFlow();
     } catch {
       toast.error("Could not update walk-in status.");
     }
@@ -156,6 +156,25 @@ export default function WalkIns() {
 
   const cancel = (id) => advanceStatus(id, "cancelled");
   const reopen = (id) => advanceStatus(id, "waiting");
+
+  if (listQuery.isError && entries.length === 0) {
+    return (
+      <div className="text-on-surface mx-auto max-w-6xl py-16 text-center">
+        <p className="font-medium">Could not load walk-ins.</p>
+        <p className="text-on-surface-variant mt-2 text-sm">
+          {listQuery.error?.message ?? "Please try again in a moment."}
+        </p>
+        <button
+          type="button"
+          onClick={() => listQuery.refetch()}
+          disabled={busy}
+          className="bg-primary text-on-primary mt-4 inline-flex h-10 items-center rounded-md px-5 text-sm font-semibold hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {listQuery.isFetching ? "Retrying…" : "Try again"}
+        </button>
+      </div>
+    );
+  }
 
   if (listQuery.isPending && entries.length === 0) {
     return (

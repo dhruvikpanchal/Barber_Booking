@@ -1,5 +1,7 @@
 "use client";
 
+import { regionConfig } from "@/config/region.js";
+
 import { Camera, Mail, MapPin, Phone, User } from "lucide-react";
 import {
   Field,
@@ -44,7 +46,7 @@ export default function ProfileEditorSection({
               <Camera className="h-4 w-4" aria-hidden />
               <input
                 type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
+                accept="image/jpeg,image/png,image/webp"
                 className="sr-only"
                 onChange={onAvatarChange}
                 disabled={disabled}
@@ -84,7 +86,7 @@ export default function ProfileEditorSection({
               type="tel"
                 value={profile.phone ?? ""}
               onChange={(e) => onPatch({ phone: e.target.value })}
-              placeholder="+1 (555) 000-0000"
+              placeholder={regionConfig.phonePlaceholder}
               autoComplete="tel"
               disabled={disabled}
             />
@@ -97,7 +99,7 @@ export default function ProfileEditorSection({
             <IconInput
               icon={Mail}
               type="email"
-              value={profile.email}
+              value={profile?.email ?? ""}
               disabled
               className="cursor-not-allowed opacity-65"
               title="Email is tied to your login"

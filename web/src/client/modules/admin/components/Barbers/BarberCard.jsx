@@ -1,4 +1,4 @@
-import { Ban, Eye, ShieldCheck, Star, Store } from "lucide-react";
+import { Ban, CalendarCheck, Eye, ShieldCheck, Star, Store } from "lucide-react";
 import { BarberStatusBadge } from "@/client/modules/shared/components/ui/badges.jsx";
 
 /** Compact mobile-only card — desktop uses BarberTableRow. */
@@ -45,11 +45,20 @@ export default function BarberCard({ barber, onAction }) {
           View
         </button>
 
+        <button
+          type="button"
+          onClick={() => onAction("appointments", barber)}
+          className="border-outline-variant text-on-surface hover:bg-surface-container inline-flex h-9 items-center justify-center gap-1.5 rounded-md border text-xs font-semibold transition-colors"
+        >
+          <CalendarCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          Appts
+        </button>
+
         {barber.status === "disabled" ? (
           <button
             type="button"
             onClick={() => onAction("enable", barber)}
-            className="border-status-confirmed/30 bg-status-confirmed/10 text-status-confirmed hover:bg-status-confirmed/20 inline-flex h-9 items-center justify-center gap-1.5 rounded-md border text-xs font-semibold transition-colors"
+            className="border-status-confirmed/30 bg-status-confirmed/10 text-status-confirmed hover:bg-status-confirmed/20 col-span-2 inline-flex h-9 items-center justify-center gap-1.5 rounded-md border text-xs font-semibold transition-colors"
           >
             <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />
             Enable
@@ -58,7 +67,7 @@ export default function BarberCard({ barber, onAction }) {
           <button
             type="button"
             onClick={() => onAction("disable", barber)}
-            className="border-status-pending/30 bg-status-pending/10 text-status-pending hover:bg-status-pending/20 inline-flex h-9 items-center justify-center gap-1.5 rounded-md border text-xs font-semibold transition-colors"
+            className="border-status-pending/30 bg-status-pending/10 text-status-pending hover:bg-status-pending/20 col-span-2 inline-flex h-9 items-center justify-center gap-1.5 rounded-md border text-xs font-semibold transition-colors"
           >
             <Ban className="h-3.5 w-3.5 shrink-0" aria-hidden />
             Disable

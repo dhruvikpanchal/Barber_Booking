@@ -1,9 +1,11 @@
 import { createInitialDays } from "@/client/modules/barber/components/Schedule/helpers.jsx";
+import { customerInitials } from "@/client/lib/format/formatInitials.js";
 
 const NOTIFICATION_UI_TYPES = {
   NEW_BOOKING_REQUEST: "booking_request",
   BOOKING_MODIFICATION_REQUEST: "modification",
   SERVICE_CHANGE_REQUESTED: "modification",
+  NEW_CUSTOMER_REVIEW: "review",
   REVIEW_REQUEST: "review",
   BOOKING_CANCELLED_BY_CUSTOMER: "cancellation",
   BOOKING_CANCELLED: "cancellation",
@@ -39,61 +41,120 @@ function toPortfolioUrl(instagram) {
   return `https://instagram.com/${handle}`;
 }
 
+function splitFullName(fullName = "") {
+  const parts = String(fullName).trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { firstName: "", lastName: "" };
+  if (parts.length === 1) return { firstName: parts[0], lastName: "" };
+  return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
+}
+
+function mapGalleryFromDto(dto) {
+  return (dto.gallery ?? []).map((item) => ({
+    id: item.id,
+    url: item.src ?? item.url,
+    caption: item.alt ?? item.caption ?? "",
+  }));
+}
+
 export function mapProfileFromApi(dto) {
   if (!dto) return null;
+
+  const nameParts =
+    dto.firstName || dto.lastName
+      ? { firstName: dto.firstName ?? "", lastName: dto.lastName ?? "" }
+      : splitFullName(dto.fullName);
+  const phone = dto.phone ?? "";
+
   return {
     shopName: dto.shopName ?? "",
     shopAddress: dto.shopAddress ?? "",
-    shopPhone: dto.shopPhone ?? dto.phone ?? "",
+    shopPhone: dto.shopPhone ?? phone,
     shopHours: dto.shopHours ?? "",
     shopAbout: dto.shopAbout ?? dto.availability ?? "",
-    firstName: dto.firstName ?? "",
-    lastName: dto.lastName ?? "",
+    firstName: nameParts.firstName,
+    lastName: nameParts.lastName,
     email: dto.email ?? "",
-    phone: dto.phone ?? "",
-    city: dto.city ?? "",
+    phone,
+    city: dto.city ?? dto.shopCity ?? "",
     instagram: formatInstagramFromUrl(dto.portfolioUrl ?? dto.instagram ?? ""),
-    experience: experienceToTier(dto.experience),
+    experience: experienceToTier(dto.experienceTier ?? dto.experience),
     bio: dto.bio ?? "",
-    specialties: dto.specialties ?? [],
+    specialties: Array.isArray(dto.specialties) ? dto.specialties : [],
     photoPreview: dto.photoUrl ?? "",
-    availableToday: dto.isAvailable ?? false,
-    portfolio: (dto.gallery ?? []).map((item) => ({
-      id: item.id,
-      url: item.src,
-      caption: item.alt ?? "",
-    })),
+    photoUrl: dto.photoUrl ?? "",
+    availableToday: dto.isAvailable ?? dto.availableToday ?? false,
+    portfolio: mapGalleryFromDto(dto),
   };
 }
 
 export function mapProfileToApi(profile) {
-  return {
-    shopName: profile.shopName?.trim() || undefined,
-    shopAddress: profile.shopAddress ?? "",
-    shopPhone: profile.shopPhone ?? "",
-    shopHours: profile.shopHours ?? "",
-    shopAbout: profile.shopAbout ?? "",
-    firstName: profile.firstName,
-    lastName: profile.lastName,
-    email: profile.email,
-    phone: profile.phone ?? "",
-    city: profile.city ?? "",
+  if (!profile) return {};
+
+  const firstName = profile.firstName?.trim() ?? "";
+  const lastName = profile.lastName?.trim() ?? "";
+  const mobile = profile.phone?.trim() ?? "";
+  const shopPhone = profile.shopPhone?.trim() ?? "";
+  const phone = mobile || shopPhone;
+
+  const payload = {
+    shopAddress: profile.shopAddress?.trim() ?? "",
+    shopPhone: shopPhone || phone,
+    shopHours: profile.shopHours?.trim() ?? "",
+    shopAbout: profile.shopAbout?.trim() ?? "",
+    firstName,
+    lastName,
+    email: profile.email?.trim() ?? "",
+    phone,
+    city: profile.city?.trim() ?? "",
     portfolioUrl: toPortfolioUrl(profile.instagram),
-    availableToday: profile.availableToday,
-    experience: profile.experience,
-    bio: profile.bio ?? "",
-    specialties: profile.specialties ?? [],
+    availableToday: Boolean(profile.availableToday),
+    experience: profile.experience || "0-2",
+    bio: profile.bio?.trim() ?? "",
+    specialties: Array.isArray(profile.specialties) ? profile.specialties : [],
+  };
+
+  const shopName = profile.shopName?.trim();
+  if (shopName) payload.shopName = shopName;
+
+  return payload;
+}
+
+export function normalizeCustomer(customer) {
+  if (!customer) {
+    const name = "Customer";
+    return { name, initials: customerInitials(name), phone: "", email: "", photoUrl: null };
+  }
+  if (typeof customer === "string") {
+    const name = customer.trim() || "Customer";
+    return { name, initials: customerInitials(name), phone: "", email: "", photoUrl: null };
+  }
+  const name = customer.name ?? "Customer";
+  return {
+    ...customer,
+    name,
+    initials: customer.initials ?? customerInitials(name),
+    phone: customer.phone ?? "",
+    email: customer.email ?? "",
+    photoUrl: customer.photoUrl ?? null,
   };
 }
 
 export function mapAppointmentListItem(dto) {
   if (!dto) return dto;
+  const estimatedPrice = dto.estimatedPrice ?? dto.price ?? 0;
+  const finalPrice = dto.finalPrice ?? null;
+  const totalPrice = dto.totalPrice ?? estimatedPrice;
+  const displayPrice =
+    dto.status === "completed" && finalPrice != null ? finalPrice : totalPrice;
+
   return {
     ...dto,
     status: normalizeStatus(dto.status),
-    customer: dto.customer ?? { name: dto.customer, phone: "", email: "" },
+    customer: normalizeCustomer(dto.customer),
     service: dto.serviceLabel ?? dto.service ?? "",
-    price: dto.totalPrice ?? dto.estimatedPrice ?? dto.price ?? 0,
+    estimatedPrice,
+    finalPrice,
+    price: displayPrice,
     duration: dto.totalDuration ?? dto.duration ?? 0,
   };
 }
@@ -102,7 +163,7 @@ export function mapDashboardAppointment(dto) {
   const item = mapAppointmentListItem(dto);
   return {
     id: item.id,
-    customer: item.customer?.name ?? item.customer ?? "",
+    customer: item.customer,
     service: item.service,
     duration: item.duration,
     price: item.price,
@@ -205,6 +266,7 @@ export function mapWalkIn(dto) {
     notes: dto.notes ?? "",
     status: normalizeStatus(dto.status),
     addedAt: new Date(dto.addedAt).getTime(),
+    startedAt: dto.startedAt ? new Date(dto.startedAt).getTime() : null,
   };
 }
 

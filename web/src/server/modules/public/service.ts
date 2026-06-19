@@ -18,6 +18,8 @@ import type {
   TestimonialsQuery,
 } from "@/server/modules/public/schema";
 import { NotFoundError } from "@/server/modules/shared/helpers/AppError";
+import { ROLES } from "@/server/modules/shared/constants/roles";
+import { realtimeToRole } from "@/server/modules/shared/realtime/emit";
 
 export const publicService = {
   async getHome() {
@@ -66,7 +68,21 @@ export const publicService = {
   async getServiceBySlug(slug: string) {
     const row = await publicRepository.findServiceBySlug(slug);
     if (!row) throw new NotFoundError("Service");
-    return toServiceDetail(row);
+
+    const detail = toServiceDetail(row);
+    const relatedIds = detail.relatedIds ?? [];
+    const relatedRows = await Promise.all(
+      relatedIds.map((relatedSlug) => publicRepository.findServiceBySlug(relatedSlug)),
+    );
+
+    const relatedServices = relatedRows
+      .filter((relatedRow): relatedRow is NonNullable<typeof relatedRow> => relatedRow != null)
+      .map(toServiceDetail);
+
+    return {
+      ...detail,
+      relatedServices,
+    };
   },
 
   async listShops(query: ShopsListQuery) {
@@ -107,6 +123,14 @@ export const publicService = {
     const message = await publicRepository.createContactMessage({
       ...input,
       userId: userId ?? null,
+    });
+
+    realtimeToRole(ROLES.ADMIN, ["contact_messages", "notifications", "nav_badges", "dashboard"], {
+      entityId: message.id,
+      toast: {
+        title: "New contact message",
+        message: `${input.name} sent a message: ${input.subject}`,
+      },
     });
 
     return {

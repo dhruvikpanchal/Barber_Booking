@@ -3,10 +3,10 @@ import { CATEGORY_LABELS } from "@/client/modules/barber/constants/reviewsConsta
 import { StarRow } from "@/client/modules/shared/components/ui/StarRow.jsx";
 
 /**
- * @param {{ overall: number, categories: Record<string, number> }} props
+ * @param {{ overall: number, categories: Record<string, number> | null }} props
  */
 export default function RatingBreakdown({ overall, categories }) {
-  const entries = Object.entries(categories ?? {});
+  const entries = categories ? Object.entries(categories) : [];
 
   return (
     <section className="border-outline-variant bg-surface-container-low rounded-xl border">
@@ -24,28 +24,35 @@ export default function RatingBreakdown({ overall, categories }) {
           <p className="text-on-surface-variant mt-2 text-xs">out of 5</p>
         </div>
 
-        <ul className="space-y-3">
-          {entries.map(([key, value]) => {
-            const pct = (value / 5) * 100;
-            return (
-              <li key={key}>
-                <div className="mb-1 flex items-center justify-between gap-2 text-sm">
-                  <span className="text-on-surface">{CATEGORY_LABELS[key] ?? key}</span>
-                  <span className="text-on-surface inline-flex items-center gap-1 font-semibold">
-                    <Star className="fill-primary text-primary h-3.5 w-3.5" aria-hidden />
-                    {value}
-                  </span>
-                </div>
-                <div className="bg-surface-container-high h-2 overflow-hidden rounded-full">
-                  <div
-                    className="bg-primary h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        {entries.length > 0 ? (
+          <ul className="space-y-3">
+            {entries.map(([key, value]) => {
+              const pct = (value / 5) * 100;
+              return (
+                <li key={key}>
+                  <div className="mb-1 flex items-center justify-between gap-2 text-sm">
+                    <span className="text-on-surface">{CATEGORY_LABELS[key] ?? key}</span>
+                    <span className="text-on-surface inline-flex items-center gap-1 font-semibold">
+                      <Star className="fill-primary text-primary h-3.5 w-3.5" aria-hidden />
+                      {value}
+                    </span>
+                  </div>
+                  <div className="bg-surface-container-high h-2 overflow-hidden rounded-full">
+                    <div
+                      className="bg-primary h-2 rounded-full transition-all duration-500"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="text-on-surface-variant text-sm">
+            Per-category ratings are not available for this review. Only the overall score was
+            submitted by the customer.
+          </p>
+        )}
       </div>
     </section>
   );

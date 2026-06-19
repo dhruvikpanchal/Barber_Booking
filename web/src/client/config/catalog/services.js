@@ -1,9 +1,9 @@
-/** Master service catalog — used by booking, barber services, walk-ins. */
+/** Master service catalog — used by booking, barber services, walk-ins. Prices in INR. */
 export const SERVICE_CATALOG = [
   {
     id: "signature-cut",
     name: "Signature Cut",
-    price: 45,
+    price: 399,
     duration: 45,
     description: "Consultation, precision cut, hot towel finish.",
     popular: true,
@@ -11,7 +11,7 @@ export const SERVICE_CATALOG = [
   {
     id: "skin-fade",
     name: "Skin Fade",
-    price: 40,
+    price: 349,
     duration: 40,
     description: "Tight gradient fade with razor detail work.",
     popular: true,
@@ -19,7 +19,7 @@ export const SERVICE_CATALOG = [
   {
     id: "beard-sculpt",
     name: "Beard Sculpt",
-    price: 28,
+    price: 249,
     duration: 25,
     description: "Trim, shape and conditioning oil treatment.",
     popular: false,
@@ -27,7 +27,7 @@ export const SERVICE_CATALOG = [
   {
     id: "hot-towel-shave",
     name: "Hot Towel Shave",
-    price: 35,
+    price: 299,
     duration: 30,
     description: "Classic straight-razor shave with hot towel.",
     popular: false,
@@ -35,7 +35,7 @@ export const SERVICE_CATALOG = [
   {
     id: "father-son",
     name: "Father & Son Cut",
-    price: 65,
+    price: 649,
     duration: 60,
     description: "Two precision cuts, side by side.",
     popular: false,
@@ -43,7 +43,7 @@ export const SERVICE_CATALOG = [
   {
     id: "the-works",
     name: "The Works",
-    price: 85,
+    price: 799,
     duration: 75,
     description: "Cut + shave + beard + scalp treatment.",
     popular: true,

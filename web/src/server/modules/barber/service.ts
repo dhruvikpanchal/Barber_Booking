@@ -11,6 +11,11 @@ import {
   SERVICE_CHANGE_STATUS,
 } from "@/server/modules/shared/constants/statuses";
 import { NOTIFICATION_TYPE } from "@/server/modules/shared/constants/notificationTypes";
+import {
+  realtimeToBarber,
+  realtimeToUser,
+  realtimeSyncUser,
+} from "@/server/modules/shared/realtime/emit";
 import { buildPaginationMeta } from "@/server/modules/shared/helpers/pagination";
 import {
   barberProfileRepository,
@@ -24,7 +29,9 @@ import {
   barberAnalyticsRepository,
   barberNotificationsRepository,
   barberDashboardRepository,
+  prepareBarberQueue,
 } from "@/server/modules/barber/repository";
+import { barberNavBadgesRepository } from "@/server/modules/barber/navBadgesRepository";
 import {
   toBarberProfileDto,
   toGalleryImageDto,
@@ -35,6 +42,7 @@ import {
   toAppointmentListItemDto,
   toAppointmentDetailDto,
   toAppointmentStatsDto,
+  toServiceChangeInboxItemDto,
   toQueueSnapshotDto,
   toWalkInDto,
   toReviewListItemDto,
@@ -80,6 +88,7 @@ import type {
   MarkNotificationReadInput,
   NotificationsQuery,
   DashboardQuery,
+  MarkBarberNavSectionSeenInput,
 } from "@/server/modules/barber/schema";
 
 // SHARED HELPERS
@@ -100,6 +109,82 @@ function appUrl(path = ""): string {
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+type AppointmentNotifyRow = {
+  customerId?: string | null;
+  customer?: { id?: string } | null;
+  startAt: Date;
+  services?: { name: string }[];
+  barber?: { user?: { fullName?: string | null } | null } | null;
+};
+
+function appointmentCustomerUserId(row: AppointmentNotifyRow): string | null {
+  return row.customerId ?? row.customer?.id ?? null;
+}
+
+function appointmentNotificationMeta(row: AppointmentNotifyRow, extra: Record<string, unknown> = {}) {
+  const barberName = row.barber?.user?.fullName ?? null;
+  return {
+    service: row.services?.map((s) => s.name).join(" + ") ?? null,
+    date: row.startAt.toISOString(),
+    ...(barberName
+      ? { barber: { name: barberName, initials: barberName.slice(0, 2).toUpperCase() } }
+      : {}),
+    ...extra,
+  };
+}
+
+function notifyAppointmentCustomer(
+  row: AppointmentNotifyRow,
+  payload: {
+    type: string;
+    title: string;
+    message: string;
+    appointmentId: string;
+    metadata?: Record<string, unknown>;
+  },
+  label: string,
+) {
+  const customerUserId = appointmentCustomerUserId(row);
+  if (!customerUserId) return;
+
+  fireAndForget(
+    barberNotificationsRepository
+      .createNotification({
+        userId: customerUserId,
+        type: payload.type,
+        title: payload.title,
+        message: payload.message,
+        appointmentId: payload.appointmentId,
+        metadata: {
+          ...appointmentNotificationMeta(row, payload.metadata),
+        },
+      })
+      .then(() => {
+        realtimeToUser(customerUserId, ["notifications", "appointments", "reviews"], {
+          entityId: payload.appointmentId,
+          toast: { title: payload.title, message: payload.message },
+        });
+      }),
+    label,
+  );
+}
+
+function notifyReviewRequest(row: AppointmentNotifyRow, appointmentId: string) {
+  notifyAppointmentCustomer(
+    row,
+    {
+      type: NOTIFICATION_TYPE.REVIEW_REQUEST,
+      title: "Leave a review",
+      message: "How was your visit? Share your experience with your barber.",
+      appointmentId,
+      metadata: {
+        completedAt: new Date().toLocaleDateString(),
+      },
+    },
+    "review request notification",
+  );
+}
+
 // PROFILE
 export const barberProfileService = {
   async getProfile(userId: string) {
@@ -116,7 +201,19 @@ export const barberProfileService = {
       profileData.experience = experienceTierToYears(input.experience);
     }
     if (input.bio !== undefined) profileData.bio = input.bio || null;
-    if (input.portfolioUrl !== undefined) profileData.portfolioUrl = input.portfolioUrl || null;
+
+    const portfolioValue =
+      input.portfolioUrl !== undefined
+        ? input.portfolioUrl
+        : input.instagram !== undefined
+          ? input.instagram.trim()
+            ? input.instagram.startsWith("http")
+              ? input.instagram.trim()
+              : `https://instagram.com/${input.instagram.replace(/^@/, "")}`
+            : ""
+          : undefined;
+    if (portfolioValue !== undefined) profileData.portfolioUrl = portfolioValue || null;
+
     if (input.shopAbout !== undefined) profileData.availability = input.shopAbout || null;
     if (input.availableToday !== undefined) profileData.isAvailable = input.availableToday;
 
@@ -127,7 +224,11 @@ export const barberProfileService = {
       userData.fullName = `${input.firstName} ${input.lastName}`.trim();
     }
     if (input.email !== undefined) userData.email = input.email;
-    if (input.phone !== undefined) userData.phone = input.phone || null;
+
+    const phoneValue = input.phone?.trim() || input.shopPhone?.trim() || "";
+    if (input.phone !== undefined || input.shopPhone !== undefined) {
+      userData.phone = phoneValue || null;
+    }
     if (input.city !== undefined) userData.city = input.city || null;
 
     if (Object.keys(profileData).length > 0 || Object.keys(userData).length > 0) {
@@ -144,19 +245,22 @@ export const barberProfileService = {
     const hasShopFields =
       input.shopName !== undefined ||
       input.shopAddress !== undefined ||
-      input.shopHours !== undefined;
+      input.shopHours !== undefined ||
+      input.shopPhone !== undefined ||
+      input.city !== undefined;
 
     if (hasShopFields) {
+      const shopName = input.shopName?.trim() || undefined;
       const shopPayload = {
-        name: input.shopName?.trim() || undefined,
+        name: shopName,
         address: input.shopAddress ?? null,
         city: input.city?.trim() || undefined,
         openHoursSummary: input.shopHours ?? null,
       };
 
-      if (shopPayload.name) {
+      if (shopName) {
         await barberProfileRepository.ensureShopForBarber(barberId, {
-          name: shopPayload.name,
+          name: shopName,
           address: shopPayload.address,
           city: shopPayload.city,
           openHoursSummary: shopPayload.openHoursSummary,
@@ -380,11 +484,14 @@ export const barberScheduleService = {
 export const barberAppointmentsService = {
   async listAppointments(userId: string, query: AppointmentsQuery) {
     const barberId = await requireBarberProfile(userId);
-    const [rows, total] = await barberAppointmentsRepository.listAppointments(barberId, query);
+    const [rows, total, stats] = await barberAppointmentsRepository.listAppointments(
+      barberId,
+      query,
+    );
     const dtos = rows.map(toAppointmentListItemDto);
     return {
       appointments: dtos,
-      stats: toAppointmentStatsDto(dtos),
+      stats,
       meta: buildPaginationMeta(total, query.page, query.limit),
     };
   },
@@ -394,6 +501,12 @@ export const barberAppointmentsService = {
     const row = await barberAppointmentsRepository.findAppointmentDetail(appointmentId, barberId);
     if (!row) throw new NotFoundError("Appointment");
     return toAppointmentDetailDto(row);
+  },
+
+  async listPendingServiceChanges(userId: string) {
+    const barberId = await requireBarberProfile(userId);
+    const rows = await barberAppointmentsRepository.listPendingServiceChanges(barberId);
+    return { requests: rows.map(toServiceChangeInboxItemDto) };
   },
 
   async updateStatus(userId: string, appointmentId: string, input: UpdateAppointmentStatusInput) {
@@ -425,6 +538,8 @@ export const barberAppointmentsService = {
       timestamps,
     });
 
+    await prepareBarberQueue(barberId);
+
     const statusLabels: Record<string, string> = {
       CONFIRMED: "confirmed",
       IN_SERVICE: "started",
@@ -451,36 +566,43 @@ export const barberAppointmentsService = {
           ? NOTIFICATION_TYPE.BOOKING_CANCELLED
           : null;
 
-    if (notifType && row.customer) {
-      const customerId = (row as { customerId?: string }).customerId;
-      if (customerId) {
-        fireAndForget(
-          barberNotificationsRepository.createNotification({
-            userId: customerId,
-            type: notifType,
-            title:
-              newStatus === APPOINTMENT_STATUS.CONFIRMED
-                ? "Booking confirmed"
-                : "Booking cancelled",
-            message:
-              newStatus === APPOINTMENT_STATUS.CONFIRMED
-                ? `Your appointment on ${new Date(row.startAt).toLocaleDateString()} has been confirmed.`
-                : `Your appointment on ${new Date(row.startAt).toLocaleDateString()} was cancelled.`,
-            appointmentId,
-            metadata: {
-              cancelledBy: input.cancelledBy,
-              reason: input.cancelReason,
-            },
-          }),
-          "appointment status notification",
-        );
-      }
+    if (notifType) {
+      notifyAppointmentCustomer(
+        row,
+        {
+          type: notifType,
+          title:
+            newStatus === APPOINTMENT_STATUS.CONFIRMED
+              ? "Booking confirmed"
+              : "Booking cancelled",
+          message:
+            newStatus === APPOINTMENT_STATUS.CONFIRMED
+              ? `Your appointment on ${new Date(row.startAt).toLocaleDateString()} has been confirmed.`
+              : `Your appointment on ${new Date(row.startAt).toLocaleDateString()} was cancelled.`,
+          appointmentId,
+          metadata: {
+            cancelledBy: input.cancelledBy,
+            reason: input.cancelReason,
+          },
+        },
+        "appointment status notification",
+      );
+    }
+
+    if (newStatus === APPOINTMENT_STATUS.COMPLETED) {
+      notifyReviewRequest(row, appointmentId);
     }
 
     fireAndForget(
       syncOnlineAppointmentQueueEntry(barberId, appointmentId),
       "online appointment queue sync",
     );
+
+    realtimeToBarber(barberId, ["appointments", "queue", "dashboard"], appointmentId);
+    const customerUserId = appointmentCustomerUserId(row);
+    if (customerUserId) {
+      realtimeToUser(customerUserId, ["appointments", "notifications", "reviews"], appointmentId);
+    }
 
     return { id: appointmentId, status: newStatus.toLowerCase().replace(/_/g, "-") };
   },
@@ -502,23 +624,25 @@ export const barberAppointmentsService = {
     );
     if (!result) throw new NotFoundError("Appointment");
 
-    // Notify customer of reschedule
-    const customerId = (row as { customerId?: string }).customerId;
-    if (customerId) {
-      fireAndForget(
-        barberNotificationsRepository.createNotification({
-          userId: customerId,
-          type: NOTIFICATION_TYPE.BOOKING_MODIFICATION_REQUEST,
-          title: "Appointment rescheduled",
-          message: `Your barber has rescheduled your appointment to ${input.startAt.toLocaleDateString()}.`,
-          appointmentId,
-          metadata: {
-            newDate: input.startAt.toISOString(),
-            reason: input.reason,
-          },
-        }),
-        "reschedule notification",
-      );
+    notifyAppointmentCustomer(
+      row,
+      {
+        type: NOTIFICATION_TYPE.BOOKING_MODIFICATION_REQUEST,
+        title: "Appointment rescheduled",
+        message: `Your barber has rescheduled your appointment to ${input.startAt.toLocaleDateString()}.`,
+        appointmentId,
+        metadata: {
+          newDate: input.startAt.toISOString(),
+          reason: input.reason,
+        },
+      },
+      "reschedule notification",
+    );
+
+    realtimeToBarber(barberId, ["appointments", "queue", "dashboard"], appointmentId);
+    const customerUserId = appointmentCustomerUserId(row);
+    if (customerUserId) {
+      realtimeToUser(customerUserId, ["appointments", "notifications"], appointmentId);
     }
 
     return { id: appointmentId, startAt: input.startAt.toISOString() };
@@ -556,11 +680,20 @@ export const barberAppointmentsService = {
         : NOTIFICATION_TYPE.SERVICE_CHANGE_REJECTED;
 
     const appt = await barberAppointmentsRepository.findAppointmentDetail(appointmentId, barberId);
-    const customerId = (appt as { customerId?: string } | null)?.customerId;
-    if (customerId) {
-      fireAndForget(
-        barberNotificationsRepository.createNotification({
-          userId: customerId,
+    if (appt) {
+      const change = appt.serviceChangeRequests?.find((r) => r.id === reqId);
+      const original = change?.items
+        ?.filter((i) => i.side === "original")
+        .map((i) => i.name)
+        .join(" + ");
+      const updated = change?.items
+        ?.filter((i) => i.side === "updated")
+        .map((i) => i.name)
+        .join(" + ");
+
+      notifyAppointmentCustomer(
+        appt,
+        {
           type: notifType,
           title:
             input.decision === "ACCEPTED" ? "Service change accepted" : "Service change rejected",
@@ -569,9 +702,19 @@ export const barberAppointmentsService = {
               ? "Your service change request has been accepted by your barber."
               : `Your service change request was declined. ${input.rejectionNote ?? ""}`.trim(),
           appointmentId,
-        }),
+          metadata: {
+            previousServices: original ?? null,
+            updatedServices: updated ?? null,
+          },
+        },
         "service change response notification",
       );
+
+      realtimeToBarber(barberId, ["appointments", "queue", "dashboard"], appointmentId);
+      const customerUserId = appointmentCustomerUserId(appt);
+      if (customerUserId) {
+        realtimeToUser(customerUserId, ["appointments", "notifications"], appointmentId);
+      }
     }
 
     return { id: reqId, decision: input.decision };
@@ -625,12 +768,17 @@ async function syncAppointmentFromQueue(
     updatedValue: targetStatus,
     summary: "Status updated from queue",
   });
+
+  if (targetStatus === APPOINTMENT_STATUS.COMPLETED) {
+    notifyReviewRequest(row, appointmentId);
+  }
 }
 
 // QUEUE
 export const barberQueueService = {
   async getQueue(userId: string, query: QueueQuery) {
     const barberId = await requireBarberProfile(userId);
+    await prepareBarberQueue(barberId);
     const [entries, chairs] = await barberQueueRepository.getLiveQueue(barberId, query);
     return toQueueSnapshotDto(entries, chairs);
   },
@@ -650,6 +798,7 @@ export const barberQueueService = {
       tab: "active",
       source: "all",
     });
+    realtimeToBarber(barberId, ["queue", "dashboard", "walk_ins"]);
     return { entry, snapshot: toQueueSnapshotDto(entries, chairs) };
   },
 
@@ -672,18 +821,21 @@ export const barberQueueService = {
     }
 
     const updated = await barberQueueRepository.findQueueEntry(entryId, barberId);
+    realtimeToBarber(barberId, ["queue", "dashboard", "walk_ins", "appointments"]);
     return updated;
   },
 
   async assignChair(userId: string, entryId: string, input: AssignChairInput) {
     const barberId = await requireBarberProfile(userId);
     const entry = await barberQueueRepository.assignChair(entryId, barberId, input.chairId);
+    realtimeToBarber(barberId, ["queue", "dashboard"]);
     return entry;
   },
 
   async removeFromQueue(userId: string, entryId: string) {
     const barberId = await requireBarberProfile(userId);
     await barberQueueRepository.removeFromQueue(entryId, barberId);
+    realtimeToBarber(barberId, ["queue", "dashboard", "walk_ins", "appointments"]);
     return { deleted: true };
   },
 };
@@ -709,6 +861,8 @@ export const barberWalkInsService = {
       notes: input.notes,
       walkInId: row.id,
     });
+
+    realtimeToBarber(barberId, ["walk_ins", "queue", "dashboard"]);
 
     return toWalkInDto(row);
   },
@@ -740,6 +894,8 @@ export const barberWalkInsService = {
 
     await barberQueueRepository.syncQueueEntryStatus(walkInId, barberId, input.status);
 
+    realtimeToBarber(barberId, ["walk_ins", "queue", "dashboard"]);
+
     return toWalkInDto(updated);
   },
 };
@@ -749,11 +905,15 @@ export const barberReviewsService = {
   async listReviews(userId: string, query: ReviewsQuery) {
     const barberId = await requireBarberProfile(userId);
     const [rows, total] = await barberReviewsRepository.listReviews(barberId, query);
-    const breakdown = await barberReviewsRepository.getRatingBreakdown(barberId);
+    const [breakdown, replySummary] = await Promise.all([
+      barberReviewsRepository.getRatingBreakdown(barberId),
+      barberReviewsRepository.getReviewReplySummary(barberId),
+    ]);
 
     return {
       reviews: rows.map(toReviewListItemDto),
       ratingBreakdown: toRatingBreakdownDto(breakdown),
+      replySummary,
       meta: buildPaginationMeta(total, query.page, query.limit),
     };
   },
@@ -778,6 +938,15 @@ export const barberReviewsService = {
 
     // Update denormalised average rating on the barber profile
     fireAndForget(barberReviewsRepository.updateBarberAverageRating(barberId), "rating sync");
+
+    realtimeToUser(row.customerId, ["reviews"], {
+      entityId: reviewId,
+      toast: {
+        title: "Barber replied to your review",
+        message: "Your barber responded to a review you left.",
+      },
+    });
+    realtimeToBarber(barberId, ["reviews"], reviewId);
 
     return { id: reviewId, replied: true };
   },
@@ -935,11 +1104,13 @@ export const barberNotificationsService = {
   async markRead(userId: string, notificationId: string, input: MarkNotificationReadInput) {
     const result = await barberNotificationsRepository.markRead(notificationId, userId);
     if (result.count === 0) throw new NotFoundError("Notification");
+    realtimeSyncUser(userId, ["notifications"]);
     return { id: notificationId, isRead: input.isRead ?? true };
   },
 
   async markAllRead(userId: string) {
     const result = await barberNotificationsRepository.markAllRead(userId);
+    realtimeSyncUser(userId, ["notifications"]);
     return { updated: result.count };
   },
 
@@ -953,11 +1124,27 @@ export const barberNotificationsService = {
 export const barberDashboardService = {
   async getDashboard(userId: string, query: DashboardQuery) {
     const barberId = await requireBarberProfile(userId);
+    await prepareBarberQueue(barberId);
     const raw = await barberDashboardRepository.getDashboardData(
       barberId,
       userId,
       query.pendingLimit,
     );
     return toDashboardDto(raw);
+  },
+};
+
+// NAV BADGES (sidebar actionable counts — separate from notification bell)
+export const barberNavBadgesService = {
+  async getNavBadges(userId: string) {
+    const barberId = await requireBarberProfile(userId);
+    const counts = await barberNavBadgesRepository.getBadgeCounts(userId, barberId);
+    return { counts };
+  },
+
+  async markNavSectionSeen(userId: string, input: MarkBarberNavSectionSeenInput) {
+    const lastSeenAt = await barberNavBadgesRepository.markSectionSeen(userId, input.section);
+    realtimeSyncUser(userId, ["nav_badges"]);
+    return { section: input.section, lastSeenAt: lastSeenAt.toISOString() };
   },
 };

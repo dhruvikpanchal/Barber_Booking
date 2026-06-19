@@ -16,23 +16,42 @@ import {
   approveBarberRequestSchema,
   generateReportSchema,
   markAdminNotificationReadSchema,
+  markAdminNavSectionSeenSchema,
   rejectBarberRequestSchema,
   replyContactMessageSchema,
   updateAdminAlertPreferencesSchema,
   updateAdminPasswordSchema,
   updateAdminProfileSchema,
   updateContactMessageSchema,
-  updateMaintenanceSettingsSchema,
 } from "@/server/modules/admin/schema";
-import { created, ok, paginated } from "@/server/modules/shared/responses";
+import { created, ok, noContent, paginated } from "@/server/modules/shared/responses";
 import type { AuthedRequest } from "@/server/modules/shared/types/request";
 import { parseBody, parseBodyOrEmpty, parseQuery } from "@/server/modules/shared/validation";
 import { ValidationError } from "@/server/modules/shared/helpers/AppError";
+import { appConfig } from "@/server/config";
+
+const ALLOWED_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 function getUserId(req: NextRequest): string {
   const user = (req as AuthedRequest).user;
   if (!user?.id) throw new ValidationError("Authentication required");
   return user.id;
+}
+
+async function parseProfilePhoto(req: NextRequest) {
+  const form = await req.formData();
+  const photoFile = form.get("photo");
+  if (!photoFile || !(photoFile instanceof File) || photoFile.size === 0) {
+    throw new ValidationError("Photo file is required");
+  }
+  if (photoFile.size > appConfig.auth.maxPhotoBytes) {
+    throw new ValidationError("Photo must be 4 MB or smaller");
+  }
+  if (!ALLOWED_PHOTO_TYPES.has(photoFile.type)) {
+    throw new ValidationError("Photo must be JPG, PNG, or WEBP");
+  }
+  const buffer = Buffer.from(await photoFile.arrayBuffer());
+  return { buffer, mimeType: photoFile.type };
 }
 
 export const adminController = {
@@ -216,6 +235,23 @@ export const adminController = {
     return ok(data);
   },
 
+  async deleteNotification(req: NextRequest, id: string) {
+    await adminService.deleteNotification(getUserId(req), id);
+    return noContent();
+  },
+
+  // Nav badges  ·  /api/v1/admin/nav-badges
+  async getNavBadges(req: NextRequest) {
+    const data = await adminService.getNavBadges(getUserId(req));
+    return ok(data);
+  },
+
+  async markNavSectionSeen(req: NextRequest) {
+    const input = await parseBody(req, markAdminNavSectionSeenSchema);
+    const data = await adminService.markNavSectionSeen(getUserId(req), input);
+    return ok(data);
+  },
+
   // Profile  ·  /api/v1/admin/profile
   async getProfile(req: NextRequest) {
     const data = await adminService.getProfile(getUserId(req));
@@ -228,16 +264,16 @@ export const adminController = {
     return ok(data);
   },
 
+  async uploadProfilePhoto(req: NextRequest) {
+    const file = await parseProfilePhoto(req);
+    const data = await adminService.uploadProfilePhoto(getUserId(req), file);
+    return ok(data);
+  },
+
   // Settings  ·  /api/v1/admin/settings
   async getSettings(req: NextRequest) {
     void req;
     const data = adminService.getSettings();
-    return ok(data);
-  },
-
-  async updateMaintenanceSettings(req: NextRequest) {
-    const input = await parseBody(req, updateMaintenanceSettingsSchema);
-    const data = adminService.updateMaintenanceSettings(input);
     return ok(data);
   },
 

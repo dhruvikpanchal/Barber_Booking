@@ -1,13 +1,12 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { login } from "@/client/assets/ImagePath.js";
 import { routes } from "@/client/config/routes/routes.js";
 import { authHook } from "@/client/modules/auth/hooks/authQuery.jsx";
-import { authServices } from "@/client/modules/auth/services/authServices.jsx";
 import RoleSelector from "@/client/modules/shared/components/forms/auth/RoleSelector.jsx";
 import LoginForm from "@/client/modules/shared/components/forms/auth/LoginForm.jsx";
 import GoogleButton from "@/client/modules/shared/components/forms/auth/GoogleButton.jsx";
@@ -44,7 +43,6 @@ export default function Login() {
   const searchParams = useSearchParams();
   const [role, setRole] = useState("customer");
   const [fieldErrors, setFieldErrors] = useState({});
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [rememberDefaults, setRememberDefaults] = useState({
     email: "",
     remember: false,
@@ -71,6 +69,13 @@ export default function Login() {
       localStorage.removeItem(REMEMBER_KEY);
     }
   }, []);
+
+  useEffect(() => {
+    const oauthError = searchParams.get("error");
+    if (!oauthError) return;
+    setFieldErrors({ form: oauthError });
+    toast.error(oauthError);
+  }, [searchParams]);
 
   async function persistRemember(email, remember) {
     if (typeof window === "undefined") return;
@@ -140,45 +145,12 @@ export default function Login() {
     }
   }
 
-  const handleGoogleCredential = useCallback(
-    async (idToken) => {
-      if (role !== "customer") return;
-      setFieldErrors({});
-      setGoogleLoading(true);
-      try {
-        const result = await authServices.googleLogin({ idToken });
-        if (!result?.user?.email) {
-          const message = "Invalid Google login response. Please try again.";
-          setFieldErrors({ form: message });
-          toast.error(message);
-          return;
-        }
-
-        toast.success("Signed in with Google successfully");
-        await completeSignIn("customer", result.user.email, false, result.user);
-      } catch (error) {
-        const message = error.message || "Google sign-in failed. Please try again.";
-        setFieldErrors({ form: message });
-        toast.error(message);
-      } finally {
-        setGoogleLoading(false);
-      }
-    },
-    [role],
-  );
-
-  const handleGoogleError = useCallback((error) => {
-    const message = error.message || "Google sign-in failed. Please try again.";
-    setFieldErrors({ form: message });
-    toast.error(message);
-  }, []);
-
   function handleRoleChange(next) {
     setRole(next);
     setFieldErrors({});
   }
 
-  const busy = loginMutation.isPending || googleLoading;
+  const busy = loginMutation.isPending;
 
   return (
     <section className="flex min-h-screen bg-[#131313] text-[#e4e2e1]">
@@ -189,7 +161,7 @@ export default function Login() {
             src={login}
             alt="barbershop"
             priority
-            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 33vw, 420px"
+            sizes="50vw"
             fill
             className="object-cover brightness-[0.35] grayscale"
           />
@@ -247,12 +219,7 @@ export default function Login() {
                 <div className="h-px flex-1 bg-[#53443c]" />
               </div>
 
-              <GoogleButton
-                onCredential={handleGoogleCredential}
-                onError={handleGoogleError}
-                loading={googleLoading}
-                disabled={busy}
-              />
+              <GoogleButton disabled={busy} />
             </>
           )}
 

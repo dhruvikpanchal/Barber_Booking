@@ -3,6 +3,7 @@
 import { X } from "lucide-react";
 import Modal from "@/client/modules/shared/components/ui/Modal";
 import { Field } from "@/client/modules/shared/components/forms/FormPrimitives.jsx";
+import { regionConfig } from "@/config/region.js";
 
 export default function WalkInFormModal({
   open,
@@ -64,7 +65,7 @@ export default function WalkInFormModal({
             type="tel"
             value={form.phone}
             onChange={(e) => onChange({ phone: e.target.value })}
-            placeholder="+1 555 000 0000"
+            placeholder={regionConfig.phonePlaceholder}
             disabled={disabled}
             className="border-outline-variant bg-surface-container-low text-on-surface placeholder:text-on-surface-variant/60 focus:border-primary h-11 w-full rounded-md border px-3 text-sm focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           />

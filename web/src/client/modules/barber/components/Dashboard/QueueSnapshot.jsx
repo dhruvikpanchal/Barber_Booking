@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { Armchair, ChevronRight, Timer, Users } from "lucide-react";
 
 export default function QueueSnapshot({ snapshot }) {

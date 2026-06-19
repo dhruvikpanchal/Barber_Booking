@@ -109,7 +109,7 @@ export default function ReviewModal({ appt, onSubmit, onClose, submitting }) {
             disabled={submitting}
             className="flex h-11 flex-1 items-center justify-center rounded-xl border border-outline-variant text-sm font-semibold text-on-surface transition-all hover:bg-surface-container-high disabled:opacity-40"
           >
-            Skip
+            Cancel
           </button>
           <button
             type="button"

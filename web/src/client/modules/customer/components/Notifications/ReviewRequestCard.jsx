@@ -37,17 +37,23 @@ export default function ReviewRequestCard({ notif, onRead, onDelete }) {
           </div>
         </div>
 
-        <div className="border-outline-variant bg-surface-container-lowest mt-3 ml-11 rounded-md border p-3">
-          <div className="flex items-center gap-2">
-            <BarberAvatar initials={notif.barber.initials} size="sm" />
-            <div>
-              <p className="text-on-surface text-sm font-semibold">{notif.barber.name}</p>
-              <p className="text-on-surface-variant text-xs">
-                {notif.service} · completed {notif.completedAt}
-              </p>
+        {notif.barber && (
+          <div className="border-outline-variant bg-surface-container-lowest mt-3 ml-11 rounded-md border p-3">
+            <div className="flex items-center gap-2">
+              <BarberAvatar initials={notif.barber.initials} size="sm" />
+              <div>
+                <p className="text-on-surface text-sm font-semibold">{notif.barber.name}</p>
+                {(notif.service || notif.completedAt) && (
+                  <p className="text-on-surface-variant text-xs">
+                    {[notif.service, notif.completedAt && `completed ${notif.completedAt}`]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <div className="mt-3 ml-11 flex flex-wrap items-center justify-between gap-2">
           <ViewLink href={href} label="Leave a review" />

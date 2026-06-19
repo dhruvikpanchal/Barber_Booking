@@ -3,15 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "tsx scripts/start-dev.mjs",
+    "predev": "node scripts/clear-next-dev-lock.mjs",
+    "dev:next": "next dev",
+    "prebuild": "node scripts/ensure-build-ready.mjs",
     "build": "next build",
-    "postbuild": "node scripts/prepare-standalone.mjs",
+    "postbuild": "node scripts/prepare-standalone.mjs && node scripts/extract-standalone-config.mjs",
     "prestart": "node scripts/check-db.mjs",
-    "start": "node .next/standalone/server.js",
+    "start": "tsx scripts/start-prod.mjs",
+    "clean": "node scripts/clean-next-cache.mjs",
+    "stop": "node scripts/stop-server.mjs",
+    "start:standalone": "node scripts/extract-standalone-config.mjs && node .next/standalone/server.js",
     "start:next": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "node scripts/baseline-drizzle-migrations.mjs && drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx --tsconfig tsconfig.json src/server/db/seed.ts"
@@ -19,6 +25,7 @@
   "dependencies": {
     "@marsidev/react-turnstile": "^1.5.2",
     "@sentry/nextjs": "^10.56.0",
+    "@tanstack/react-query": "^5.101.0",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
     "axios": "^1.16.1",
@@ -37,9 +44,11 @@
     "react-dom": "19.2.4",
     "react-icons": "^5.6.0",
     "recharts": "^3.8.1",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "sonner": "^2.0.7",
-    "zod": "^4.4.3",
-    "@tanstack/react-query": "^5.101.0"
+    "tsx": "^4.22.4",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -56,7 +65,6 @@
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",
     "tailwindcss": "^4",
-    "tsx": "^4.22.4",
     "typescript": "^6.0.3"
   }
 }

@@ -22,9 +22,7 @@ import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
 import { mapAdminBarberListItem } from "@/client/modules/admin/helpers/adminMappers.js";
 import BarberTableRow from "@/client/modules/admin/components/Barbers/BarberTableRow.jsx";
 import BarberCard from "@/client/modules/admin/components/Barbers/BarberCard.jsx";
-import ProfileDrawer from "@/client/modules/admin/components/Barbers/ProfileDrawer.jsx";
 import ConfirmModal from "@/client/modules/admin/components/Barbers/ConfirmModal.jsx";
-import { Toast } from "@/client/modules/shared/components/settings/TinyPrimitives.jsx";
 
 export default function AdminBarbers() {
   const router = useRouter();
@@ -33,14 +31,11 @@ export default function AdminBarbers() {
   const [sortKey, setSortKey] = useState("name_asc");
   const [sortOpen, setSortOpen] = useState(false);
   const [page, setPage] = useState(1);
-  const [profileDrawer, setProfileDrawer] = useState(null);
   const [confirmModal, setConfirmModal] = useState({
     open: false,
     variant: null,
     barber: null,
   });
-  const [toast, setToast] = useState(null);
-
   const listParams = useMemo(
     () => ({
       status: filterStatus === "all" ? undefined : filterStatus,
@@ -64,11 +59,6 @@ export default function AdminBarbers() {
     }
   }, [listQuery.isError, listQuery.error]);
 
-  function showToast(message, type = "success") {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 2800);
-  }
-
   async function refetch() {
     await listQuery.refetch();
   }
@@ -79,16 +69,11 @@ export default function AdminBarbers() {
       router.push(routes.admin.barbersDetail(barber.id));
       return;
     }
-    if (type === "reviews") {
-      showToast(`Opening reviews for ${barber.name}…`, "info");
-      return;
-    }
     if (type === "appointments") {
-      router.push(routes.admin.appointments);
+      router.push(`${routes.admin.appointments}?barberId=${barber.id}`);
       return;
     }
     if (type === "disable" || type === "enable" || type === "delete") {
-      setProfileDrawer(null);
       setConfirmModal({ open: true, variant: type, barber });
     }
   }
@@ -98,9 +83,9 @@ export default function AdminBarbers() {
     try {
       if (variant === "delete") {
         await toast.promise(deleteMutation.mutateAsync(id), {
-          loading: "Deleting barber…",
-          success: "Barber deleted successfully.",
-          error: "Could not delete barber.",
+          loading: "Deactivating barber…",
+          success: "Barber account deactivated.",
+          error: "Could not deactivate barber.",
         });
       } else if (variant === "disable") {
         await toast.promise(statusMutation.mutateAsync({ id, status: "DISABLED" }), {
@@ -130,18 +115,25 @@ export default function AdminBarbers() {
   const filtered = barbers;
   const isFiltered = filterStatus !== "all" || query.trim() !== "";
 
-  const stats = useMemo(
-    () => ({
-      total: listQuery.data?.meta?.total ?? barbers.length,
-      active: barbers.filter((b) => b.status === "active").length,
-      inactive: barbers.filter((b) => b.status === "inactive").length,
-      disabled: barbers.filter((b) => b.status === "disabled").length,
-      avgRating: barbers.length
-        ? (barbers.reduce((s, b) => s + b.rating, 0) / barbers.length).toFixed(1)
-        : "—",
-    }),
-    [barbers, listQuery.data],
-  );
+  const stats = useMemo(() => {
+    const platform = listQuery.data?.meta?.stats;
+    if (platform) {
+      return {
+        total: platform.total,
+        active: platform.active,
+        inactive: platform.inactive,
+        disabled: platform.disabled,
+        avgRating: platform.avgRating,
+      };
+    }
+    return {
+      total: listQuery.data?.meta?.total ?? 0,
+      active: 0,
+      inactive: 0,
+      disabled: 0,
+      avgRating: "—",
+    };
+  }, [listQuery.data]);
 
   if (listQuery.isPending && barbers.length === 0) {
     return (
@@ -384,12 +376,6 @@ export default function AdminBarbers() {
         )}
       </section>
 
-      <ProfileDrawer
-        barber={profileDrawer}
-        onClose={() => setProfileDrawer(null)}
-        onAction={handleAction}
-      />
-
       <ConfirmModal
         open={confirmModal.open}
         variant={confirmModal.variant}
@@ -398,7 +384,6 @@ export default function AdminBarbers() {
         onConfirm={handleConfirm}
       />
 
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { ChevronRight, Home, XCircle } from "lucide-react";
 
 import { routes } from "@/client/config/routes/routes";

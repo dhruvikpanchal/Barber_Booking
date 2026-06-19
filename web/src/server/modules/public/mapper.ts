@@ -142,8 +142,16 @@ export function toBarberDetail(row: BarberDetailRow) {
       description: bs.service.description,
     }));
 
+  const minOfferedPrice =
+    offeredServices.length > 0
+      ? Math.min(...offeredServices.map((service) => service.price))
+      : null;
+  const startingPrice =
+    base.startingPrice > 0 ? base.startingPrice : (minOfferedPrice ?? base.startingPrice);
+
   return {
     ...base,
+    startingPrice,
     address: row.shop?.address ?? null,
     bio: row.bio,
     portfolioUrl: row.portfolioUrl,

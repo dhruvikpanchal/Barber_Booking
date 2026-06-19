@@ -7,12 +7,11 @@ const STAT_GROUPS = [
   { key: "appointments", types: APPOINTMENT_TYPES, metaKey: "booking_confirmed" },
   { key: "service_change", types: ["service_change"], metaKey: "service_change" },
   { key: "review_request", types: ["review_request"], metaKey: "review_request" },
-  { key: "promotion", types: ["promotion"], metaKey: "promotion" },
 ];
 
 export default function StatsBar({ notifications }) {
   return (
-    <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
       {STAT_GROUPS.map(({ key, types, metaKey }) => {
         const meta = TYPE_META[metaKey];
         const Icon = meta.icon;

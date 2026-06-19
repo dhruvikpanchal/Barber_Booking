@@ -221,6 +221,7 @@ export const BARBER_NOTIFICATION_TYPES = [
   "BOOKING_MODIFICATION_REQUEST",
   "SERVICE_CHANGE_REQUESTED",
   "BOOKING_CANCELLED_BY_CUSTOMER",
+  "NEW_CUSTOMER_REVIEW",
 ] as const;
 
 export type BarberNotificationType = (typeof BARBER_NOTIFICATION_TYPES)[number];
@@ -230,6 +231,7 @@ export const BARBER_NOTIFICATION_TYPE_LABELS: Record<BarberNotificationType, str
   BOOKING_MODIFICATION_REQUEST: "Modification Request",
   SERVICE_CHANGE_REQUESTED: "Service Change Request",
   BOOKING_CANCELLED_BY_CUSTOMER: "Cancellation",
+  NEW_CUSTOMER_REVIEW: "New Review",
 };
 
 export const BARBER_NOTIFICATION_ACTIONABLE: Record<BarberNotificationType, boolean> = {
@@ -237,6 +239,7 @@ export const BARBER_NOTIFICATION_ACTIONABLE: Record<BarberNotificationType, bool
   BOOKING_MODIFICATION_REQUEST: true,
   SERVICE_CHANGE_REQUESTED: true,
   BOOKING_CANCELLED_BY_CUSTOMER: false,
+  NEW_CUSTOMER_REVIEW: true,
 };
 
 export const NOTIFICATION_FILTER_TABS = [
@@ -253,3 +256,9 @@ export const DASHBOARD_EARNINGS_TREND_DAYS = 7;
 export const DASHBOARD_QUEUE_PREVIEW_COUNT = 3;
 
 export const DASHBOARD_PENDING_PREVIEW_COUNT = 5;
+
+// NAV BADGES  ·  /barber/nav-badges
+// Per-barber last-seen watermarks for sidebar actionable-item badges.
+export const BARBER_NAV_SECTION_KEYS = ["appointments", "queue", "reviews"] as const;
+
+export type BarberNavSection = (typeof BARBER_NAV_SECTION_KEYS)[number];

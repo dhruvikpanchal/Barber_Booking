@@ -19,7 +19,7 @@ export function UserAvatar({ photoUrl, name = "User", size = "sm", className = "
       } ${className}`}
     >
       {hasPhoto ? (
-        <img src={photoUrl} alt={name} className="h-full w-full object-cover" />
+        <img key={photoUrl} src={photoUrl} alt={name} className="h-full w-full object-cover" />
       ) : (
         <User className={`${icon} text-primary`} aria-hidden />
       )}

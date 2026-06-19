@@ -8,6 +8,7 @@ import {
   exists,
   gte,
   inArray,
+  isNull,
   lt,
   lte,
   notExists,
@@ -73,6 +74,7 @@ type GalleryImageUpdate = Partial<
 
 const customerWith = {
   columns: {
+    id: true,
     fullName: true,
     email: true,
     phone: true,
@@ -85,10 +87,14 @@ const appointmentListWith = {
   services: {
     columns: { name: true, price: true, duration: true },
   },
+  modificationHistory: {
+    columns: { field: true },
+  },
 } as const;
 
 const appointmentListColumns = {
   id: true,
+  customerId: true,
   status: true,
   startAt: true,
   estimatedPrice: true,
@@ -175,6 +181,7 @@ const reviewWith = {
 
 const reviewColumns = {
   id: true,
+  customerId: true,
   rating: true,
   comment: true,
   barberReply: true,
@@ -234,15 +241,32 @@ function buildAppointmentListConditions(
   const parts: SQL[] = [eq(appointments.barberId, barberId)];
 
   if (tab && tab !== "all") {
-    const statusMap: Record<string, string[]> = {
-      upcoming: [APPOINTMENT_STATUS.CONFIRMED, APPOINTMENT_STATUS.IN_SERVICE],
-      pending: [APPOINTMENT_STATUS.PENDING],
-      confirmed: [APPOINTMENT_STATUS.CONFIRMED],
-      completed: [APPOINTMENT_STATUS.COMPLETED],
-      cancelled: [APPOINTMENT_STATUS.CANCELLED, APPOINTMENT_STATUS.NO_SHOW],
-    };
-    if (statusMap[tab]) {
-      parts.push(inArray(appointments.status, statusMap[tab] as Appointment["status"][]));
+    if (tab === "rescheduled") {
+      parts.push(eq(appointments.status, APPOINTMENT_STATUS.CONFIRMED));
+      parts.push(
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(appointmentModifications)
+            .where(
+              and(
+                eq(appointmentModifications.appointmentId, appointments.id),
+                eq(appointmentModifications.field, "startAt"),
+              ),
+            ),
+        ),
+      );
+    } else {
+      const statusMap: Record<string, string[]> = {
+        upcoming: [APPOINTMENT_STATUS.CONFIRMED, APPOINTMENT_STATUS.IN_SERVICE],
+        pending: [APPOINTMENT_STATUS.PENDING],
+        confirmed: [APPOINTMENT_STATUS.CONFIRMED],
+        completed: [APPOINTMENT_STATUS.COMPLETED],
+        cancelled: [APPOINTMENT_STATUS.CANCELLED, APPOINTMENT_STATUS.NO_SHOW],
+      };
+      if (statusMap[tab]) {
+        parts.push(inArray(appointments.status, statusMap[tab] as Appointment["status"][]));
+      }
     }
   }
 
@@ -367,10 +391,23 @@ export const barberProfileRepository = {
         .where(eq(barberProfiles.id, barberId))
         .returning();
 
-      await tx.update(users).set(data.user).where(eq(users.id, profile!.userId));
+      if (Object.keys(data.user).length > 0) {
+        await tx.update(users).set(data.user).where(eq(users.id, profile!.userId));
+      }
 
       return profile!;
     });
+  },
+
+  async updateUserForBarber(barberId: string, user: UserUpdate) {
+    const profile = await db.query.barberProfiles.findFirst({
+      where: eq(barberProfiles.id, barberId),
+      columns: { userId: true },
+    });
+    if (!profile || Object.keys(user).length === 0) return null;
+
+    const [row] = await db.update(users).set(user).where(eq(users.id, profile.userId)).returning();
+    return row ?? null;
   },
 
   updatePhoto(barberId: string, photoUrl: string) {
@@ -737,6 +774,38 @@ export const barberScheduleRepository = {
 
 // ─── APPOINTMENTS ────────────────────────────────────────────────────────────
 
+async function getAppointmentSummaryStats(barberId: string) {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date(todayStart.getTime() + 86_400_000);
+
+  const [statusRows, todayRow] = await Promise.all([
+    db
+      .select({ status: appointments.status, total: count() })
+      .from(appointments)
+      .where(eq(appointments.barberId, barberId))
+      .groupBy(appointments.status),
+    db
+      .select({ total: count() })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.barberId, barberId),
+          gte(appointments.startAt, todayStart),
+          lte(appointments.startAt, todayEnd),
+        ),
+      ),
+  ]);
+
+  const byStatus = Object.fromEntries(statusRows.map((r) => [r.status, Number(r.total)]));
+  return {
+    pending: byStatus[APPOINTMENT_STATUS.PENDING] ?? 0,
+    confirmed: byStatus[APPOINTMENT_STATUS.CONFIRMED] ?? 0,
+    completed: byStatus[APPOINTMENT_STATUS.COMPLETED] ?? 0,
+    today: Number(todayRow[0]?.total ?? 0),
+  };
+}
+
 export const barberAppointmentsRepository = {
   listAppointments(barberId: string, query: AppointmentsQuery) {
     const { page, limit } = query;
@@ -756,8 +825,12 @@ export const barberAppointmentsRepository = {
       ? db.$count(appointments, where)
       : db.$count(appointments, eq(appointments.barberId, barberId));
 
-    return Promise.all([findMany, countQuery]);
+    const statsQuery = getAppointmentSummaryStats(barberId);
+
+    return Promise.all([findMany, countQuery, statsQuery]);
   },
+
+  getAppointmentSummaryStats,
 
   findAppointmentDetail(id: string, barberId: string) {
     return db.query.appointments.findFirst({
@@ -771,6 +844,11 @@ export const barberAppointmentsRepository = {
       },
       with: {
         ...appointmentListWith,
+        barber: {
+          with: {
+            user: { columns: { fullName: true } },
+          },
+        },
         serviceChangeRequests: {
           columns: {
             id: true,
@@ -865,6 +943,49 @@ export const barberAppointmentsRepository = {
       });
 
       return true;
+    });
+  },
+
+  listPendingServiceChanges(barberId: string) {
+    return db.query.serviceChangeRequests.findMany({
+      where: and(
+        eq(serviceChangeRequests.status, SERVICE_CHANGE_STATUS.PENDING),
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(appointments)
+            .where(
+              and(
+                eq(appointments.id, serviceChangeRequests.appointmentId),
+                eq(appointments.barberId, barberId),
+              ),
+            ),
+        ),
+      ),
+      columns: {
+        id: true,
+        appointmentId: true,
+        status: true,
+        customerNote: true,
+        rejectionNote: true,
+        requestedAt: true,
+        resolvedAt: true,
+      },
+      with: {
+        items: {
+          columns: { side: true, name: true, price: true, duration: true },
+        },
+        appointment: {
+          columns: { id: true, startAt: true },
+          with: {
+            customer: customerWith,
+            services: {
+              columns: { name: true, price: true, duration: true },
+            },
+          },
+        },
+      },
+      orderBy: (t, { desc: descFn }) => [descFn(t.requestedAt)],
     });
   },
 
@@ -1129,11 +1250,13 @@ export async function ensureDefaultBarberChairs(barberId: string, client: DbOrTx
   );
 }
 
+export async function prepareBarberQueue(barberId: string, client: DbOrTx = db) {
+  await ensureDefaultBarberChairs(barberId, client);
+  await syncTodayOnlineAppointmentsToQueue(barberId, client);
+}
+
 export const barberQueueRepository = {
   async getLiveQueue(barberId: string, query: QueueQuery) {
-    await ensureDefaultBarberChairs(barberId);
-    await syncTodayOnlineAppointmentsToQueue(barberId);
-
     const parts: SQL[] = [eq(queueEntries.barberId, barberId)];
 
     if (query.tab && query.tab !== "all") {
@@ -1281,7 +1404,16 @@ export const barberWalkInsRepository = {
     const parts: SQL[] = [eq(walkIns.barberId, barberId)];
 
     if (query.status && query.status !== "all") {
-      parts.push(eq(walkIns.status, query.status.toUpperCase() as WalkInStatus));
+      const statusMap: Record<string, WalkInStatus> = {
+        waiting: WALK_IN_STATUS.WAITING,
+        "in-service": WALK_IN_STATUS.IN_SERVICE,
+        done: WALK_IN_STATUS.DONE,
+        cancelled: WALK_IN_STATUS.CANCELLED,
+      };
+      const dbStatus = statusMap[query.status];
+      if (dbStatus) {
+        parts.push(eq(walkIns.status, dbStatus));
+      }
     }
 
     if (query.date) {
@@ -1430,6 +1562,23 @@ export const barberReviewsRepository = {
       where: eq(reviews.barberId, barberId),
       columns: { rating: true },
     });
+  },
+
+  async getReviewReplySummary(barberId: string) {
+    const [unreplied] = await db
+      .select({ total: count() })
+      .from(reviews)
+      .where(and(eq(reviews.barberId, barberId), isNull(reviews.barberReply)));
+
+    const [replied] = await db
+      .select({ total: count() })
+      .from(reviews)
+      .where(and(eq(reviews.barberId, barberId), sql`${reviews.barberReply} IS NOT NULL`));
+
+    return {
+      unreplied: Number(unreplied?.total ?? 0),
+      replied: Number(replied?.total ?? 0),
+    };
   },
 
   updateBarberAverageRating(barberId: string) {
@@ -1684,12 +1833,14 @@ export const barberNotificationsRepository = {
       NOTIFICATION_TYPE.BOOKING_MODIFICATION_REQUEST,
       NOTIFICATION_TYPE.SERVICE_CHANGE_REQUESTED,
       NOTIFICATION_TYPE.BOOKING_CANCELLED_BY_CUSTOMER,
+      NOTIFICATION_TYPE.NEW_CUSTOMER_REVIEW,
     ];
 
     const actionableTypes: NotificationType[] = [
       NOTIFICATION_TYPE.NEW_BOOKING_REQUEST,
       NOTIFICATION_TYPE.BOOKING_MODIFICATION_REQUEST,
       NOTIFICATION_TYPE.SERVICE_CHANGE_REQUESTED,
+      NOTIFICATION_TYPE.NEW_CUSTOMER_REVIEW,
     ];
 
     const parts: SQL[] = [
@@ -1752,6 +1903,7 @@ export const barberNotificationsRepository = {
       NOTIFICATION_TYPE.BOOKING_MODIFICATION_REQUEST,
       NOTIFICATION_TYPE.SERVICE_CHANGE_REQUESTED,
       NOTIFICATION_TYPE.BOOKING_CANCELLED_BY_CUSTOMER,
+      NOTIFICATION_TYPE.NEW_CUSTOMER_REVIEW,
     ];
 
     const [result] = await db
@@ -1891,13 +2043,33 @@ export const barberDashboardRepository = {
         return d;
       });
 
-      const earningsTrend = await Promise.all(
-        trendDays.map(async (day) => {
-          const nextDay = new Date(day.getTime() + 86_400_000);
-          const agg = await sumFinalPrice({ gte: day, lt: nextDay });
-          return agg._sum.finalPrice ?? 0;
-        }),
+      const trendStart = trendDays[0] ?? todayStart;
+      const dailyEarningsRows = await tx
+        .select({
+          day: sql<string>`date(${appointments.startAt})`,
+          total: sum(appointments.finalPrice),
+        })
+        .from(appointments)
+        .where(
+          and(
+            eq(appointments.barberId, barberId),
+            eq(appointments.status, APPOINTMENT_STATUS.COMPLETED),
+            gte(appointments.startAt, trendStart),
+            lt(appointments.startAt, todayEnd),
+          ),
+        )
+        .groupBy(sql`date(${appointments.startAt})`);
+
+      const earningsByDay = new Map(
+        dailyEarningsRows.map((row) => [String(row.day), Number(row.total ?? 0)]),
       );
+
+      const toLocalDateKey = (day: Date) => {
+        const pad = (value: number) => String(value).padStart(2, "0");
+        return `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`;
+      };
+
+      const earningsTrend = trendDays.map((day) => earningsByDay.get(toLocalDateKey(day)) ?? 0);
 
       const servedTodayCount = await tx.$count(
         appointments,

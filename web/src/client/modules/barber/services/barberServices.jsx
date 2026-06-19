@@ -57,10 +57,10 @@ export const barberServices = {
   respondServiceChange: (appointmentId, reqId, data) =>
     patch(`/barber/appointments/${appointmentId}/service-change/${reqId}`, data), //
 
+  listPendingServiceChanges: () => get("/barber/appointments/service-change-requests"), //
+
   // Queue — snapshot DTO
   getQueue: (params) => get("/barber/queue", params), //
-
-  addToQueue: (data) => post("/barber/queue", data), //
 
   updateQueueStatus: (id, data) => patch(`/barber/queue/${id}/status`, data), //
 
@@ -93,6 +93,10 @@ export const barberServices = {
   markAllNotificationsRead: () => post("/barber/notifications/read-all"), //
 
   getUnreadNotificationCount: () => get("/barber/notifications/unread-count"), //
+
+  getNavBadges: () => get("/barber/nav-badges"),
+
+  markNavSectionSeen: (data) => post("/barber/nav-badges/seen", data),
 
   // Dashboard
   getDashboard: (params) => get("/barber/dashboard", params), //

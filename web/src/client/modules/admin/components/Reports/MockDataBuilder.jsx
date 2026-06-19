@@ -2,6 +2,7 @@ import {
   REPORT_DATE_RANGES,
   REPORT_RANGE_MULTIPLIER,
 } from "@/client/modules/admin/constants/adminConstants.js";
+import { formatMoney } from "@/client/lib/format/formatMoney.js";
 
 export function scale(base, rangeKey) {
   return Math.round(base * (REPORT_RANGE_MULTIPLIER[rangeKey] ?? 1));
@@ -35,7 +36,7 @@ export function buildTableRows(reportKey, rangeKey) {
           barber: "Marcus Vale",
           service: "Skin Fade",
           status: "Completed",
-          amount: "$40",
+          amount: formatMoney(40),
         },
         {
           id: "2",
@@ -44,7 +45,7 @@ export function buildTableRows(reportKey, rangeKey) {
           barber: "Ezra Finch",
           service: "Signature Cut",
           status: "Confirmed",
-          amount: "$45",
+          amount: formatMoney(45),
         },
         {
           id: "3",
@@ -53,7 +54,7 @@ export function buildTableRows(reportKey, rangeKey) {
           barber: "Diego Rey",
           service: "Classic Cut",
           status: "Cancelled",
-          amount: "$42",
+          amount: formatMoney(42),
         },
         {
           id: "4",
@@ -62,7 +63,7 @@ export function buildTableRows(reportKey, rangeKey) {
           barber: "Liam Porter",
           service: "Razor Fade",
           status: "Completed",
-          amount: "$46",
+          amount: formatMoney(46),
         },
         {
           id: "5",
@@ -71,7 +72,7 @@ export function buildTableRows(reportKey, rangeKey) {
           barber: "Theo Harris",
           service: "Beard Trim",
           status: "Completed",
-          amount: "$28",
+          amount: formatMoney(28),
         },
         {
           id: "6",
@@ -80,7 +81,7 @@ export function buildTableRows(reportKey, rangeKey) {
           barber: "Rafael Soto",
           service: "Hot Towel Shave",
           status: "No-show",
-          amount: "$35",
+          amount: formatMoney(35),
         },
       ].map((r) => ({ ...r, period }));
 
@@ -172,7 +173,7 @@ export function buildTableRows(reportKey, rangeKey) {
           category: "Haircut",
           bookings: scale(84, rangeKey),
           share: "32%",
-          revenue: `$${scale(3360, rangeKey).toLocaleString()}`,
+          revenue: formatMoney(scale(268800, rangeKey)),
         },
         {
           id: "s2",
@@ -180,7 +181,7 @@ export function buildTableRows(reportKey, rangeKey) {
           category: "Haircut",
           bookings: scale(61, rangeKey),
           share: "23%",
-          revenue: `$${scale(2745, rangeKey).toLocaleString()}`,
+          revenue: formatMoney(scale(219600, rangeKey)),
         },
         {
           id: "s3",
@@ -188,7 +189,7 @@ export function buildTableRows(reportKey, rangeKey) {
           category: "Beard",
           bookings: scale(44, rangeKey),
           share: "17%",
-          revenue: `$${scale(1232, rangeKey).toLocaleString()}`,
+          revenue: formatMoney(scale(98560, rangeKey)),
         },
         {
           id: "s4",
@@ -196,7 +197,7 @@ export function buildTableRows(reportKey, rangeKey) {
           category: "Shave",
           bookings: scale(29, rangeKey),
           share: "11%",
-          revenue: `$${scale(1015, rangeKey).toLocaleString()}`,
+          revenue: formatMoney(scale(81200, rangeKey)),
         },
         {
           id: "s5",
@@ -204,7 +205,7 @@ export function buildTableRows(reportKey, rangeKey) {
           category: "Package",
           bookings: scale(18, rangeKey),
           share: "7%",
-          revenue: `$${scale(1530, rangeKey).toLocaleString()}`,
+          revenue: formatMoney(scale(122400, rangeKey)),
         },
       ];
 

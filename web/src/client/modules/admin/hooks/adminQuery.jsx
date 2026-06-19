@@ -1,6 +1,8 @@
 import { createQuery, createMutation } from "@/client/modules/shared/hooks/useTanstack.js";
 
 import { adminServices } from "@/client/modules/admin/services/adminServices.jsx";
+import { isCompleteAdminProfile } from "@/client/modules/shared/helpers/profilePhotoHelpers.js";
+import { getProfilePlaceholderData } from "@/client/lib/auth/profileCache.js";
 
 export const adminHook = {
   Dashboard: {
@@ -32,8 +34,11 @@ export const adminHook = {
   },
 
   BarberRequests: {
-    useBarberRequestStats: () =>
-      createQuery("barberRequestStats", adminServices.getBarberRequestStats),
+    useBarberRequestStats: (options = {}) =>
+      createQuery("barberRequestStats", adminServices.getBarberRequestStats, {
+        staleTime: 60_000,
+        ...options,
+      }),
 
     useListBarberRequests: (params) =>
       createQuery("barberRequests", adminServices.listBarberRequests, params),
@@ -78,8 +83,11 @@ export const adminHook = {
   },
 
   ContactMessages: {
-    useContactMessageStats: () =>
-      createQuery("contactMessageStats", adminServices.getContactMessageStats),
+    useContactMessageStats: (options = {}) =>
+      createQuery("contactMessageStats", adminServices.getContactMessageStats, {
+        staleTime: 60_000,
+        ...options,
+      }),
 
     useListContactMessages: (params) =>
       createQuery("contactMessages", adminServices.listContactMessages, params),
@@ -98,11 +106,17 @@ export const adminHook = {
   },
 
   Notifications: {
-    useListNotifications: (params) =>
-      createQuery("notifications", adminServices.listNotifications, params),
+    useListNotifications: (params, options = {}) =>
+      createQuery("notifications", adminServices.listNotifications, params, {
+        staleTime: 60_000,
+        ...options,
+      }),
 
-    useUnreadNotificationCount: () =>
-      createQuery("unreadNotificationCount", adminServices.getUnreadNotificationCount),
+    useUnreadNotificationCount: (options = {}) =>
+      createQuery("unreadNotificationCount", adminServices.getUnreadNotificationCount, {
+        staleTime: 60_000,
+        ...options,
+      }),
 
     useMarkNotificationRead: () =>
       createMutation("markNotificationRead", ({ id, ...data }) =>
@@ -111,19 +125,38 @@ export const adminHook = {
 
     useMarkAllNotificationsRead: () =>
       createMutation("markAllNotificationsRead", adminServices.markAllNotificationsRead),
+
+    useDeleteNotification: () =>
+      createMutation("deleteNotification", (id) => adminServices.deleteNotification(id)),
+  },
+
+  NavBadges: {
+    useNavBadges: (options = {}) =>
+      createQuery("adminNavBadges", adminServices.getNavBadges, {
+        staleTime: 45_000,
+        ...options,
+      }),
+
+    useMarkNavSectionSeen: () =>
+      createMutation("markAdminNavSectionSeen", adminServices.markNavSectionSeen),
   },
 
   Profile: {
-    useProfile: () => createQuery("profile", adminServices.getProfile),
+    useProfile: () =>
+      createQuery("profile", adminServices.getProfile, {
+        staleTime: 5 * 60_000,
+        placeholderData: () => getProfilePlaceholderData("admin"),
+        refetchOnMount: (query) => !isCompleteAdminProfile(query.state.data),
+      }),
 
     useUpdateProfile: () => createMutation("updateProfile", adminServices.updateProfile),
+
+    useUploadProfilePhoto: () =>
+      createMutation("uploadAdminProfilePhoto", adminServices.uploadProfilePhoto),
   },
 
   Settings: {
     useSettings: () => createQuery("settings", adminServices.getSettings),
-
-    useUpdateMaintenanceSettings: () =>
-      createMutation("updateMaintenanceSettings", adminServices.updateMaintenanceSettings),
 
     useUpdatePassword: () => createMutation("updatePassword", adminServices.updatePassword),
 

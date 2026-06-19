@@ -15,6 +15,7 @@ import {
   barberAnalyticsService,
   barberNotificationsService,
   barberDashboardService,
+  barberNavBadgesService,
 } from "@/server/modules/barber/service";
 import { userSettingsService } from "@/server/modules/shared/settings/service";
 import { updatePasswordSchema } from "@/server/modules/shared/settings/schema";
@@ -46,6 +47,7 @@ import {
   markNotificationReadSchema,
   notificationsQuerySchema,
   dashboardQuerySchema,
+  markBarberNavSectionSeenSchema,
 } from "@/server/modules/barber/schema";
 
 // SHARED HELPERS
@@ -239,6 +241,12 @@ export const barberController = {
     return ok(data);
   },
 
+  async listPendingServiceChanges(req: NextRequest) {
+    const userId = getUserId(req);
+    const data = await barberAppointmentsService.listPendingServiceChanges(userId);
+    return ok(data);
+  },
+
   async updateAppointementStatus(req: NextRequest, id: string) {
     const userId = getUserId(req);
     const input = await parseBody(req, updateAppointmentStatusSchema);
@@ -370,6 +378,18 @@ export const barberController = {
   async getUnreadNotificationCount(req: NextRequest) {
     const userId = getUserId(req);
     const data = await barberNotificationsService.getUnreadCount(userId);
+    return ok(data);
+  },
+
+  // Nav badges  ·  /api/v1/barber/nav-badges
+  async getNavBadges(req: NextRequest) {
+    const data = await barberNavBadgesService.getNavBadges(getUserId(req));
+    return ok(data);
+  },
+
+  async markNavSectionSeen(req: NextRequest) {
+    const input = await parseBody(req, markBarberNavSectionSeenSchema);
+    const data = await barberNavBadgesService.markNavSectionSeen(getUserId(req), input);
     return ok(data);
   },
 

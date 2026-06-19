@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
 import UserTableRow from "@/client/modules/admin/components/Users/UserTableRow.jsx";
 import UserCard from "@/client/modules/admin/components/Users/UserCard.jsx";
-import DetailDrawer from "@/client/modules/admin/components/Users/DetailDrawer.jsx";
 import ConfirmModal from "@/client/modules/admin/components/Users/ConfirmModal.jsx";
 import {
   Users,
@@ -38,7 +37,6 @@ export default function AdminUsers() {
   const [sortKey, setSortKey] = useState("name_asc");
   const [sortOpen, setSortOpen] = useState(false);
   const [page, setPage] = useState(1);
-  const [detailDrawer, setDetailDrawer] = useState(null);
   const [confirmModal, setConfirmModal] = useState({
     open: false,
     variant: null,
@@ -76,7 +74,6 @@ export default function AdminUsers() {
       return;
     }
     if (type === "disable" || type === "enable" || type === "delete") {
-      setDetailDrawer(null);
       setConfirmModal({
         open: true,
         variant: type === "enable" ? "enable" : type,
@@ -90,9 +87,9 @@ export default function AdminUsers() {
     try {
       if (variant === "delete") {
         await toast.promise(deleteMutation.mutateAsync(id), {
-          loading: "Deleting user…",
-          success: "User deleted successfully.",
-          error: "Could not delete user.",
+          loading: "Deactivating user…",
+          success: "User account deactivated.",
+          error: "Could not deactivate user.",
         });
       } else if (variant === "disable") {
         await toast.promise(statusMutation.mutateAsync({ id, isActive: false }), {
@@ -122,17 +119,27 @@ export default function AdminUsers() {
   const filtered = users;
   const isFiltered = filterStatus !== "all" || filterActivity !== "all" || query.trim() !== "";
 
-  const stats = useMemo(
-    () => ({
-      total: listQuery.data?.meta?.total ?? users.length,
-      active: users.filter((u) => u.status === "active").length,
-      disabled: users.filter((u) => u.status === "disabled").length,
-      highActivity: users.filter((u) => u.activity === "high").length,
-      totalBookings: users.reduce((s, u) => s + u.bookingsTotal, 0),
-      totalReviews: users.reduce((s, u) => s + (u.reviewsGiven ?? 0), 0),
-    }),
-    [users, listQuery.data],
-  );
+  const stats = useMemo(() => {
+    const platform = listQuery.data?.meta?.stats;
+    if (platform) {
+      return {
+        total: platform.total,
+        active: platform.active,
+        disabled: platform.disabled,
+        highActivity: platform.highActivity,
+        totalBookings: platform.totalBookings,
+        totalReviews: platform.totalReviews,
+      };
+    }
+    return {
+      total: listQuery.data?.meta?.total ?? 0,
+      active: 0,
+      disabled: 0,
+      highActivity: 0,
+      totalBookings: 0,
+      totalReviews: 0,
+    };
+  }, [listQuery.data]);
 
   if (listQuery.isPending && users.length === 0) {
     return (
@@ -440,12 +447,6 @@ export default function AdminUsers() {
           </div>
         )}
       </section>
-
-      <DetailDrawer
-        user={detailDrawer}
-        onClose={() => setDetailDrawer(null)}
-        onAction={handleAction}
-      />
 
       <ConfirmModal
         open={confirmModal.open}

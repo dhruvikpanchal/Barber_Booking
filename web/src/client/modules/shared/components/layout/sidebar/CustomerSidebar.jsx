@@ -1,24 +1,24 @@
 "use client";
 
 import {
-  Bell,
   CalendarDays,
   CalendarPlus,
   Heart,
   LayoutDashboard,
-  Settings,
   Star,
-  User,
 } from "lucide-react";
 import SidebarShell from "./SidebarShell";
 import SidebarSection from "./SidebarSection";
 import SidebarItem from "./SidebarItem";
 import { routes } from "@/config/routes/routes.js";
-import { customerHook } from "@/client/modules/customer/hooks/customerQuery.jsx";
+import { CUSTOMER } from "@/client/modules/shared/constants/roles.js";
+import {
+  getNavBadgeCount,
+  useNavBadgeCounts,
+} from "@/client/modules/shared/hooks/useNavBadgeCounts.js";
 
 export default function CustomerSidebar() {
-  const { data: unreadData } = customerHook.Notifications.useGetUnreadNotificationCount();
-  const unreadCount = unreadData?.count ?? 0;
+  const badgeCounts = useNavBadgeCounts(CUSTOMER);
 
   return (
     <SidebarShell>
@@ -37,6 +37,7 @@ export default function CustomerSidebar() {
           href={routes.customer.myAppointments}
           icon={CalendarDays}
           label="My appointments"
+          badgeCount={getNavBadgeCount(badgeCounts, routes.customer.myAppointments)}
         />
         <SidebarItem
           href={routes.customer.favorites}
@@ -46,27 +47,10 @@ export default function CustomerSidebar() {
       </SidebarSection>
       <SidebarSection label="Activity">
         <SidebarItem
-          href={routes.customer.notifications}
-          icon={Bell}
-          label="Notifications"
-          badge={unreadCount > 0 ? (unreadCount > 9 ? "9+" : String(unreadCount)) : undefined}
-        />
-        <SidebarItem
           href={routes.customer.reviews}
           icon={Star}
           label="Reviews"
-        />
-      </SidebarSection>
-      <SidebarSection label="Account">
-        <SidebarItem
-          href={routes.customer.profile}
-          icon={User}
-          label="Profile"
-        />
-        <SidebarItem
-          href={routes.customer.settings}
-          icon={Settings}
-          label="Settings"
+          badgeCount={getNavBadgeCount(badgeCounts, routes.customer.reviews)}
         />
       </SidebarSection>
     </SidebarShell>

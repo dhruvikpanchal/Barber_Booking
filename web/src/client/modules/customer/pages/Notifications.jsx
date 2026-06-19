@@ -2,10 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Bell, BellOff, CheckCheck, Search } from "lucide-react";
+import { Bell, BellOff, Search } from "lucide-react";
 import { toast } from "sonner";
 import EmptyState from "@/client/modules/shared/components/ui/EmptyState";
+import { ErrorState } from "@/client/modules/customer/components/MyAppointments/ApptStates.jsx";
 import { customerHook } from "@/client/modules/customer/hooks/customerQuery.jsx";
+import {
+  applyNotificationDeletedInCache,
+  applyNotificationReadInCache,
+  invalidateCustomerNotificationQueries,
+} from "@/client/modules/customer/helpers/customerCacheHelpers.js";
 import {
   FILTERS,
   TYPE_META,
@@ -18,24 +24,15 @@ import {
 import AppointmentNotificationCard from "@/client/modules/customer/components/Notifications/AppointmentNotificationCard.jsx";
 import ServiceChangeCard from "@/client/modules/customer/components/Notifications/ServiceChangeCard.jsx";
 import ReviewRequestCard from "@/client/modules/customer/components/Notifications/ReviewRequestCard.jsx";
-import PromotionCard from "@/client/modules/customer/components/Notifications/PromotionCard.jsx";
 import GenericNotificationCard from "@/client/modules/customer/components/Notifications/GenericNotificationCard.jsx";
 import StatsBar from "@/client/modules/customer/components/Notifications/StatsBar.jsx";
-
-function invalidateNotificationQueries(queryClient) {
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: ["listNotifications"] }),
-    queryClient.invalidateQueries({ queryKey: ["getUnreadNotificationCount"] }),
-    queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
-  ]);
-}
+import { useAutoMarkCustomerNotificationsRead } from "@/client/modules/customer/hooks/useAutoMarkCustomerNotificationsRead.js";
 
 export default function Notifications() {
   const queryClient = useQueryClient();
-  const { data, isPending, isError, error, refetch } =
-    customerHook.Notifications.useListNotifications({
-      limit: 100,
-    });
+  const { data, isPending, isError, error, refetch } = customerHook.Notifications.useListNotifications({
+    limit: 100,
+  });
   const markReadMutation = customerHook.Notifications.useMarkNotificationRead();
   const markAllReadMutation = customerHook.Notifications.useMarkAllNotificationsRead();
   const deleteMutation = customerHook.Notifications.useDeleteNotification();
@@ -57,47 +54,41 @@ export default function Notifications() {
     }
   }, [isError, error]);
 
+  useAutoMarkCustomerNotificationsRead(notifications, { isPending });
+
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const markRead = useCallback(
     async (id) => {
       if (busy) return;
+      const target = notifications.find((item) => item.id === id);
+      if (!target || target.read) return;
+
+      applyNotificationReadInCache(queryClient, id);
+
       try {
         await markReadMutation.mutateAsync(id);
-        await invalidateNotificationQueries(queryClient);
       } catch {
+        await invalidateCustomerNotificationQueries(queryClient);
         toast.error("Could not mark notification as read.");
       }
     },
-    [busy, markReadMutation, queryClient],
+    [busy, markReadMutation, queryClient, notifications],
   );
-
-  const markAllRead = useCallback(async () => {
-    if (busy) return;
-    try {
-      await toast.promise(markAllReadMutation.mutateAsync(), {
-        loading: "Marking all as read…",
-        success: "All notifications marked as read.",
-        error: "Could not mark all as read.",
-      });
-      await invalidateNotificationQueries(queryClient);
-    } catch {
-      /* toast handles error */
-    }
-  }, [busy, markAllReadMutation, queryClient]);
 
   const deleteNotif = useCallback(
     async (id) => {
       if (busy) return;
+      applyNotificationDeletedInCache(queryClient, id);
+
       try {
         await toast.promise(deleteMutation.mutateAsync(id), {
           loading: "Deleting notification…",
           success: "Notification deleted.",
           error: "Could not delete notification.",
         });
-        await invalidateNotificationQueries(queryClient);
       } catch {
-        /* toast handles error */
+        await invalidateCustomerNotificationQueries(queryClient);
       }
     },
     [busy, deleteMutation, queryClient],
@@ -128,15 +119,13 @@ export default function Notifications() {
         return <ServiceChangeCard {...props} />;
       case "review_request":
         return <ReviewRequestCard {...props} />;
-      case "promotion":
-        return <PromotionCard {...props} />;
       default:
         return <GenericNotificationCard {...props} />;
     }
   };
 
   return (
-    <div className="bg-background text-on-surface mx-auto max-w-6xl space-y-8 pb-4">
+    <div className="bg-background text-on-surface mx-auto max-w-6xl space-y-8">
       <header className="space-y-4">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="space-y-2">
@@ -161,18 +150,6 @@ export default function Notifications() {
               appointments.
             </p>
           </div>
-
-          {unreadCount > 0 && (
-            <button
-              type="button"
-              onClick={markAllRead}
-              disabled={busy}
-              className="border-outline-variant text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface inline-flex items-center justify-center gap-1.5 rounded-full border px-4 py-2 text-xs font-medium transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <CheckCheck className="h-3.5 w-3.5" />
-              Mark all read
-            </button>
-          )}
         </div>
       </header>
 
@@ -244,6 +221,12 @@ export default function Notifications() {
             <div key={i} className="bg-surface-container h-24 animate-pulse rounded-xl" />
           ))}
         </div>
+      ) : isError ? (
+        <ErrorState
+          onRetry={() => refetch()}
+          title="Couldn't load notifications"
+          message="There was a problem fetching your notifications. Please check your connection and try again."
+        />
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={BellOff}

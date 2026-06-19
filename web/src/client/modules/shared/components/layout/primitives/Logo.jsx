@@ -1,10 +1,11 @@
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { routes } from "@/config/routes/routes";
 
 export default function Logo({ href = routes.public.home, compact = false }) {
   return (
     <Link
       href={href}
+      prefetch={false}
       className="font-serif font-black tracking-tighter text-on-surface transition-colors hover:text-primary"
       aria-label="Iron & Oak home"
     >

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
-import customerServices from "@/client/modules/customer/services/customerServices.jsx";
-import { formatLocalDate } from "@/client/modules/shared/helpers/formatLocalDate";
+import { customerHook } from "@/client/modules/customer/hooks/customerQuery.jsx";
+import { formatLocalDate, parseLocalDateKey } from "@/client/modules/shared/helpers/formatLocalDate";
+import { getBookingTimezoneOffsetMinutes, normalizeTimeKey } from "@/client/modules/shared/helpers/calendarDate.js";
 
 const DAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const MONTHS = [
@@ -46,11 +47,20 @@ export default function BookingStep3DateTime({ booking, onSelect, disabled = fal
     return d;
   });
 
-  const [timeSlots, setTimeSlots] = useState([]);
-  const [slotsLoading, setSlotsLoading] = useState(false);
+  const selectedDate = booking.date ? parseLocalDateKey(booking.date) : null;
+  const slug = booking.barber?.slug ?? booking.barber?.id ?? "";
+  const duration = booking.services.reduce((sum, service) => sum + service.duration, 0);
+  const serviceIds = useMemo(() => booking.services.map((service) => service.id), [booking.services]);
+  const dateParam = selectedDate ? formatLocalDate(selectedDate) : "";
+  const timezoneOffsetMinutes = getBookingTimezoneOffsetMinutes();
 
-  const selectedDate = booking.date ? new Date(booking.date) : null;
-  const slug = booking.barber?.slug ?? booking.barber?.id;
+  const slotsEnabled = Boolean(selectedDate && slug && booking.services.length > 0);
+  const { data: timeSlotsRaw = [], isPending: slotsLoading } = customerHook.Booking.useGetAvailableSlots(
+    slug,
+    { date: dateParam, duration, serviceIds, timezoneOffsetMinutes },
+    { enabled: slotsEnabled },
+  );
+  const timeSlots = Array.isArray(timeSlotsRaw) ? timeSlotsRaw : [];
 
   const monthStart = startOfMonth(cursor);
   const firstDow = monthStart.getDay();
@@ -71,44 +81,14 @@ export default function BookingStep3DateTime({ booking, onSelect, disabled = fal
   function pickDate(day) {
     const d = new Date(cursor.getFullYear(), cursor.getMonth(), day);
     if (d < today) return;
-    onSelect({ date: d.toISOString(), time: null, timeLabel: null });
+    onSelect({ date: formatLocalDate(d), time: null, timeLabel: null });
   }
 
   function pickTime(slot) {
     if (!slot.available) return;
-    onSelect({ time: slot.id, timeLabel: slot.label });
+    const time = slot.time ?? slot.id;
+    onSelect({ time: normalizeTimeKey(time), timeLabel: slot.label });
   }
-
-  useEffect(() => {
-    if (!selectedDate || !slug || booking.services.length === 0) {
-      setTimeSlots([]);
-      return;
-    }
-    let cancelled = false;
-    setSlotsLoading(true);
-    const duration = booking.services.reduce((s, sv) => s + sv.duration, 0);
-    const serviceIds = booking.services.map((s) => s.id);
-
-    customerServices
-      .getAvailableSlots(slug, {
-        date: formatLocalDate(selectedDate),
-        duration,
-        serviceIds,
-      })
-      .then((slots) => {
-        if (!cancelled) setTimeSlots(Array.isArray(slots) ? slots : []);
-      })
-      .catch(() => {
-        if (!cancelled) setTimeSlots([]);
-      })
-      .finally(() => {
-        if (!cancelled) setSlotsLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedDate, slug, booking.services]);
 
   const morningSlots = timeSlots.filter((s) => {
     const [h] = s.id.split(":").map(Number);
@@ -218,7 +198,8 @@ export default function BookingStep3DateTime({ booking, onSelect, disabled = fal
                 </p>
                 <div className="grid grid-cols-2 gap-1.5">
                   {morningSlots.map((slot) => {
-                    const sel = booking.time === slot.id;
+                    const slotTime = normalizeTimeKey(slot.time ?? slot.id);
+                    const sel = normalizeTimeKey(booking.time) === slotTime;
                     return (
                       <button
                         key={slot.id}
@@ -248,7 +229,8 @@ export default function BookingStep3DateTime({ booking, onSelect, disabled = fal
                 </p>
                 <div className="grid grid-cols-2 gap-1.5">
                   {afternoonSlots.map((slot) => {
-                    const sel = booking.time === slot.id;
+                    const slotTime = normalizeTimeKey(slot.time ?? slot.id);
+                    const sel = normalizeTimeKey(booking.time) === slotTime;
                     return (
                       <button
                         key={slot.id}

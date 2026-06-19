@@ -1,13 +1,13 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { CheckCheck, Trash2, ChevronRight } from "lucide-react";
 
 export { InitialsAvatar as BarberAvatar } from "@/client/modules/shared/components/ui/InitialsAvatar.jsx";
 
 export function CardActions({ notif, onRead, onDelete }) {
   return (
-    <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+    <div className="flex items-center gap-1 opacity-100 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
       {!notif.read && (
         <button
           type="button"

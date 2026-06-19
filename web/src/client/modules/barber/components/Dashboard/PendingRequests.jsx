@@ -1,6 +1,7 @@
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { AlertCircle, Check, ChevronRight, X } from "lucide-react";
 import { formatTimeAgo, formatTimeLabel } from "@/lib/format/formatDateTime.js";
+import { formatMoney } from "@/client/lib/format/formatMoney.js";
 import { useHydrated } from "@/client/modules/shared/hooks/useHydrated.js";
 
 export default function PendingRequests({ requests, onAccept, onReject }) {
@@ -41,9 +42,9 @@ export default function PendingRequests({ requests, onAccept, onReject }) {
             <li key={r.id} className="px-4 py-3 sm:px-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <p className="text-on-surface truncate font-medium">{r.customer}</p>
+                  <p className="text-on-surface truncate font-medium">{r.customer?.name ?? "Customer"}</p>
                   <p className="text-on-surface-variant truncate text-xs">
-                    {r.service} · {formatTimeLabel(r.startAt)} · ${r.price}
+                    {r.service} · {formatTimeLabel(r.startAt)} · {formatMoney(r.price)}
                   </p>
                   <p className="text-on-surface-variant mt-0.5 text-[11px]">
                     requested {hydrated ? formatTimeAgo(r.requestedAt) : "recently"}

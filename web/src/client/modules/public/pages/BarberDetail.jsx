@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -14,11 +14,21 @@ import BarberGallery from "@/client/modules/public/components/Barbers/BarberGall
 import BarberReviewsSection from "@/client/modules/public/components/Barbers/BarberReviewsSection.jsx";
 import BarberBookingSidebar from "@/client/modules/public/components/Barbers/BarberBookingSidebar.jsx";
 import { publicHook } from "@/client/modules/public/hooks/publicQuery.jsx";
+import {
+  PUBLIC_DETAIL_STALE_MS,
+  ssrQueryOptions,
+} from "@/client/modules/public/helpers/publicQueryHelpers.js";
 
 export default function BarberDetail({ slug, initialBarber }) {
-  const { data: barber, isPending, isError, error } = publicHook.Barbers.useBarber(slug, {
-    initialData: initialBarber ?? undefined,
-  });
+  const {
+    data: barber,
+    isPending,
+    isError,
+    error,
+  } = publicHook.Barbers.useBarber(
+    slug,
+    ssrQueryOptions(initialBarber, { staleTime: PUBLIC_DETAIL_STALE_MS }),
+  );
 
   useEffect(() => {
     if (isError) {

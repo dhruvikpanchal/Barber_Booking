@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import {
   Activity,
   CalendarPlus,
@@ -83,7 +83,7 @@ export default function RecentActivity({ items }) {
                     </p>
                   </div>
                   <ChevronRight
-                    className="text-on-surface-variant mt-2 h-4 w-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                    className="text-on-surface-variant mt-2 h-4 w-4 shrink-0 opacity-60 lg:opacity-0 lg:transition-opacity lg:group-hover:opacity-100"
                     aria-hidden
                   />
                 </Link>

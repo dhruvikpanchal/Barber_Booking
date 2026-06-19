@@ -1,8 +1,10 @@
 "use client";
 
 import { TrendingUp } from "lucide-react";
-import { AreaChart, Area, ResponsiveContainer, XAxis, CartesianGrid, Tooltip } from "recharts";
-import { ChartContainer } from "./ChartContainer.jsx";
+import { AreaChart, Area, XAxis, CartesianGrid } from "recharts";
+import { ChartContainer, ChartResponsiveContainer } from "./ChartContainer.jsx";
+import ChartTooltip from "./ChartTooltip.jsx";
+import { CHART_AXIS_TICK } from "./chartStyles.js";
 
 export default function BookingTrendCard({ data = [], total, delta }) {
   return (
@@ -26,7 +28,7 @@ export default function BookingTrendCard({ data = [], total, delta }) {
       </header>
 
       <ChartContainer className="h-40 w-full min-w-0 sm:h-52">
-        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+        <ChartResponsiveContainer>
           <AreaChart data={data}>
             <defs>
               <linearGradient id="bookingGradient" x1="0" y1="0" x2="0" y2="1">
@@ -37,9 +39,9 @@ export default function BookingTrendCard({ data = [], total, delta }) {
 
             <CartesianGrid strokeDasharray="3 4" opacity={0.1} />
 
-            <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} />
+            <XAxis dataKey="label" tickLine={false} axisLine={false} tick={CHART_AXIS_TICK} />
 
-            <Tooltip />
+            <ChartTooltip />
 
             <Area
               type="monotone"
@@ -50,7 +52,7 @@ export default function BookingTrendCard({ data = [], total, delta }) {
               className="text-primary"
             />
           </AreaChart>
-        </ResponsiveContainer>
+        </ChartResponsiveContainer>
       </ChartContainer>
     </section>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { Eye, EyeOff } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";
 import { isTurnstileEnabled } from "@/client/lib/turnstile.js";

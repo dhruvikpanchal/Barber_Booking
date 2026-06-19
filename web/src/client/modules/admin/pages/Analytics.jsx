@@ -17,21 +17,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { SkeletonLoader } from "@/client/modules/admin/components/Analytics/SkeletonLoader.jsx";
-import QueueOverviewChart from "@/client/modules/shared/components/charts/QueueOverviewChart.jsx";
+import AreaSeriesPanel from "@/client/modules/shared/components/charts/AreaSeriesPanel.jsx";
 import VerticalBarChart from "@/client/modules/shared/components/charts/VerticalBarChart.jsx";
+import { rowsToCsv, downloadFile } from "@/client/modules/admin/components/Reports/MockDataBuilder";
 import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
-
-function buildTrendChartData(trend) {
-  if (!trend?.labels?.length) {
-    return [{ city: "Platform", waiting: 0, inService: 0, chairsTotal: 0 }];
-  }
-  return trend.labels.map((label, i) => ({
-    city: label,
-    waiting: 0,
-    inService: trend.data?.[i] ?? 0,
-    chairsTotal: trend.data?.[i] ?? 0,
-  }));
-}
+import { formatMoney } from "@/client/lib/format/formatMoney.js";
 
 export default function AdminAnalytics() {
   const [filter, setFilter] = useState("month");
@@ -52,6 +42,8 @@ export default function AdminAnalytics() {
     return "";
   }, [filter, startDate, endDate, isCustomApplied]);
 
+  const generateMutation = adminHook.Reports.useGenerateReport();
+
   const {
     data: analytics,
     isPending,
@@ -60,7 +52,7 @@ export default function AdminAnalytics() {
     refetch,
   } = adminHook.Analytics.useAnalytics(shouldFetch ? queryParams : "");
 
-  const busy = isPending || exporting;
+  const busy = isPending || exporting || generateMutation.isPending;
 
   useEffect(() => {
     if (isError) {
@@ -89,9 +81,37 @@ export default function AdminAnalytics() {
 
   const handleExportReport = async () => {
     setExporting(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setExporting(false);
-    toast.success(`Platform report (${filter.toUpperCase()}) export queued.`);
+    try {
+      const payload = {
+        type: "appointments",
+        range: filter,
+        format: "csv",
+        ...(filter === "custom" ? { start: startDate, end: endDate } : {}),
+      };
+
+      const result = await toast
+        .promise(generateMutation.mutateAsync(payload), {
+          loading: "Generating platform report…",
+          success: "Report downloaded.",
+          error: "Could not export report.",
+        })
+        .unwrap();
+
+      if (result?.columns?.length && result?.rows?.length) {
+        const csv = rowsToCsv(result.columns, result.rows);
+        downloadFile(
+          csv,
+          `iron-oak-analytics-${filter}-${Date.now()}.csv`,
+          "text/csv;charset=utf-8;",
+        );
+      } else {
+        toast.info("No appointment rows to export for this period.");
+      }
+    } catch {
+      /* toast handles error */
+    } finally {
+      setExporting(false);
+    }
   };
 
   const currentData = useMemo(() => {
@@ -105,11 +125,6 @@ export default function AdminAnalytics() {
     };
   }, [analytics]);
 
-  const trendChartData = useMemo(
-    () => buildTrendChartData(currentData?.appointmentsTrends),
-    [currentData],
-  );
-
   const isEmptyState =
     shouldFetch &&
     !isPending &&
@@ -122,7 +137,7 @@ export default function AdminAnalytics() {
 
   if (isPending && shouldFetch && !currentData) {
     return (
-      <div className="mx-auto max-w-7xl space-y-8 pb-4">
+      <div className="mx-auto max-w-7xl min-w-0 space-y-8 pb-4">
         <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
             <p className="font-label-caps text-primary">Admin · Monitoring</p>
@@ -137,7 +152,7 @@ export default function AdminAnalytics() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 pb-4">
+    <div className="mx-auto max-w-7xl min-w-0 space-y-8 pb-4">
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="space-y-2">
           <p className="font-label-caps text-primary">Admin · Monitoring</p>
@@ -147,8 +162,8 @@ export default function AdminAnalytics() {
           </h1>
 
           <p className="text-on-surface-variant max-w-2xl text-sm leading-relaxed">
-            Monitor platform performance, appointment activity, revenue trends, barber productivity,
-            customer growth, service popularity, and rating insights across the entire system.
+            Monitor appointments, new customer sign-ups, service demand, and platform ratings for the
+            selected period.
           </p>
         </div>
 
@@ -170,8 +185,7 @@ export default function AdminAnalytics() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 md:px-8 md:py-8">
-        <div className="border-outline-variant/60 bg-surface-container-low rounded-xl border p-4">
+      <div className="border-outline-variant/60 bg-surface-container-low rounded-xl border p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-2">
               <Filter className="text-on-surface-variant/70 h-4 w-4" />
@@ -299,6 +313,9 @@ export default function AdminAnalytics() {
                 if (stat.label === "Total Barbers") {
                   Icon = Scissors;
                   accent = "text-amber-500 bg-amber-500/10";
+                } else if (stat.label === "New Customers") {
+                  Icon = Users;
+                  accent = "text-primary bg-primary/10";
                 } else if (stat.label === "Total Appointments") {
                   Icon = CalendarCheck;
                   accent = "text-emerald-500 bg-emerald-500/10";
@@ -343,9 +360,6 @@ export default function AdminAnalytics() {
                           )}
                           {stat.change}
                         </span>
-                        <span className="text-on-surface-variant text-[9px] opacity-60">
-                          prev period
-                        </span>
                       </div>
                     )}
                   </div>
@@ -353,29 +367,25 @@ export default function AdminAnalytics() {
               })}
             </section>
 
-            <section className="grid gap-6 md:grid-cols-2">
-              <div className="border-outline-variant/60 bg-surface-container-low rounded-xl border p-5 shadow-sm">
-                <QueueOverviewChart cities={trendChartData} />
+            <section className="grid min-w-0 gap-6 md:grid-cols-2">
+              <div className="border-outline-variant/60 bg-surface-container-low min-w-0 overflow-hidden rounded-xl border p-5 shadow-sm">
+                <h4 className="text-on-surface-variant mb-3 text-xs font-semibold tracking-wider uppercase">
+                  Appointments over time
+                </h4>
+                <AreaSeriesPanel
+                  embedded
+                  gradientId="analyticsAppointmentsTrend"
+                  data={currentData.appointmentsTrends.data ?? []}
+                  labels={currentData.appointmentsTrends.labels ?? []}
+                />
               </div>
 
-              <div className="border-outline-variant/60 bg-surface-container-low rounded-xl border p-5 shadow-sm">
-                <QueueOverviewChart cities={trendChartData} />
-              </div>
-
-              <div className="border-outline-variant/60 bg-surface-container-low rounded-xl border p-5 shadow-sm">
-                <QueueOverviewChart cities={trendChartData} />
-              </div>
-
-              <div className="border-outline-variant/60 bg-surface-container-low rounded-xl border p-5 shadow-sm">
+              <div className="border-outline-variant/60 bg-surface-container-low min-w-0 overflow-hidden rounded-xl border p-5 shadow-sm">
                 <VerticalBarChart
                   data={currentData.serviceUsage.data}
                   labels={currentData.serviceUsage.labels}
                   title="Top 5 Most Demanded Services"
                 />
-              </div>
-
-              <div className="border-outline-variant/60 bg-surface-container-low rounded-xl border p-5 shadow-sm md:col-span-2">
-                <QueueOverviewChart cities={trendChartData} />
               </div>
             </section>
 
@@ -458,7 +468,7 @@ export default function AdminAnalytics() {
                   { label: "New customers", value: currentData.summary.totalCustomers },
                   {
                     label: "Revenue",
-                    value: `$${Number(currentData.summary.totalRevenue ?? 0).toLocaleString()}`,
+                    value: formatMoney(Number(currentData.summary.totalRevenue ?? 0)),
                   },
                 ].map((row) => (
                   <div
@@ -475,7 +485,6 @@ export default function AdminAnalytics() {
             </section>
           </div>
         ) : null}
-      </div>
     </div>
   );
 }

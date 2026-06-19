@@ -1,6 +1,11 @@
+function resolveWorkflowStatus(raw) {
+  if (raw.workflowStatus) return raw.workflowStatus;
+  if (raw.replyStatus === "replied") return "replied";
+  return "new";
+}
+
 export function buildContactMessageRecord(raw) {
-  const baseStatus = raw.replyStatus === "replied" ? "replied" : "new";
-  const submittedDate = new Date(raw.submittedAt);
+  const status = resolveWorkflowStatus(raw);
 
   const thread = [
     {
@@ -20,24 +25,16 @@ export function buildContactMessageRecord(raw) {
       author: "Admin",
       authorRole: "admin",
       content: raw.replyText,
-      timestamp: new Date(submittedDate.getTime() + 1000 * 60 * 45).toISOString(),
-    });
-    thread.push({
-      id: `${raw.id}-status-replied`,
-      type: "status_change",
-      author: "Admin",
-      authorRole: "admin",
-      content: 'Status changed to "Replied"',
-      timestamp: new Date(submittedDate.getTime() + 1000 * 60 * 46).toISOString(),
+      timestamp: raw.repliedAt ?? raw.submittedAt,
     });
   }
 
   return {
     ...raw,
     phone: raw.phone ?? null,
-    status: baseStatus,
+    status,
     thread,
-    assignedTo: baseStatus !== "new" ? "Admin" : null,
-    internalNote: null,
+    assignedTo: raw.assignedTo ?? null,
+    internalNote: raw.internalNote ?? null,
   };
 }

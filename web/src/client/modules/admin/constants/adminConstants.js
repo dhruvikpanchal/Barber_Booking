@@ -4,7 +4,6 @@ import {
   Info,
   CalendarCheck,
   Scissors,
-  Construction,
   Lock,
   Mail,
   CalendarX,
@@ -44,10 +43,7 @@ export const CONTACT_MESSAGE_TABS = [
   { key: "replied", label: "Replied" },
 ];
 
-export const SETTINGS_TABS = [
-  { id: "maintenance", icon: Construction, label: "Maintenance" },
-  { id: "password", icon: Lock, label: "Password" },
-];
+export const SETTINGS_TABS = [{ id: "password", icon: Lock, label: "Password" }];
 
 export const APPOINTMENT_STATUSES = {
   pending: {
@@ -113,7 +109,6 @@ export const BARBER_REQUEST_STATUSES = {
 export function getBarberActionsMenuItems(barber) {
   return [
     { key: "view", label: "View Profile", Icon: Eye },
-    { key: "reviews", label: "View Reviews", Icon: MessageSquare },
     { key: "appointments", label: "View Appointments", Icon: CalendarCheck },
     barber.status === "disabled"
       ? {
@@ -130,7 +125,7 @@ export function getBarberActionsMenuItems(barber) {
         },
     {
       key: "delete",
-      label: "Delete",
+      label: "Deactivate",
       Icon: Trash2,
       color: "text-status-cancelled",
     },
@@ -159,9 +154,9 @@ export function getBarberStatusConfig(barber) {
     delete: {
       icon: Trash2,
       iconBg: "bg-status-cancelled/15 text-status-cancelled",
-      title: `Delete ${barber.name}?`,
-      body: `This action is permanent. All profile data, reviews, and appointment history linked to this barber will be removed. This cannot be undone.`,
-      confirmLabel: "Delete Permanently",
+      title: `Deactivate ${barber.name}?`,
+      body: `This barber account will be disabled and removed from active listings. Appointment history is retained. You can re-enable the account later if needed.`,
+      confirmLabel: "Deactivate Barber",
       confirmClass: "bg-status-cancelled text-on-error hover:opacity-90",
     },
   };
@@ -279,7 +274,7 @@ export function getUserActionsMenuItems(user) {
     },
     {
       key: "delete",
-      label: "Delete User",
+      label: "Deactivate User",
       Icon: Trash2,
       color: "text-status-cancelled",
     },
@@ -320,6 +315,10 @@ export const BOOKING_STATUS_CONFIG = {
 export const ACTIVITY_ORDER = { high: 0, medium: 1, low: 2 };
 
 export const PAGE_SIZE = 6;
+
+export const APPOINTMENTS_PAGE_SIZE = 25;
+
+export const NOTIFICATIONS_PAGE_SIZE = 25;
 
 export const USER_STATUS_CONFIG = {
   active: {

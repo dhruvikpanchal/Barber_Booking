@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import Logo from "@/components/layout/primitives/Logo";
 import NavLink from "@/components/layout/primitives/NavLink";
 import PublicAccountMenu from "@/components/layout/primitives/PublicAccountMenu";
@@ -42,12 +42,14 @@ export default function PublicNavbar() {
           <div className="flex items-center justify-end gap-3">
             <Link
               href={routes.auth.login}
+              prefetch={false}
               className="font-label-caps rounded-md border border-outline px-4 py-2 text-on-surface transition-colors hover:border-primary hover:text-primary"
             >
               Sign in
             </Link>
             <Link
               href={routes.auth.register}
+              prefetch={false}
               className="font-label-caps rounded-md bg-primary px-5 py-2 text-on-primary transition-colors hover:opacity-90 active:scale-[0.98]"
             >
               Sign up

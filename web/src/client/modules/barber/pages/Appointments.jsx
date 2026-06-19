@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { CalendarCheck, Search } from "lucide-react";
 import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
@@ -16,7 +17,13 @@ import ServiceChangeRequestsSection from "@/client/modules/barber/components/App
 import { APPOINTMENT_TABS } from "@/client/modules/barber/constants/barberConstants.js";
 import { STATUS_RANK } from "@/client/modules/barber/constants/appointmentConstants.js";
 import { barberHook, useBarberInvalidation } from "@/client/modules/barber/hooks/barberQuery.jsx";
+import { barberServices } from "@/client/modules/barber/services/barberServices.jsx";
 import { mapAppointmentListItem } from "@/client/modules/barber/helpers/barberMappers.js";
+import { shouldRetryQuery } from "@/client/lib/query/retryPolicy.js";
+import { filterAppointmentsBySearch } from "@/client/modules/barber/helpers/appointmentListHelpers.js";
+
+const APPOINTMENTS_PAGE_SIZE = 20;
+const LIST_STALE_TIME = 60_000;
 
 function toReschedulePayload(isoStart) {
   const d = new Date(isoStart);
@@ -36,16 +43,27 @@ export default function Appointments() {
   const [rescheduleFor, setRescheduleFor] = useState(null);
   const [detailFor, setDetailFor] = useState(null);
 
-  const listQuery = barberHook.Appointments.useListAppointments({
-    tab,
-    q: query.trim() || undefined,
-    page: 1,
-    limit: 100,
+  const listQuery = useInfiniteQuery({
+    queryKey: ["barberListAppointments", { tab, q: query.trim() || undefined }],
+    queryFn: ({ pageParam }) =>
+      barberServices.listAppointments({
+        tab,
+        page: pageParam,
+        limit: APPOINTMENTS_PAGE_SIZE,
+        ...(query.trim() ? { q: query.trim() } : {}),
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.meta?.hasNext ? lastPage.meta.page + 1 : undefined,
+    staleTime: LIST_STALE_TIME,
+    retry: shouldRetryQuery,
   });
+
   const statusMutation = barberHook.Appointments.useUpdateAppointmentStatus();
   const rescheduleMutation = barberHook.Appointments.useRescheduleAppointment();
 
-  const busy = listQuery.isPending || statusMutation.isPending || rescheduleMutation.isPending;
+  const busy =
+    listQuery.isPending || statusMutation.isPending || rescheduleMutation.isPending;
 
   useEffect(() => {
     if (listQuery.isError) {
@@ -54,34 +72,38 @@ export default function Appointments() {
   }, [listQuery.isError, listQuery.error]);
 
   const appointments = useMemo(
-    () => (listQuery.data?.appointments ?? []).map(mapAppointmentListItem),
-    [listQuery.data],
+    () =>
+      (listQuery.data?.pages ?? [])
+        .flatMap((page) => page.appointments ?? [])
+        .map(mapAppointmentListItem),
+    [listQuery.data?.pages],
   );
 
-  const stats = listQuery.data?.stats ?? {
+  const stats = listQuery.data?.pages?.[0]?.stats ?? {
     pending: 0,
     confirmed: 0,
     completed: 0,
     today: 0,
   };
 
+  const meta = listQuery.data?.pages?.[listQuery.data.pages.length - 1]?.meta;
+  const totalLoaded = appointments.length;
+  const totalAvailable = meta?.total ?? totalLoaded;
+
   const filtered = useMemo(() => {
     const rank = (s) => {
       const i = STATUS_RANK.indexOf(s);
       return i === -1 ? STATUS_RANK.length : i;
     };
-    return [...appointments].sort((a, b) => {
+    const bySearch = filterAppointmentsBySearch(appointments, query);
+    return [...bySearch].sort((a, b) => {
       if (tab === "upcoming") {
         const r = rank(a.status) - rank(b.status);
         if (r !== 0) return r;
       }
       return new Date(a.startAt) - new Date(b.startAt);
     });
-  }, [appointments, tab]);
-
-  async function refetch() {
-    await listQuery.refetch();
-  }
+  }, [appointments, tab, query]);
 
   async function updateStatus(id, status) {
     if (busy) return;
@@ -94,8 +116,8 @@ export default function Appointments() {
           error: "Could not update appointment.",
         },
       );
-      await refetch();
-      await invalidate.workflow();
+      await listQuery.refetch();
+      await invalidate.operations();
       setDetailFor((cur) => (cur && cur.id === id ? { ...cur, status } : cur));
     } catch {
       /* toast handles error */
@@ -117,7 +139,8 @@ export default function Appointments() {
           error: "Could not reschedule appointment.",
         },
       );
-      await refetch();
+      await listQuery.refetch();
+      await invalidate.reschedule(id);
       setRescheduleFor(null);
     } catch {
       /* toast handles error */
@@ -183,6 +206,9 @@ export default function Appointments() {
               <h2 className="text-on-surface font-serif text-lg font-bold">Booking inbox</h2>
               <p className="text-on-surface-variant text-sm">
                 {stats.pending} pending · {stats.confirmed} confirmed
+                {totalAvailable > totalLoaded
+                  ? ` · showing ${totalLoaded} of ${totalAvailable}`
+                  : ""}
               </p>
             </div>
           </div>
@@ -265,6 +291,19 @@ export default function Appointments() {
             </div>
           </>
         )}
+
+        {listQuery.hasNextPage ? (
+          <div className="border-outline-variant border-t px-5 py-4 text-center md:px-6">
+            <button
+              type="button"
+              onClick={() => listQuery.fetchNextPage()}
+              disabled={busy || listQuery.isFetchingNextPage}
+              className="border-outline-variant text-on-surface hover:bg-surface-container inline-flex h-10 items-center justify-center rounded-md border px-5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {listQuery.isFetchingNextPage ? "Loading more…" : "Load more appointments"}
+            </button>
+          </div>
+        ) : null}
       </section>
 
       <RescheduleModal

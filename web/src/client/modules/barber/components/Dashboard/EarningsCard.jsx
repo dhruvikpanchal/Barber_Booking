@@ -2,6 +2,7 @@
 
 import { TrendingUp, Wallet } from "lucide-react";
 import dynamic from "next/dynamic";
+import { formatMoney } from "@/client/lib/format/formatMoney.js";
 
 const SparklineChart = dynamic(
   () => import("@/client/modules/shared/components/charts/SparklineChart.jsx"),
@@ -42,8 +43,12 @@ export default function EarningsCard({ earnings }) {
       <div className="grid gap-4 px-4 py-3.5 sm:grid-cols-2 sm:px-5 sm:py-4">
         <div>
           <p className="font-label-caps text-on-surface-variant">Today</p>
-          <p className="text-on-surface font-serif text-2xl font-bold sm:text-3xl">${today}</p>
-          <p className="text-on-surface-variant mt-0.5 text-xs">Yesterday ${yesterday}</p>
+          <p className="text-on-surface font-serif text-2xl font-bold sm:text-3xl">
+            {formatMoney(today)}
+          </p>
+          <p className="text-on-surface-variant mt-0.5 text-xs">
+            Yesterday {formatMoney(yesterday)}
+          </p>
           <div className="text-status-confirmed mt-2">
             <SparklineChart data={trend} />
           </div>
@@ -51,7 +56,9 @@ export default function EarningsCard({ earnings }) {
         <div className="border-outline-variant bg-surface-container rounded-lg border p-3">
           <p className="font-label-caps text-on-surface-variant">Week to date</p>
           <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <p className="text-on-surface font-serif text-xl font-bold sm:text-2xl">${weekToDate}</p>
+            <p className="text-on-surface font-serif text-xl font-bold sm:text-2xl">
+              {formatMoney(weekToDate)}
+            </p>
           </div>
         </div>
       </div>

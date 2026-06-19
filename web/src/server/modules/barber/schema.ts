@@ -22,6 +22,7 @@ import {
   MAX_BREAK_SLOTS,
   REVIEW_REPLY_MAX_LENGTH,
   DASHBOARD_PENDING_PREVIEW_COUNT,
+  BARBER_NAV_SECTION_KEYS,
 } from "@/server/modules/barber/constants";
 
 // SHARED PRIMITIVES
@@ -246,7 +247,7 @@ export const respondServiceChangeSchema = z.object({
 /** GET /api/v1/barber/appointments — query params */
 export const appointmentsQuerySchema = paginationSchema.extend({
   tab: z
-    .enum(["upcoming", "pending", "confirmed", "completed", "cancelled", "all"])
+    .enum(["upcoming", "pending", "confirmed", "rescheduled", "completed", "cancelled", "all"])
     .optional()
     .default("upcoming"),
   q: z.string().trim().optional(),
@@ -408,6 +409,12 @@ export const dashboardQuerySchema = z.object({
     .default(DASHBOARD_PENDING_PREVIEW_COUNT),
 });
 
+// NAV BADGES  ·  GET /api/v1/barber/nav-badges, POST /api/v1/barber/nav-badges/seen
+
+export const markBarberNavSectionSeenSchema = z.object({
+  section: z.enum(BARBER_NAV_SECTION_KEYS),
+});
+
 // INFERRED TYPES
 
 // Profile
@@ -458,3 +465,6 @@ export type NotificationsQuery = z.infer<typeof notificationsQuerySchema>;
 
 // Dashboard
 export type DashboardQuery = z.infer<typeof dashboardQuerySchema>;
+
+// Nav badges
+export type MarkBarberNavSectionSeenInput = z.infer<typeof markBarberNavSectionSeenSchema>;

@@ -1,8 +1,12 @@
-import Link from "next/link";
+import Link from "@/lib/AppLink";
+import { useMemo } from "react";
 import { routes } from "@/client/config/routes/routes";
-import LandingServiceCard from "@/client/modules/public/components/HomePage/LandingServiceCard";
+import ServiceCard from "@/client/modules/public/components/Services/ServiceCard.jsx";
+import { enrichService } from "@/client/modules/public/helpers/serviceHelpers.js";
 
 export default function LandingServicesShowcase({ services = [] }) {
+  const enriched = useMemo(() => services.map(enrichService).filter(Boolean), [services]);
+
   return (
     <section className="px-4 py-24 md:px-16">
       <div className="mx-auto max-w-6xl">
@@ -13,14 +17,14 @@ export default function LandingServicesShowcase({ services = [] }) {
           </div>
           <Link
             href={routes.public.services}
-            className="font-label-caps link-underline text-on-surface-variant hover:text-primary hidden md:inline"
+            className="font-label-caps text-on-surface-variant hover:text-primary link-underline hidden md:inline"
           >
             Full catalog →
           </Link>
         </div>
-        <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {services.map((s) => (
-            <LandingServiceCard key={s.id} service={s} />
+        <div className="mt-12 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          {enriched.map((service) => (
+            <ServiceCard key={service.id} service={service} />
           ))}
         </div>
       </div>

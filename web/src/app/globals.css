@@ -284,3 +284,20 @@
     transform: translateY(0);
   }
 }
+
+/* Recharts tooltips — theme-aware fallback when default white box is used */
+.recharts-default-tooltip {
+  background-color: var(--color-surface-container-high) !important;
+  border: 1px solid var(--color-outline-variant) !important;
+  border-radius: 12px !important;
+  color: var(--color-on-surface) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.recharts-tooltip-label {
+  color: var(--color-on-surface-variant) !important;
+}
+
+.recharts-tooltip-item {
+  color: var(--color-on-surface) !important;
+}

@@ -1,17 +1,9 @@
 "use client";
 
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Cell,
-} from "recharts";
-import { ChartContainer } from "./ChartContainer.jsx";
-import { CHART_TOOLTIP_STYLE } from "./chartStyles.js";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell } from "recharts";
+import { ChartContainer, ChartResponsiveContainer } from "./ChartContainer.jsx";
+import ChartTooltip from "./ChartTooltip.jsx";
+import { CHART_AXIS_TICK } from "./chartStyles.js";
 
 /**
  * @param {{
@@ -37,7 +29,7 @@ export default function HorizontalBarChart({ title, description, data = [] }) {
       </header>
 
       <ChartContainer className="h-72 w-full min-w-0">
-        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+        <ChartResponsiveContainer>
           <BarChart
             data={chartData}
             layout="vertical"
@@ -50,7 +42,7 @@ export default function HorizontalBarChart({ title, description, data = [] }) {
           >
             <CartesianGrid strokeDasharray="3 4" horizontal={false} opacity={0.08} />
 
-            <XAxis type="number" tickLine={false} axisLine={false} fontSize={11} />
+            <XAxis type="number" tickLine={false} axisLine={false} tick={CHART_AXIS_TICK} />
 
             <YAxis
               type="category"
@@ -58,10 +50,10 @@ export default function HorizontalBarChart({ title, description, data = [] }) {
               tickLine={false}
               axisLine={false}
               width={110}
-              fontSize={11}
+              tick={CHART_AXIS_TICK}
             />
 
-            <Tooltip cursor={{ opacity: 0.08 }} contentStyle={CHART_TOOLTIP_STYLE} />
+            <ChartTooltip />
 
             <Bar dataKey="value" radius={[0, 8, 8, 0]} barSize={18}>
               {chartData.map((_, index) => (
@@ -69,7 +61,7 @@ export default function HorizontalBarChart({ title, description, data = [] }) {
               ))}
             </Bar>
           </BarChart>
-        </ResponsiveContainer>
+        </ChartResponsiveContainer>
       </ChartContainer>
     </section>
   );

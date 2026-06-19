@@ -1,8 +1,7 @@
-import { Clock, DollarSign, Pencil, Trash2 } from "lucide-react";
-
+import { Clock, Eye, EyeOff, Pencil, Trash2 } from "lucide-react";
 import { formatMoney } from "@/client/lib/format/formatMoney.js";
 
-export function ServiceCard({ service, onEdit, onDeleteRequest }) {
+export function ServiceCard({ service, onEdit, onDeleteRequest, onToggleActive, toggling }) {
   return (
     <article
       className={`bg-surface-container-low rounded-xl border transition-opacity ${
@@ -26,7 +25,6 @@ export function ServiceCard({ service, onEdit, onDeleteRequest }) {
             <div className="flex items-center gap-2">
               <dt className="sr-only">Price</dt>
               <dd className="text-primary inline-flex items-center gap-1.5 font-semibold">
-                <DollarSign className="h-4 w-4" aria-hidden />
                 {formatMoney(service.price)}
               </dd>
             </div>
@@ -41,6 +39,20 @@ export function ServiceCard({ service, onEdit, onDeleteRequest }) {
         </div>
 
         <div className="flex shrink-0 gap-2 sm:flex-col">
+          <button
+            type="button"
+            onClick={() => onToggleActive?.(service)}
+            disabled={toggling}
+            className="border-outline-variant text-on-surface hover:border-primary hover:text-primary inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md border px-3 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
+            title={service.active ? "Hide from customers" : "Show to customers"}
+          >
+            {service.active ? (
+              <EyeOff className="h-3.5 w-3.5" aria-hidden />
+            ) : (
+              <Eye className="h-3.5 w-3.5" aria-hidden />
+            )}
+            {service.active ? "Hide" : "Show"}
+          </button>
           <button
             type="button"
             onClick={() => onEdit(service)}

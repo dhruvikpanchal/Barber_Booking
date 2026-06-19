@@ -49,7 +49,7 @@ export const BARBER_PROFILE_DETAILS = {
         id: "rv-m2",
         name: "Marcus T.",
         rating: 5,
-        text: "None come close in Brooklyn. The precision on the fade line is something else entirely.",
+        text: "None come close in Ahmedabad. The precision on the fade line is something else entirely.",
         date: "1 month ago",
         service: "Skin Fade",
       },

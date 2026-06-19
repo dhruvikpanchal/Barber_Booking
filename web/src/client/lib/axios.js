@@ -63,6 +63,7 @@ export function setAuthTokens({ accessToken, refreshToken }) {
   if (typeof window === "undefined") return;
   if (accessToken) localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
   if (refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  window.dispatchEvent(new CustomEvent("io:auth-updated"));
 }
 
 export function clearAuthTokens() {

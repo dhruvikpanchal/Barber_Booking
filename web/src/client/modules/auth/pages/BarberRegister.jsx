@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { regionConfig } from "@/config/region.js";
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import {
   Eye,
   EyeOff,
@@ -101,7 +101,7 @@ function StepPersonal({ data, setData, disabled = false }) {
       <Field label="PHONE NUMBER">
         <Input
           type="tel"
-          placeholder="+1 (212) 555-0100"
+          placeholder={regionConfig.phonePlaceholder}
           value={data.phone}
           disabled={disabled}
           onChange={(e) => setData({ ...data, phone: e.target.value })}
@@ -116,7 +116,7 @@ function StepPersonal({ data, setData, disabled = false }) {
           />
           <Input
             type="text"
-            placeholder="Brooklyn, NY"
+            placeholder={regionConfig.cityPlaceholder}
             className="pl-10"
             value={data.city}
             disabled={disabled}

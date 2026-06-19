@@ -32,6 +32,7 @@ import {
   UnauthorizedError,
 } from "@/server/modules/shared/helpers/AppError";
 import { ROLES } from "@/server/modules/shared/constants/roles";
+import { realtimeToRole } from "@/server/modules/shared/realtime/emit";
 import { BARBER_REQUEST_STATUS } from "@/server/modules/shared/constants/statuses";
 import { ok } from "@/server/modules/shared/responses";
 
@@ -93,6 +94,8 @@ export const authService = {
         html: `<p>Hi ${fullName},</p><p>Your account has been created. You can sign in and start booking.</p>`,
       }),
     );
+
+    realtimeToRole(ROLES.ADMIN, ["users", "nav_badges", "dashboard"]);
 
     return buildAuthResult(user);
   },
@@ -321,6 +324,7 @@ export const authService = {
           isActive: true,
           emailVerified: true,
         });
+        realtimeToRole(ROLES.ADMIN, ["users", "nav_badges", "dashboard"]);
       }
     }
 

@@ -32,12 +32,12 @@ export default function ConfirmModal({
     delete: {
       icon: Trash2,
       iconBg: "bg-status-cancelled/15 text-status-cancelled",
-      title: `Delete ${user.name}?`,
-      body: "All profile data, booking history, and reviews submitted by this user will be permanently removed. This cannot be undone.",
-      confirmLabel: "Delete Permanently",
+      title: `Deactivate ${user.name}?`,
+      body: "This customer account will be disabled and will lose platform access. Booking history and reviews are retained in the system.",
+      confirmLabel: "Deactivate User",
       confirmClass: "bg-status-cancelled text-on-error hover:opacity-90",
       warning:
-        "This will permanently erase all data including booking history and reviews. Export any necessary records before continuing.",
+        "The account is deactivated, not permanently erased. Re-enable the user later from this list if they should regain access.",
     },
   };
 

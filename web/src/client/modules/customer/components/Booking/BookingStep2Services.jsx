@@ -1,39 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Clock, CheckCircle, Flame } from "lucide-react";
-import customerServices from "@/client/modules/customer/services/customerServices.jsx";
+import { useMemo } from "react";
+import { Clock, CheckCircle } from "lucide-react";
+import { customerHook } from "@/client/modules/customer/hooks/customerQuery.jsx";
 import { formatMoney } from "@/client/lib/format/formatMoney.js";
 
 export default function BookingStep2Services({ booking, onToggle, disabled = false }) {
-  const [services, setServices] = useState([]);
-  const [loading, setLoading] = useState(false);
-
   const slug = booking.barber?.slug ?? booking.barber?.id;
 
-  useEffect(() => {
-    if (!slug) {
-      setServices([]);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    customerServices
-      .listBookingServices(slug)
-      .then((items) => {
-        if (!cancelled)
-          setServices(Array.isArray(items) ? items.filter((s) => s.active !== false) : []);
-      })
-      .catch(() => {
-        if (!cancelled) setServices([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [slug]);
+  const { data: servicesRaw = [], isPending: loading } = customerHook.Booking.useListBookingServices(
+    slug ?? "",
+    { enabled: Boolean(slug) },
+  );
+
+  const services = useMemo(
+    () =>
+      Array.isArray(servicesRaw) ? servicesRaw.filter((service) => service.active !== false) : [],
+    [servicesRaw],
+  );
 
   const selectedIds = new Set(booking.services.map((s) => s.id));
   const total = booking.services.reduce((sum, s) => sum + s.price, 0);

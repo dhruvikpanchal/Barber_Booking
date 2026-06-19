@@ -16,10 +16,6 @@ function sortBarbers(list, key) {
     switch (key) {
       case "rating":
         return b.rating - a.rating;
-      case "visits":
-        return b.totalVisits - a.totalVisits;
-      case "price":
-        return a.startingPrice - b.startingPrice;
       case "available":
         return (b.available ? 1 : 0) - (a.available ? 1 : 0);
       default:
@@ -29,7 +25,6 @@ function sortBarbers(list, key) {
 }
 
 function StatsStrip({ barbers }) {
-  const totalVisits = [...barbers].reduce((s, x) => s + (x.totalVisits ?? 0), 0);
   const avgRating =
     barbers.length > 0
       ? (barbers.reduce((s, b) => s + b.rating, 0) / barbers.length).toFixed(1)
@@ -38,13 +33,12 @@ function StatsStrip({ barbers }) {
 
   const stats = [
     { label: "Saved Barbers", value: barbers.length, icon: User },
-    { label: "Total Visits", value: totalVisits, icon: CheckCircle },
     { label: "Avg Barber Rating", value: avgRating, icon: Star },
     { label: "Available Now", value: availableNow, icon: CheckCircle },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       {stats.map(({ label, value, icon: Icon }) => (
         <div
           key={label}
@@ -94,10 +88,7 @@ export default function Favorites() {
     isPending,
     isError,
     error,
-    refetch,
-  } = customerHook.Favorites.useListFavorites({
-    sort: barberSort,
-  });
+  } = customerHook.Favorites.useListFavorites();
   const removeMutation = customerHook.Favorites.useRemoveFavorite();
 
   const busy = isPending || removeMutation.isPending;
@@ -117,7 +108,6 @@ export default function Favorites() {
         success: `${removed?.name ?? "Barber"} removed from favourites.`,
         error: "Could not remove favorite.",
       });
-      await refetch();
       await queryClient.invalidateQueries({ queryKey: ["listFavorites"] });
     } catch {
       /* toast handles error */
@@ -126,22 +116,23 @@ export default function Favorites() {
 
   function handleBookBarber(barber) {
     if (busy) return;
-    router.push(`${routes.customer.bookAppointment}?barber=${encodeURIComponent(barber.id)}`);
+    const id = encodeURIComponent(barber.slug ?? barber.id);
+    router.push(`${routes.customer.bookAppointment}?barber=${id}&step=services&from=favorites`);
   }
 
   const sortedBarbers = useMemo(() => sortBarbers(barbers, barberSort), [barbers, barberSort]);
 
   return (
-    <div className="mx-auto max-w-6xl pb-28 md:pb-10">
+    <div className="mx-auto max-w-6xl">
       <header className="mb-6">
         <div className="mb-1 flex items-center gap-2">
           <Heart className="text-primary h-4 w-4" />
-          <span className="text-on-surface-variant text-[10px] font-semibold tracking-[0.15em] uppercase">
-            Customer · Favourites
+          <span className="font-label-caps text-on-surface-variant text-[10px]">
+            Customer · Favorites
           </span>
         </div>
         <h1 className="text-on-surface font-serif text-2xl font-bold tracking-tight md:text-3xl">
-          My Favourites
+          My Favorites
         </h1>
         <p className="text-on-surface-variant mt-1 max-w-xl text-sm leading-relaxed">
           Your saved barbers — ready for a quick booking whenever you are.

@@ -74,7 +74,7 @@ export default function Drawer({
         <div className={`absolute inset-0 ${backdropClassName}`} aria-hidden />
       )}
       <aside
-        className={`relative z-10 h-full max-h-[100dvh] shadow-2xl ${panelAnimationClass} ${panelClassName} ${className}`.trim()}
+        className={`relative z-10 max-h-[100dvh] shadow-2xl ${panelAnimationClass} ${panelClassName} ${className}`.trim()}
         onClick={(event) => event.stopPropagation()}
       >
         {children}

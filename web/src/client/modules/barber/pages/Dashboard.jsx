@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
-import { CalendarDays, CheckCircle2, DollarSign, PlusCircle, Users } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import Link from "@/lib/AppLink";
+import { CalendarDays, CheckCircle2, IndianRupee, PlusCircle, Users } from "lucide-react";
 import { toast } from "sonner";
 import StatTile from "@/client/modules/shared/components/ui/StatTile";
 import TodaySchedule from "@/client/modules/barber/components/Dashboard/TodaySchedule";
@@ -11,19 +12,27 @@ import QueueSnapshot from "@/client/modules/barber/components/Dashboard/QueueSna
 import EarningsCard from "@/client/modules/barber/components/Dashboard/EarningsCard";
 import CustomerStats from "@/client/modules/barber/components/Dashboard/CustomerStats";
 import { getGreeting, getTodayDateLabel } from "@/client/lib/format/formatDateTime.js";
+import { formatMoney } from "@/client/lib/format/formatMoney.js";
 import { useHydrated } from "@/client/modules/shared/hooks/useHydrated.js";
 import { routes } from "@/client/config/routes/routes.js";
-import { barberHook } from "@/client/modules/barber/hooks/barberQuery.jsx";
-import {
-  mapDashboardAppointment,
-} from "@/client/modules/barber/helpers/barberMappers.js";
+import { barberHook, useBarberInvalidation } from "@/client/modules/barber/hooks/barberQuery.jsx";
+import { seedBarberDashboardQueryCache } from "@/client/modules/barber/helpers/barberCacheHelpers.js";
+import { useStoredUser } from "@/client/modules/shared/hooks/useStoredUser.js";
+import { mapDashboardAppointment } from "@/client/modules/barber/helpers/barberMappers.js";
 
 export default function Dashboard() {
   const hydrated = useHydrated();
+  const queryClient = useQueryClient();
+  const storedUser = useStoredUser();
   const { data, isPending, isError, error, refetch } = barberHook.Dashboard.useGetDashboard();
   const statusMutation = barberHook.Appointments.useUpdateAppointmentStatus();
+  const invalidate = useBarberInvalidation();
 
   const busy = isPending || statusMutation.isPending;
+
+  useEffect(() => {
+    if (data) seedBarberDashboardQueryCache(queryClient, data);
+  }, [data, queryClient]);
 
   useEffect(() => {
     if (isError) {
@@ -33,7 +42,11 @@ export default function Dashboard() {
 
   const greeting = hydrated ? getGreeting() : "Hello";
   const today = hydrated ? getTodayDateLabel() : "";
-  const firstName = data?.barber?.firstName ?? data?.barber?.fullName?.split(" ")[0] ?? "there";
+  const firstName =
+    data?.barber?.firstName ??
+    storedUser?.firstName ??
+    storedUser?.fullName?.split(" ")[0] ??
+    "there";
 
   const stats = data?.stats ?? {
     today: 0,
@@ -73,10 +86,8 @@ export default function Dashboard() {
     if (busy) return;
     try {
       await statusMutation.mutateAsync({ id, status: status.toUpperCase() });
-      toast.success(
-        status === "confirmed" ? "Booking confirmed." : "Booking rejected.",
-      );
-      await refetch();
+      toast.success(status === "confirmed" ? "Booking confirmed." : "Booking rejected.");
+      await Promise.all([refetch(), invalidate.operations()]);
     } catch (err) {
       toast.error(err?.message || "Could not update booking.");
     }
@@ -165,9 +176,9 @@ export default function Dashboard() {
         />
         <StatTile
           label="Today's earnings"
-          value={`$${stats.earnings}`}
+          value={formatMoney(stats.earnings)}
           hint={`${stats.served} customers served`}
-          Icon={DollarSign}
+          Icon={IndianRupee}
           accent="text-status-confirmed bg-status-confirmed/15"
         />
       </section>

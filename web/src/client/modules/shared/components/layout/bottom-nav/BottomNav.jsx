@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { usePathname } from "next/navigation";
+import NavBadge from "@/client/modules/shared/components/layout/primitives/NavBadge.jsx";
 import MobileNavDrawer from "@/components/layout/drawer/MobileNavDrawer";
 
 /**
  * Generic mobile bottom-nav primitive.
- * `items`: [{ label, icon: LucideIcon, href, more?: boolean }]
+ * `items`: [{ label, icon: LucideIcon, href, more?: boolean, badgeCount?: number }]
  * If an item has `more: true`, it opens the MobileNavDrawer with `drawerItems`.
  */
 function isNavActive(pathname, href) {
@@ -32,13 +33,16 @@ export default function BottomNav({ items = [], drawerItems = [], drawerTitle = 
             const active = it.more ? false : isNavActive(pathname, it.href);
             const content = (
               <span
-                className={`flex min-h-[var(--bottom-nav-height)] flex-col items-center justify-center gap-1 px-2 py-2 transition-colors ${
+                className={`relative flex min-h-[var(--bottom-nav-height)] flex-col items-center justify-center gap-1 px-2 py-2 transition-colors ${
                   active
                     ? "text-primary"
                     : "text-on-surface-variant hover:text-primary"
                 }`}
               >
-                <Icon className={`h-5 w-5 ${active ? "stroke-[2.5]" : ""}`} />
+                <span className="relative">
+                  <Icon className={`h-5 w-5 ${active ? "stroke-[2.5]" : ""}`} />
+                  <NavBadge count={it.badgeCount ?? 0} compact className="right-0 top-0 translate-x-1/2 -translate-y-1/2 ring-surface-container-low" />
+                </span>
                 <span className="text-[11px] font-medium leading-none">
                   {it.label}
                 </span>
@@ -56,7 +60,7 @@ export default function BottomNav({ items = [], drawerItems = [], drawerTitle = 
                     {content}
                   </button>
                 ) : (
-                  <Link href={it.href || "#"} className="block">
+                  <Link href={it.href || "#"} prefetch={false} className="block">
                     {content}
                   </Link>
                 )}

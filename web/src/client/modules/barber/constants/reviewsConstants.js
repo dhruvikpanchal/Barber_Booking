@@ -1,12 +1,3 @@
-export const SERVICES = [
-  "All Services",
-  "Skin Fade",
-  "Signature Cut",
-  "Beard Sculpt",
-  "Hot Towel Shave",
-  "Classic Cut",
-];
-
 export const SORT_OPTIONS = [
   { key: "recent", label: "Most Recent" },
   { key: "highest", label: "Highest Rated" },

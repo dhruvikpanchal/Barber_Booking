@@ -1,11 +1,16 @@
 import { hashPassword, verifyPassword } from "@/server/infra/auth/password";
+import { regionConfig } from "@/server/config/region";
+import { formatCurrency } from "@/server/modules/shared/helpers/formatCurrency";
+import { uploadImage } from "@/server/infra/storage/cloudinary";
+import { appConfig } from "@/server/config";
 import {
   ADMIN_ALERT_PREFERENCE_KEYS,
   ADMIN_APPOINTMENT_ADMIN_TRANSITIONS,
   ADMIN_DIGEST_PREFERENCE_KEYS,
   ADMIN_REPORT_TYPES,
+  type ContactWorkflowStatus,
 } from "@/server/modules/admin/constants";
-import { analyticsDateRange, reportDateRange } from "@/server/modules/admin/helpers";
+import { analyticsDateRange, percentDelta, buildDailyTrendSeries, peakBookingPatterns, reportDateRange } from "@/server/modules/admin/helpers";
 import {
   buildPaginationMeta,
   centsToDollars,
@@ -21,6 +26,7 @@ import {
   toAdminProfileDto,
   toAdminUserListItemDto,
   toClientEnumKey,
+  toContactWorkflowStatusDb,
 } from "@/server/modules/admin/mapper";
 import {
   adminAnalyticsRepository,
@@ -52,17 +58,20 @@ import type {
   ApproveBarberRequestInput,
   GenerateReportInput,
   MarkAdminNotificationReadInput,
+  MarkAdminNavSectionSeenInput,
   RejectBarberRequestInput,
   ReplyContactMessageInput,
   UpdateAdminAlertPreferencesInput,
   UpdateAdminPasswordInput,
   UpdateAdminProfileInput,
   UpdateContactMessageInput,
-  UpdateMaintenanceSettingsInput,
 } from "@/server/modules/admin/schema";
+import { adminNavBadgesRepository } from "@/server/modules/admin/navBadgesRepository";
 import { authRepository } from "@/server/modules/auth/repository";
 import { APPOINTMENT_STATUS, CANCELLED_BY } from "@/server/modules/shared/constants/statuses";
+import { ROLES } from "@/server/modules/shared/constants/roles";
 import { NOTIFICATION_TYPE } from "@/server/modules/shared/constants/notificationTypes";
+import { realtimeToBarber, realtimeToRole, realtimeToUser, realtimeSyncUser } from "@/server/modules/shared/realtime/emit";
 import {
   BadRequestError,
   NotFoundError,
@@ -129,11 +138,6 @@ function statusCountsToAppointmentStats(groups: { status: string; _count: { id: 
   return stats;
 }
 
-import {
-  getMaintenanceState,
-  setMaintenanceState,
-} from "@/server/modules/shared/settings/maintenanceState";
-
 const defaultAlertPrefs = Object.fromEntries(
   ADMIN_ALERT_PREFERENCE_KEYS.map((k) => [k, true]),
 ) as Record<string, boolean>;
@@ -154,11 +158,31 @@ export const adminService = {
   },
 
   async updateProfile(userId: string, input: UpdateAdminProfileInput) {
+    const trimmed = input.fullName.trim();
+    const parts = trimmed.split(/\s+/).filter(Boolean);
+    const firstName = parts[0] ?? trimmed;
+    const lastName = parts.length > 1 ? parts.slice(1).join(" ") : "";
+
     const row = await adminProfileRepository.updateAdminProfile(userId, {
-      fullName: input.fullName.trim(),
+      fullName: trimmed,
+      firstName,
+      lastName,
       phone: input.phone || null,
     });
     return toAdminProfileDto(row);
+  },
+
+  async uploadProfilePhoto(userId: string, file: { buffer: Buffer; mimeType: string }) {
+    const row = await adminProfileRepository.findAdminById(userId);
+    if (!row) throw new NotFoundError("Admin profile");
+
+    const uploaded = await uploadImage(file.buffer, appConfig.auth.avatarFolder, {
+      resource_type: "image",
+    });
+    const updated = await adminProfileRepository.updateAdminProfile(userId, {
+      photoUrl: uploaded.url,
+    });
+    return { photoUrl: updated.photoUrl };
   },
 
   async updatePassword(userId: string, input: UpdateAdminPasswordInput) {
@@ -178,15 +202,22 @@ export const adminService = {
 
   // Dashboard
   async getDashboard(_userId: string, query: AdminDashboardQuery) {
-    const since = new Date();
-    since.setDate(since.getDate() - 7);
-    const prevSince = new Date(since);
-    prevSince.setDate(prevSince.getDate() - 7);
+    const now = new Date();
+    const last7 = new Date(now);
+    last7.setDate(last7.getDate() - 7);
+    const prev7Start = new Date(last7);
+    prev7Start.setDate(prev7Start.getDate() - 7);
+
+    const last30 = new Date(now);
+    last30.setDate(last30.getDate() - 30);
+    const prev30Start = new Date(last30);
+    prev30Start.setDate(prev30Start.getDate() - 30);
 
     const [
       customers,
       activeBarbers,
-      totalAppointments,
+      bookingsLast30,
+      bookingsPrev30,
       completedAppointments,
       pendingRequests,
       unreadMessages,
@@ -194,46 +225,65 @@ export const adminService = {
       trendRows,
       cityRows,
       queueOverview,
-      prevCustomers,
-      prevAppointments,
+      problemReports,
+      customersLast30,
+      customersPrev30,
+      barbersLast30,
+      barbersPrev30,
+      bookingsLast7,
+      bookingsPrev7,
+      cityBookingsCurrent,
+      cityBookingsPrevious,
     ] = await Promise.all([
       adminDashboardRepository.countCustomers(),
       adminDashboardRepository.countActiveBarbers(),
-      adminDashboardRepository.countAppointments(),
+      adminDashboardRepository.countAppointments({ bookedAt: { gte: last30 } }),
+      adminDashboardRepository.countAppointments({
+        bookedAt: { gte: prev30Start, lt: last30 },
+      }),
       adminDashboardRepository.countAppointments({ status: APPOINTMENT_STATUS.COMPLETED }),
       adminDashboardRepository.countPendingBarberRequests(),
       adminDashboardRepository.countUnreadContactMessages(),
       adminDashboardRepository.recentAppointments(query.activityLimit),
-      adminDashboardRepository.bookingTrendSince(since),
+      adminDashboardRepository.bookingTrendSince(last7),
       adminDashboardRepository.cityBarberCounts(),
       adminQueueRepository.globalOverview(),
-      adminDashboardRepository.countCustomers(), // placeholder — optional prev period
-      adminDashboardRepository.countAppointments({ bookedAt: { gte: prevSince, lt: since } }),
+      adminDashboardRepository.recentProblemReports(query.reportsLimit),
+      adminDashboardRepository.countCustomersSince({ gte: last30 }),
+      adminDashboardRepository.countCustomersSince({ gte: prev30Start, lt: last30 }),
+      adminDashboardRepository.countBarbersSince({ gte: last30 }),
+      adminDashboardRepository.countBarbersSince({ gte: prev30Start, lt: last30 }),
+      adminDashboardRepository.countAppointments({ bookedAt: { gte: last7 } }),
+      adminDashboardRepository.countAppointments({
+        bookedAt: { gte: prev7Start, lt: last7 },
+      }),
+      adminDashboardRepository.appointmentCountByCity({ gte: last30, lte: now }),
+      adminDashboardRepository.appointmentCountByCity({ gte: prev30Start, lte: last30 }),
     ]);
-
-    void prevCustomers;
 
     const trendByDay = new Map<string, number>();
     for (const row of trendRows) {
-      const key = row.bookedAt.toLocaleDateString("en-US", { weekday: "short" });
+      const key = row.bookedAt.toLocaleDateString(regionConfig.locale, { weekday: "short" });
       trendByDay.set(key, (trendByDay.get(key) ?? 0) + 1);
     }
 
-    const bookingsDelta =
-      prevAppointments > 0
-        ? Math.round(((trendRows.length - prevAppointments) / prevAppointments) * 1000) / 10
-        : 0;
+    const bookingsDelta = percentDelta(bookingsLast7, bookingsPrev7);
+    const usersDelta = percentDelta(customersLast30, customersPrev30);
+    const barbersDelta = percentDelta(barbersLast30, barbersPrev30);
+    const systemGrowth = percentDelta(bookingsLast30, bookingsPrev30);
+
+    const prevCityMap = new Map(cityBookingsPrevious.map((row) => [row.city, row.count]));
 
     return {
       stats: {
         totalUsers: customers,
-        usersDelta: 0,
+        usersDelta,
         totalBarbers: activeBarbers,
-        barbersDelta: 0,
+        barbersDelta,
         pendingApprovals: pendingRequests,
-        totalBookings: totalAppointments,
+        totalBookings: bookingsLast30,
         bookingsDelta,
-        systemGrowth: bookingsDelta,
+        systemGrowth,
         completedAppointments,
         unreadMessages,
       },
@@ -246,18 +296,29 @@ export const adminService = {
         meta: `${a.services[0]?.name ?? "Booking"} · ${a.barber.user.fullName}`,
         time: a.bookedAt.toISOString(),
       })),
-      recentReports: [],
+      recentReports: problemReports.map((report) => ({
+        id: report.id,
+        title: report.message.length > 80 ? `${report.message.slice(0, 77)}…` : report.message,
+        reporter: report.name,
+        target: report.email,
+        severity: "medium",
+        time: report.submittedAt.toISOString(),
+      })),
       queueOverview: {
         waiting: queueOverview.waiting,
         inService: queueOverview.inService,
         chairsBusy: queueOverview.chairsBusy,
         chairsTotal: queueOverview.chairsTotal,
       },
-      cityGrowth: cityRows.map((c) => ({
-        city: c.city,
-        barbers: c._count.barbers,
-        growthPct: 0,
-      })),
+      cityGrowth: cityRows.map((c) => {
+        const current = cityBookingsCurrent.find((row) => row.city === c.city)?.count ?? 0;
+        const previous = prevCityMap.get(c.city) ?? 0;
+        return {
+          city: c.city,
+          barbers: c._count.barbers,
+          growthPct: percentDelta(current, previous),
+        };
+      }),
     };
   },
 
@@ -274,6 +335,8 @@ export const adminService = {
       ratingAgg,
       topServices,
       appointments,
+      mostActiveBarber,
+      highestRatedBarber,
     ] = await Promise.all([
       adminAnalyticsRepository.aggregateAppointments(range),
       adminAnalyticsRepository.countUsersSince(range),
@@ -283,6 +346,8 @@ export const adminService = {
       adminAnalyticsRepository.averageBarberRating(),
       adminAnalyticsRepository.topServicesInRange(range),
       adminAnalyticsRepository.appointmentsInRange(range),
+      adminAnalyticsRepository.mostActiveBarberInRange(range),
+      adminAnalyticsRepository.highestRatedBarber(),
     ]);
 
     let totalAppointments = 0;
@@ -298,6 +363,8 @@ export const adminService = {
     }
 
     const avgRating = ratingAgg._avg.averageRating ?? 0;
+    const appointmentsTrends = buildDailyTrendSeries(appointments, range);
+    const peaks = peakBookingPatterns(appointments);
 
     return {
       period: query.period,
@@ -309,9 +376,9 @@ export const adminService = {
           isPositive: true,
         },
         {
-          label: "Total Customers",
+          label: "New Customers",
           value: String(newCustomers),
-          change: `+${newCustomers} in range`,
+          change: `in selected period`,
           isPositive: true,
         },
         {
@@ -338,16 +405,16 @@ export const adminService = {
         data: topServices.map((s) => s._count.name),
         labels: topServices.map((s) => s.name),
       },
-      appointmentsTrends: {
-        data: [appointments.length],
-        labels: ["Selected period"],
-      },
+      appointmentsTrends,
       insights: {
-        mostActiveBarber: "—",
+        mostActiveBarber: mostActiveBarber?.name ?? "—",
         mostBookedService: topServices[0]?.name ?? "—",
-        highestRatedBarber: avgRating > 0 ? `${avgRating.toFixed(2)} avg` : "—",
-        peakBookingDay: "—",
-        peakBookingTime: "—",
+        highestRatedBarber:
+          highestRatedBarber?.name && highestRatedBarber.rating
+            ? `${highestRatedBarber.name} (${Number(highestRatedBarber.rating).toFixed(1)}★)`
+            : "—",
+        peakBookingDay: peaks.peakBookingDay,
+        peakBookingTime: peaks.peakBookingTime,
       },
       summary: {
         totalAppointments,
@@ -392,11 +459,11 @@ export const adminService = {
         rows = data.map((a) => ({
           id: a.id,
           date: a.startAt.toISOString().slice(0, 10),
-          customer: a.customer.fullName,
-          barber: a.barber.user.fullName,
+          customer: a.customer?.fullName ?? "—",
+          barber: a.barber?.user?.fullName ?? "—",
           service: a.services[0]?.name ?? "—",
           status: toClientEnumKey(a.status),
-          amount: `$${centsToDollars(a.finalPrice ?? a.estimatedPrice).toFixed(2)}`,
+          amount: formatCurrency(centsToDollars(a.finalPrice ?? a.estimatedPrice)),
         }));
         summary.totalAppointments = rows.length;
         summary.completed = rows.filter((r) => r.status === "completed").length;
@@ -414,6 +481,7 @@ export const adminService = {
           status: u.isActive ? "Active" : "Disabled",
         }));
         summary.newCustomers = data.length;
+        summary.platformSessions = rows.length;
         break;
       }
       case "barber-activity": {
@@ -427,6 +495,7 @@ export const adminService = {
           status: b.barberStatus.toLowerCase(),
         }));
         summary.activeBarbers = data.filter((b) => b.barberStatus === "ACTIVE").length;
+        summary.platformSessions = rows.length;
         break;
       }
       case "service-usage": {
@@ -437,9 +506,10 @@ export const adminService = {
           category: "Service",
           bookings: s._count.name,
           share: `${Math.round((s._count.name / total) * 100)}%`,
-          revenue: `$${centsToDollars(s._sum.price ?? 0).toFixed(2)}`,
+          revenue: formatCurrency(centsToDollars(s._sum.price ?? 0)),
         }));
         summary.topService = data[0]?.name ?? "—";
+        summary.platformSessions = rows.length;
         break;
       }
       case "registrations": {
@@ -462,6 +532,18 @@ export const adminService = {
         ];
         summary.newCustomers = customers.length;
         summary.newBarbers = requests.length;
+        break;
+      }
+      case "platform-activity": {
+        const data = await adminReportsRepository.platformActivityReport(range);
+        rows = data.map((event) => ({
+          id: event.id,
+          timestamp: event.timestamp,
+          event: event.event,
+          actor: event.actor,
+          detail: event.detail,
+        }));
+        summary.platformSessions = rows.length;
         break;
       }
       default:
@@ -491,10 +573,16 @@ export const adminService = {
   },
 
   async listAppointments(_userId: string, query: AdminAppointmentsQuery) {
-    const [rows, total] = await adminAppointmentsRepository.list(query);
+    const [[rows, total], statusGroups] = await Promise.all([
+      adminAppointmentsRepository.list(query),
+      adminAppointmentsRepository.countByStatus(),
+    ]);
     return {
       items: rows.map(toAdminAppointmentListItemDto),
-      meta: buildPaginationMeta(total, query.page, query.limit),
+      meta: {
+        ...buildPaginationMeta(total, query.page, query.limit),
+        stats: statusCountsToAppointmentStats(statusGroups),
+      },
     };
   },
 
@@ -539,6 +627,14 @@ export const adminService = {
     });
     if (!row) throw new NotFoundError("Appointment");
 
+    realtimeToRole(ROLES.ADMIN, ["appointments", "nav_badges", "dashboard"], id);
+    if (existing.customerId) {
+      realtimeToUser(existing.customerId, ["appointments", "notifications"], id);
+    }
+    if (existing.barber?.id) {
+      realtimeToBarber(existing.barber.id, ["appointments", "queue", "dashboard"], id);
+    }
+
     return toAdminAppointmentDetailDto(row);
   },
 
@@ -549,10 +645,17 @@ export const adminService = {
   },
 
   async listBarberRequests(_userId: string, query: AdminBarberRequestsQuery) {
-    const [rows, total] = await adminBarberRequestsRepository.list(query);
+    const [[rows, total], requestStats] = await Promise.all([
+      adminBarberRequestsRepository.list(query),
+      adminBarberRequestStatsRepository.countByStatus(),
+    ]);
+    const [pending, approved, rejected] = requestStats;
     return {
       items: rows.map(toAdminBarberRequestListItemDto),
-      meta: buildPaginationMeta(total, query.page, query.limit),
+      meta: {
+        ...buildPaginationMeta(total, query.page, query.limit),
+        stats: { pending, approved, rejected },
+      },
     };
   },
 
@@ -587,6 +690,11 @@ export const adminService = {
       );
     }
 
+    realtimeToRole(ROLES.ADMIN, ["barber_requests", "notifications", "nav_badges", "barbers", "dashboard"], id);
+    if (user) {
+      realtimeToUser(user.id, ["notifications"]);
+    }
+
     return toAdminBarberRequestDetailDto(row);
   },
 
@@ -611,15 +719,26 @@ export const adminService = {
       );
     }
 
+    realtimeToRole(ROLES.ADMIN, ["barber_requests", "notifications", "nav_badges", "barbers", "dashboard"], id);
+    if (user) {
+      realtimeToUser(user.id, ["notifications"]);
+    }
+
     return toAdminBarberRequestDetailDto(row);
   },
 
   // Barbers
   async listBarbers(_userId: string, query: AdminBarbersQuery) {
-    const [rows, total] = await adminBarbersRepository.list(query);
+    const [[rows, total], stats] = await Promise.all([
+      adminBarbersRepository.list(query),
+      adminBarbersRepository.countPlatformSummary(),
+    ]);
     return {
       items: rows.map(toAdminBarberListItemDto),
-      meta: buildPaginationMeta(total, query.page, query.limit),
+      meta: {
+        ...buildPaginationMeta(total, query.page, query.limit),
+        stats,
+      },
     };
   },
 
@@ -649,14 +768,20 @@ export const adminService = {
 
   // Users
   async listUsers(_userId: string, query: AdminUsersQuery) {
-    const [rows, total] = await adminUsersRepository.list(query);
+    const [[rows, total], stats] = await Promise.all([
+      adminUsersRepository.list(query),
+      adminUsersRepository.countPlatformSummary(),
+    ]);
     const items = rows.map((row) =>
       toAdminUserListItemDto(row, deriveUserActivity(row._count?.appointments ?? 0)),
     );
 
     return {
       items,
-      meta: buildPaginationMeta(total, query.page, query.limit),
+      meta: {
+        ...buildPaginationMeta(total, query.page, query.limit),
+        stats,
+      },
     };
   },
 
@@ -725,10 +850,17 @@ export const adminService = {
   },
 
   async listContactMessages(_userId: string, query: AdminContactMessagesQuery) {
-    const [rows, total] = await adminContactMessagesRepository.list(query);
+    const [[rows, total], messageStats] = await Promise.all([
+      adminContactMessagesRepository.list(query),
+      adminContactMessagesRepository.countStats(),
+    ]);
+    const [totalMessages, unread, unreplied] = messageStats;
     return {
       items: rows.map(toAdminContactMessageListItemDto),
-      meta: buildPaginationMeta(total, query.page, query.limit),
+      meta: {
+        ...buildPaginationMeta(total, query.page, query.limit),
+        stats: { total: totalMessages, unread, unreplied },
+      },
     };
   },
 
@@ -743,6 +875,7 @@ export const adminService = {
     if (!existing) throw new NotFoundError("Contact message");
 
     const row = await adminContactMessagesRepository.reply(id, input.replyText);
+    realtimeToRole(ROLES.ADMIN, ["contact_messages", "notifications", "nav_badges", "dashboard"], id);
     return toAdminContactMessageDetailDto(row);
   },
 
@@ -752,9 +885,14 @@ export const adminService = {
 
     const row = await adminContactMessagesRepository.update(id, {
       ...(input.isRead !== undefined ? { isRead: input.isRead } : {}),
+      ...(input.workflowStatus !== undefined
+        ? { workflowStatus: toContactWorkflowStatusDb(input.workflowStatus) as ContactWorkflowStatus }
+        : {}),
       internalNote: input.internalNote === "" ? null : input.internalNote,
       assignedTo: input.assignedTo === "" ? null : input.assignedTo,
     });
+
+    realtimeToRole(ROLES.ADMIN, ["contact_messages", "notifications", "nav_badges", "dashboard"], id);
 
     return toAdminContactMessageDetailDto(row);
   },
@@ -776,29 +914,40 @@ export const adminService = {
   async markNotificationRead(userId: string, id: string, input: MarkAdminNotificationReadInput) {
     const result = await adminNotificationsRepository.markRead(userId, id, input.isRead);
     if (result.count === 0) throw new NotFoundError("Notification");
+    realtimeSyncUser(userId, ["notifications"]);
     return { id, read: input.isRead };
   },
 
   async markAllNotificationsRead(userId: string) {
     const result = await adminNotificationsRepository.markAllRead(userId);
+    realtimeSyncUser(userId, ["notifications"]);
     return { updated: result.count };
+  },
+
+  async deleteNotification(userId: string, id: string) {
+    const deleted = await adminNotificationsRepository.deleteNotification(userId, id);
+    if (!deleted) throw new NotFoundError("Notification");
+    realtimeSyncUser(userId, ["notifications"]);
+  },
+
+  // Nav badges (sidebar actionable counts — separate from notification bell)
+  async getNavBadges(userId: string) {
+    const counts = await adminNavBadgesRepository.getBadgeCounts(userId);
+    return { counts };
+  },
+
+  async markNavSectionSeen(userId: string, input: MarkAdminNavSectionSeenInput) {
+    const lastSeenAt = await adminNavBadgesRepository.markSectionSeen(userId, input.section);
+    realtimeSyncUser(userId, ["nav_badges"]);
+    return { section: input.section, lastSeenAt: lastSeenAt.toISOString() };
   },
 
   // Settings
   getSettings() {
     return {
-      maintenance: getMaintenanceState(),
       alerts: alertPreferences,
       digests: digestPreferences,
     };
-  },
-
-  updateMaintenanceSettings(input: UpdateMaintenanceSettingsInput) {
-    const maintenance = setMaintenanceState({
-      enabled: input.enabled,
-      message: input.message ?? "",
-    });
-    return { maintenance };
   },
 
   updateAlertPreferences(input: UpdateAdminAlertPreferencesInput) {
@@ -869,6 +1018,13 @@ function reportColumns(type: string) {
         { key: "name", label: "Name" },
         { key: "email", label: "Email" },
         { key: "status", label: "Status" },
+      ];
+    case "platform-activity":
+      return [
+        { key: "timestamp", label: "Timestamp" },
+        { key: "event", label: "Event" },
+        { key: "actor", label: "Actor" },
+        { key: "detail", label: "Detail" },
       ];
     default:
       return [];

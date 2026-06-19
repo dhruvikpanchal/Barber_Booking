@@ -6,18 +6,23 @@ import {
   Clock,
   LayoutDashboard,
   Scissors,
-  Settings,
   Star,
   UserPlus,
   Users,
-  User,
 } from "lucide-react";
 import { routes } from "@/config/routes/routes";
+import { BARBER } from "@/client/modules/shared/constants/roles.js";
+import {
+  getNavBadgeCount,
+  useNavBadgeCounts,
+} from "@/client/modules/shared/hooks/useNavBadgeCounts.js";
 import SidebarShell from "./SidebarShell";
 import SidebarSection from "./SidebarSection";
 import SidebarItem from "./SidebarItem";
 
 export default function BarberSidebar() {
+  const badgeCounts = useNavBadgeCounts(BARBER);
+
   return (
     <SidebarShell>
       <SidebarSection label="Today">
@@ -30,7 +35,7 @@ export default function BarberSidebar() {
           href={routes.barber.queue}
           icon={Users}
           label="Queue"
-          badge="4"
+          badgeCount={getNavBadgeCount(badgeCounts, routes.barber.queue)}
         />
         <SidebarItem
           href={routes.barber.walkIns}
@@ -43,6 +48,7 @@ export default function BarberSidebar() {
           href={routes.barber.appointments}
           icon={Calendar}
           label="Appointments"
+          badgeCount={getNavBadgeCount(badgeCounts, routes.barber.appointments)}
         />
         <SidebarItem
           href={routes.barber.schedule}
@@ -55,24 +61,17 @@ export default function BarberSidebar() {
           label="Services"
         />
       </SidebarSection>
-      <SidebarSection label="Profile">
+      <SidebarSection label="Insights">
         <SidebarItem
-          href={routes.barber.profile}
-          icon={User}
-          label="My profile"
+          href={routes.barber.reviews}
+          icon={Star}
+          label="Reviews"
+          badgeCount={getNavBadgeCount(badgeCounts, routes.barber.reviews)}
         />
-        <SidebarItem href={routes.barber.reviews} icon={Star} label="Reviews" />
         <SidebarItem
           href={routes.barber.analytics}
           icon={BarChart3}
           label="Analytics"
-        />
-      </SidebarSection>
-      <SidebarSection label="Account">
-        <SidebarItem
-          href={routes.barber.settings}
-          icon={Settings}
-          label="Settings"
         />
       </SidebarSection>
     </SidebarShell>

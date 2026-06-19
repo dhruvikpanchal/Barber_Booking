@@ -20,10 +20,16 @@ export const EXP_TIERS = [
   { label: "Master", sub: "10+ yrs", value: "10+" },
 ];
 
+/** Keep in sync with server MAX_GALLERY_IMAGES */
+export const MAX_PORTFOLIO_IMAGES = 20;
+
+export const PHONE_PATTERN = /^\+?[\d\s\-().]{7,20}$/;
+
 export const APPOINTMENT_TABS = [
   { key: "upcoming", label: "Upcoming" },
   { key: "pending", label: "Pending" },
   { key: "confirmed", label: "Confirmed" },
+  { key: "rescheduled", label: "Rescheduled" },
   { key: "completed", label: "Completed" },
   { key: "cancelled", label: "Cancelled" },
   { key: "all", label: "All" },

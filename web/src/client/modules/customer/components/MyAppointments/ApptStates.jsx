@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "@/lib/AppLink";
 import { CalendarX, Wifi, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { routes } from "@/client/config/routes/routes.js";
 
 // ── Empty state ───────────────────────────────────────────────────────────────
 
@@ -10,14 +12,14 @@ const EMPTY_CONFIG = {
     heading: "No upcoming appointments",
     sub: "You don't have any bookings scheduled. Ready for a fresh cut?",
     cta: "Book an Appointment",
-    ctaHref: "/customer/book-appointment",
+    ctaHref: routes.customer.bookAppointment,
   },
   past: {
     icon: CheckCircle2,
     heading: "No past appointments",
     sub: "Your completed appointments will show up here after your first visit.",
     cta: "Book your first appointment",
-    ctaHref: "/customer/book-appointment",
+    ctaHref: routes.customer.bookAppointment,
   },
   cancelled: {
     icon: XCircle,
@@ -39,12 +41,12 @@ export function EmptyState({ tab }) {
       <h3 className="font-serif text-xl font-bold text-on-surface">{cfg.heading}</h3>
       <p className="mt-2 max-w-sm text-sm leading-relaxed text-on-surface-variant">{cfg.sub}</p>
       {cfg.cta && (
-        <a
+        <Link
           href={cfg.ctaHref}
           className="mt-6 inline-flex h-11 items-center gap-2 rounded-xl bg-primary px-6 text-sm font-semibold text-on-primary transition-all hover:opacity-90"
         >
           {cfg.cta}
-        </a>
+        </Link>
       )}
     </div>
   );
@@ -78,16 +80,18 @@ export function LoadingSkeleton() {
 
 // ── Error state ───────────────────────────────────────────────────────────────
 
-export function ErrorState({ onRetry }) {
+export function ErrorState({
+  onRetry,
+  title = "Couldn't load appointments",
+  message = "There was a problem fetching your bookings. Please check your connection and try again.",
+}) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
       <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-status-cancelled/30 bg-status-cancelled/10">
         <Wifi className="h-8 w-8 text-status-cancelled/70" />
       </div>
-      <h3 className="font-serif text-xl font-bold text-on-surface">Couldn't load appointments</h3>
-      <p className="mt-2 max-w-sm text-sm text-on-surface-variant">
-        There was a problem fetching your bookings. Please check your connection and try again.
-      </p>
+      <h3 className="font-serif text-xl font-bold text-on-surface">{title}</h3>
+      <p className="mt-2 max-w-sm text-sm text-on-surface-variant">{message}</p>
       {onRetry && (
         <button
           type="button"

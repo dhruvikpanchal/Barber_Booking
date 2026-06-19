@@ -1,18 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { CheckCircle, Calendar, Clock, MapPin, Scissors, CalendarCheck } from "lucide-react";
 
-import { formatLongDate } from "@/client/lib/format/formatDateTime.js";
+import { formatLongLocalDate } from "@/client/modules/shared/helpers/formatLocalDate.jsx";
 import { formatMoney } from "@/client/lib/format/formatMoney.js";
+import { downloadAppointmentIcs } from "@/client/modules/customer/helpers/calendarHelpers.js";
+import BarberImage from "@/client/modules/customer/components/shared/BarberImage.jsx";
+import { routes } from "@/client/config/routes/routes.js";
+import { useRouter } from "next/navigation.js";
 
-export default function BookingConfirmed({ booking, onBookAnother }) {
+export default function BookingConfirmed({ booking, appointment, onBookAnother }) {
   const total = booking.services.reduce((s, sv) => s + sv.price, 0);
-  const [confirmId, setConfirmId] = useState("IOK-······");
+  const totalDuration = booking.services.reduce((s, sv) => s + sv.duration, 0);
 
-  useEffect(() => {
-    setConfirmId(`IOK-${Math.random().toString(36).slice(2, 7).toUpperCase()}`);
-  }, []);
+  const router = useRouter();
+
+  function handleMoveToMyAppointments() {
+    router.push(routes.customer.myAppointments);
+  }
 
   return (
     <div className="mx-auto max-w-lg py-4">
@@ -27,21 +32,19 @@ export default function BookingConfirmed({ booking, onBookAnother }) {
           Your appointment is pending barber confirmation. See you soon.
         </p>
         <div className="border-outline-variant bg-surface-container mx-auto mt-3 inline-flex items-center gap-2 rounded-full border px-4 py-1.5">
-          <span className="text-on-surface-variant text-xs">Confirmation #</span>
-          <span className="text-primary font-mono text-sm font-bold">{confirmId}</span>
+          <span className="text-on-surface-variant text-xs">Appointment ID</span>
+          <span className="text-primary font-mono text-sm font-bold">{appointment.id}</span>
         </div>
       </div>
 
       <div className="border-outline-variant bg-surface-container-low overflow-hidden rounded-xl border">
         <div className="divide-outline-variant divide-y p-5">
           <div className="flex items-center gap-4 pb-4">
-            {booking.barber?.image && (
-              <img
-                src={booking.barber.image}
-                alt={booking.barber.name}
-                className="border-primary/30 h-12 w-12 rounded-xl border-2 object-cover"
-              />
-            )}
+            <BarberImage
+              src={booking.barber?.image}
+              name={booking.barber?.name}
+              className="border-primary/30 h-12 w-12 rounded-xl border-2"
+            />
             <div>
               <p className="text-on-surface font-semibold">{booking.barber?.name}</p>
               <p className="text-on-surface-variant text-xs">{booking.barber?.role}</p>
@@ -60,7 +63,7 @@ export default function BookingConfirmed({ booking, onBookAnother }) {
               <div>
                 <p className="font-label-caps text-on-surface-variant text-[10px]">Date</p>
                 <p className="text-on-surface text-sm font-medium">
-                  {formatLongDate(booking.date)}
+                  {formatLongLocalDate(booking.date)}
                 </p>
               </div>
             </div>
@@ -101,10 +104,11 @@ export default function BookingConfirmed({ booking, onBookAnother }) {
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         <button
           type="button"
+          onClick={handleMoveToMyAppointments}
           className="border-outline-variant bg-surface-container text-on-surface hover:bg-surface-container-high flex h-11 items-center justify-center gap-2 rounded-xl border text-sm font-semibold transition-all active:scale-[0.98]"
         >
           <CalendarCheck className="text-primary h-4 w-4" />
-          Add to calendar
+          My Appointments
         </button>
         <button
           type="button"
@@ -117,7 +121,7 @@ export default function BookingConfirmed({ booking, onBookAnother }) {
       </div>
 
       <p className="text-on-surface-variant mt-5 text-center text-xs">
-        A confirmation has been sent to your email address.
+        A confirmation email has been sent to your email address.
       </p>
     </div>
   );

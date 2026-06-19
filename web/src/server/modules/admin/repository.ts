@@ -35,6 +35,7 @@ import {
 } from "@/server/db";
 import { contains } from "@/server/db/helpers";
 import { getPrismaSkipTake } from "@/server/modules/shared/helpers/pagination";
+import { regionConfig } from "@/server/config/region";
 import { NOTIFICATION_TYPE } from "@/server/modules/shared/constants/notificationTypes";
 import { ROLES } from "@/server/modules/shared/constants/roles";
 import {
@@ -415,7 +416,16 @@ export const adminProfileRepository = {
     });
   },
 
-  async updateAdminProfile(userId: string, data: { fullName?: string; phone?: string | null }) {
+  async updateAdminProfile(
+    userId: string,
+    data: {
+      fullName?: string;
+      firstName?: string;
+      lastName?: string;
+      phone?: string | null;
+      photoUrl?: string | null;
+    },
+  ) {
     const [row] = await db.update(users).set(data).where(eq(users.id, userId)).returning({
       id: users.id,
       fullName: users.fullName,
@@ -512,6 +522,54 @@ export const adminDashboardRepository = {
       _count: { barbers: Number(row.barberCount) },
     }));
   },
+
+  countCustomersSince(range: { gte: Date; lt?: Date; lte?: Date }) {
+    const parts: SQL[] = [eq(users.role, ROLES.CUSTOMER), gte(users.createdAt, range.gte)];
+    if (range.lt) parts.push(lt(users.createdAt, range.lt));
+    if (range.lte) parts.push(lte(users.createdAt, range.lte));
+    return db.$count(users, and(...parts));
+  },
+
+  countBarbersSince(range: { gte: Date; lt?: Date; lte?: Date }) {
+    const parts: SQL[] = [gte(barberProfiles.joinedAt, range.gte)];
+    if (range.lt) parts.push(lt(barberProfiles.joinedAt, range.lt));
+    if (range.lte) parts.push(lte(barberProfiles.joinedAt, range.lte));
+    return db.$count(barberProfiles, and(...parts));
+  },
+
+  recentProblemReports(limit: number) {
+    return db.query.contactMessages.findMany({
+      where: eq(contactMessages.subject, "Report a problem"),
+      limit,
+      orderBy: (fields, { desc: descFn }) => [descFn(fields.submittedAt)],
+      columns: {
+        id: true,
+        name: true,
+        email: true,
+        subject: true,
+        message: true,
+        submittedAt: true,
+      },
+    });
+  },
+
+  async appointmentCountByCity(range: { gte: Date; lte: Date }) {
+    const rows = await db
+      .select({
+        city: shops.city,
+        cnt: count(appointments.id),
+      })
+      .from(appointments)
+      .innerJoin(barberProfiles, eq(appointments.barberId, barberProfiles.id))
+      .innerJoin(shops, eq(barberProfiles.shopId, shops.id))
+      .where(and(gte(appointments.bookedAt, range.gte), lte(appointments.bookedAt, range.lte)))
+      .groupBy(shops.city);
+
+    return rows.map((row) => ({
+      city: row.city,
+      count: Number(row.cnt),
+    }));
+  },
 };
 
 export const adminAnalyticsRepository = {
@@ -599,6 +657,38 @@ export const adminAnalyticsRepository = {
       name: row.name,
       _count: { name: Number(row.nameCount) },
     }));
+  },
+
+  async mostActiveBarberInRange(range: { gte: Date; lte: Date }) {
+    const rows = await db
+      .select({
+        name: users.fullName,
+        cnt: count(appointments.id),
+      })
+      .from(appointments)
+      .innerJoin(barberProfiles, eq(appointments.barberId, barberProfiles.id))
+      .innerJoin(users, eq(barberProfiles.userId, users.id))
+      .where(and(gte(appointments.startAt, range.gte), lte(appointments.startAt, range.lte)))
+      .groupBy(users.id, users.fullName)
+      .orderBy(desc(count(appointments.id)))
+      .limit(1);
+
+    return rows[0] ?? null;
+  },
+
+  async highestRatedBarber() {
+    const rows = await db
+      .select({
+        name: users.fullName,
+        rating: barberProfiles.averageRating,
+      })
+      .from(barberProfiles)
+      .innerJoin(users, eq(barberProfiles.userId, users.id))
+      .where(eq(barberProfiles.barberStatus, "ACTIVE"))
+      .orderBy(desc(barberProfiles.averageRating))
+      .limit(1);
+
+    return rows[0] ?? null;
   },
 };
 
@@ -952,6 +1042,34 @@ export const adminBarbersRepository = {
       with: barberListWith,
     });
   },
+
+  async countPlatformSummary() {
+    const [totalRow] = await db.select({ cnt: count() }).from(barberProfiles);
+    const [activeRow] = await db
+      .select({ cnt: count() })
+      .from(barberProfiles)
+      .where(eq(barberProfiles.barberStatus, "ACTIVE"));
+    const [inactiveRow] = await db
+      .select({ cnt: count() })
+      .from(barberProfiles)
+      .where(eq(barberProfiles.barberStatus, "INACTIVE"));
+    const [disabledRow] = await db
+      .select({ cnt: count() })
+      .from(barberProfiles)
+      .where(eq(barberProfiles.barberStatus, "DISABLED"));
+    const [avgRow] = await db.select({ avg: avg(barberProfiles.averageRating) }).from(barberProfiles);
+
+    const averageRating = avgRow?.avg != null ? Number(avgRow.avg) : null;
+
+    return {
+      total: Number(totalRow?.cnt ?? 0),
+      active: Number(activeRow?.cnt ?? 0),
+      inactive: Number(inactiveRow?.cnt ?? 0),
+      disabled: Number(disabledRow?.cnt ?? 0),
+      avgRating:
+        averageRating != null && !Number.isNaN(averageRating) ? averageRating.toFixed(1) : "—",
+    };
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -975,6 +1093,56 @@ export const adminUsersRepository = {
     const countQuery = db.$count(users, where);
     const [items, total] = await Promise.all([attachUserCounts(rows), countQuery]);
     return [items, total] as const;
+  },
+
+  async countPlatformSummary() {
+    const customerRole = ROLES.CUSTOMER;
+
+    const totals = await db.execute<{
+      active: number;
+      inactive: number;
+      disabled: number;
+      high_activity: number;
+      total_bookings: number;
+      total_reviews: number;
+    }>(sql`
+      SELECT
+        COUNT(*) FILTER (WHERE u.is_active = false)::int AS disabled,
+        COUNT(*) FILTER (WHERE u.is_active = true AND COALESCE(ac.cnt, 0) >= 3)::int AS active,
+        COUNT(*) FILTER (WHERE u.is_active = true AND COALESCE(ac.cnt, 0) < 3)::int AS inactive,
+        COUNT(*) FILTER (WHERE COALESCE(ac.cnt, 0) >= 10)::int AS high_activity,
+        COALESCE(SUM(COALESCE(ac.cnt, 0)), 0)::int AS total_bookings,
+        COALESCE(SUM(COALESCE(rc.cnt, 0)), 0)::int AS total_reviews
+      FROM users u
+      LEFT JOIN (
+        SELECT customer_id, COUNT(*)::int AS cnt
+        FROM appointments
+        GROUP BY customer_id
+      ) ac ON ac.customer_id = u.id
+      LEFT JOIN (
+        SELECT customer_id, COUNT(*)::int AS cnt
+        FROM reviews
+        GROUP BY customer_id
+      ) rc ON rc.customer_id = u.id
+      WHERE u.role = ${customerRole}
+    `);
+
+    const [totalRow] = await db
+      .select({ cnt: count() })
+      .from(users)
+      .where(eq(users.role, ROLES.CUSTOMER));
+
+    const row = totals[0];
+
+    return {
+      total: Number(totalRow?.cnt ?? 0),
+      active: Number(row?.active ?? 0),
+      inactive: Number(row?.inactive ?? 0),
+      disabled: Number(row?.disabled ?? 0),
+      highActivity: Number(row?.high_activity ?? 0),
+      totalBookings: Number(row?.total_bookings ?? 0),
+      totalReviews: Number(row?.total_reviews ?? 0),
+    };
   },
 
   async findById(id: string) {
@@ -1047,6 +1215,7 @@ type ContactMessageUpdate = Partial<{
   assignedTo: string | null;
   replyText: string;
   replyStatus: (typeof contactMessages.$inferSelect)["replyStatus"];
+  workflowStatus: (typeof contactMessages.$inferSelect)["workflowStatus"];
   repliedAt: Date;
 }>;
 
@@ -1108,6 +1277,7 @@ export const adminContactMessagesRepository = {
       .set({
         replyText,
         replyStatus: CONTACT_REPLY_STATUS.REPLIED,
+        workflowStatus: "REPLIED",
         repliedAt: new Date(),
         isRead: true,
       })
@@ -1192,6 +1362,16 @@ export const adminNotificationsRepository = {
     return { count: updated.length };
   },
 
+  async deleteNotification(userId: string, id: string) {
+    const row = await db.query.notifications.findFirst({
+      where: and(eq(notifications.id, id), eq(notifications.userId, userId)),
+    });
+    if (!row) return false;
+
+    await db.delete(notifications).where(eq(notifications.id, id));
+    return true;
+  },
+
   unreadCount(userId: string) {
     return db.$count(
       notifications,
@@ -1260,7 +1440,11 @@ export const adminReportsRepository = {
 
   async customersReport(range: { gte: Date; lte: Date }, limit = 100) {
     const rows = await db.query.users.findMany({
-      where: and(eq(users.role, ROLES.CUSTOMER), lte(users.createdAt, range.lte)),
+      where: and(
+        eq(users.role, ROLES.CUSTOMER),
+        gte(users.createdAt, range.gte),
+        lte(users.createdAt, range.lte),
+      ),
       columns: {
         id: true,
         fullName: true,
@@ -1335,5 +1519,111 @@ export const adminReportsRepository = {
         limit,
       }),
     ]);
+  },
+
+  async platformActivityReport(range: { gte: Date; lte: Date }, limit = 100) {
+    const perSource = Math.max(20, Math.ceil(limit / 4));
+
+    const [messages, requests, bookings, signups] = await Promise.all([
+      db.query.contactMessages.findMany({
+        where: and(
+          gte(contactMessages.submittedAt, range.gte),
+          lte(contactMessages.submittedAt, range.lte),
+        ),
+        columns: { id: true, name: true, subject: true, submittedAt: true },
+        orderBy: (fields, { desc: descFn }) => [descFn(fields.submittedAt)],
+        limit: perSource,
+      }),
+      db.query.barberRequests.findMany({
+        where: and(
+          gte(barberRequests.submittedAt, range.gte),
+          lte(barberRequests.submittedAt, range.lte),
+        ),
+        columns: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          status: true,
+          submittedAt: true,
+        },
+        orderBy: (fields, { desc: descFn }) => [descFn(fields.submittedAt)],
+        limit: perSource,
+      }),
+      db.query.appointments.findMany({
+        where: and(gte(appointments.bookedAt, range.gte), lte(appointments.bookedAt, range.lte)),
+        columns: { id: true, bookedAt: true },
+        with: {
+          customer: { columns: { fullName: true } },
+          services: { columns: { name: true }, limit: 1 },
+        },
+        orderBy: (fields, { desc: descFn }) => [descFn(fields.bookedAt)],
+        limit: perSource,
+      }),
+      db.query.users.findMany({
+        where: and(gte(users.createdAt, range.gte), lte(users.createdAt, range.lte)),
+        columns: { id: true, fullName: true, role: true, createdAt: true },
+        orderBy: (fields, { desc: descFn }) => [descFn(fields.createdAt)],
+        limit: perSource,
+      }),
+    ]);
+
+    type ActivityRow = {
+      id: string;
+      at: Date;
+      timestamp: string;
+      event: string;
+      actor: string;
+      detail: string;
+    };
+
+    const formatTimestamp = (date: Date) =>
+      date.toLocaleString(regionConfig.locale, {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+
+    const events: ActivityRow[] = [
+      ...messages.map((message) => ({
+        id: `contact-${message.id}`,
+        at: message.submittedAt,
+        timestamp: formatTimestamp(message.submittedAt),
+        event: "Contact message",
+        actor: message.name,
+        detail: message.subject,
+      })),
+      ...requests.map((request) => ({
+        id: `request-${request.id}`,
+        at: request.submittedAt,
+        timestamp: formatTimestamp(request.submittedAt),
+        event: "Barber application",
+        actor: `${request.firstName} ${request.lastName}`.trim(),
+        detail: `${request.id.slice(0, 8)} · ${request.status.toLowerCase()}`,
+      })),
+      ...bookings.map((booking) => ({
+        id: `booking-${booking.id}`,
+        at: booking.bookedAt,
+        timestamp: formatTimestamp(booking.bookedAt),
+        event: "New appointment",
+        actor: booking.customer?.fullName ?? "Customer",
+        detail: `${booking.id.slice(0, 8)} · ${booking.services[0]?.name ?? "Booking"}`,
+      })),
+      ...signups.map((user) => ({
+        id: `signup-${user.id}`,
+        at: user.createdAt,
+        timestamp: formatTimestamp(user.createdAt),
+        event: "Account registration",
+        actor: user.fullName,
+        detail: user.role === ROLES.BARBER ? "Barber account" : "Customer account",
+      })),
+    ];
+
+    return events
+      .sort((a, b) => b.at.getTime() - a.at.getTime())
+      .slice(0, limit)
+      .map(({ at: _at, ...row }) => row);
   },
 };

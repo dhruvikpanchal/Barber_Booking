@@ -1,18 +1,16 @@
 import { notFound } from "next/navigation";
 import BarberDetail from "@/client/modules/public/pages/BarberDetail.jsx";
-import { publicService } from "@/server/modules/public/service";
 import { getCachedBarberBySlug } from "@/server/modules/public/serverFetch";
 
 export const revalidate = 30;
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
-  try {
-    const barber = await publicService.getBarberBySlug(id);
-    return { title: `${barber.name} · Barber` };
-  } catch {
+  const barber = await getCachedBarberBySlug(id);
+  if (!barber) {
     return { title: "Barber not found" };
   }
+  return { title: `${barber.name} · Barber` };
 }
 
 export default async function BarberDetailPage({ params }) {

@@ -10,7 +10,12 @@ export default function CityGrowth({ cities = [] }) {
         </h3>
       </header>
       <div className="grid gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3">
-        {cities.map((c) => {
+        {cities.length === 0 ? (
+          <p className="text-on-surface-variant col-span-full py-6 text-center text-sm">
+            City performance data will appear as barbers join across markets.
+          </p>
+        ) : (
+          cities.map((c) => {
           const up = c.delta >= 0;
           return (
             <div
@@ -34,8 +39,9 @@ export default function CityGrowth({ cities = [] }) {
                 ) : null}
               </div>
               <p className="mt-2 font-serif text-lg font-bold text-on-surface sm:text-xl">
-                {c.users.toLocaleString()}
+                {c.barbers.toLocaleString()}
               </p>
+              <p className="text-on-surface-variant mt-0.5 text-[11px]">active barbers</p>
               <div
                 className={`mt-1 inline-flex items-center gap-0.5 text-xs font-medium ${
                   up ? "text-status-confirmed" : "text-status-cancelled"
@@ -51,7 +57,8 @@ export default function CityGrowth({ cities = [] }) {
               </div>
             </div>
           );
-        })}
+        })
+        )}
       </div>
     </section>
   );

@@ -270,7 +270,7 @@ function buildAppointmentTabCondition(tab: CustomerAppointmentsQuery["tab"], now
     default:
       return and(
         inArray(appointments.status, [...CUSTOMER_UPCOMING_STATUSES]),
-        gt(appointments.startAt, now),
+        or(gt(appointments.startAt, now), eq(appointments.status, "IN_SERVICE")),
       )!;
   }
 }
@@ -442,6 +442,24 @@ export const customerRepository = {
         address: true,
         createdAt: true,
         role: true,
+      },
+    });
+  },
+
+  findUserProfileById(userId: string) {
+    return db.query.users.findFirst({
+      where: eq(users.id, userId),
+      columns: {
+        id: true,
+        email: true,
+        fullName: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        photoUrl: true,
+        address: true,
+        createdAt: true,
+        passwordHash: true,
       },
     });
   },

@@ -98,7 +98,7 @@ export const REVIEW_RATING_MAX = 5;
 
 export const REVIEW_COMMENT_MAX_LENGTH = 1000;
 
-/** 24-hour edit window — matches REVIEW_EDIT_MS in customer Reviews/Primitives.jsx */
+/** 24-hour edit/delete window after a review is posted (not a limit on leaving a review). */
 export const REVIEW_EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export const REVIEW_SORT_OPTIONS = [
@@ -121,7 +121,6 @@ export const CUSTOMER_NOTIFICATION_TYPES = [
   NOTIFICATION_TYPE.SERVICE_CHANGE_ACCEPTED,
   NOTIFICATION_TYPE.SERVICE_CHANGE_REJECTED,
   NOTIFICATION_TYPE.REVIEW_REQUEST,
-  NOTIFICATION_TYPE.PROMOTION,
 ] as const;
 
 export type CustomerNotificationType = (typeof CUSTOMER_NOTIFICATION_TYPES)[number];
@@ -135,7 +134,6 @@ export const CUSTOMER_NOTIFICATION_CLIENT_TYPES: Record<CustomerNotificationType
   SERVICE_CHANGE_ACCEPTED: "service_change",
   SERVICE_CHANGE_REJECTED: "service_change",
   REVIEW_REQUEST: "review_request",
-  PROMOTION: "promotion",
 };
 
 export const CUSTOMER_NOTIFICATION_FILTER_TABS = [
@@ -143,7 +141,6 @@ export const CUSTOMER_NOTIFICATION_FILTER_TABS = [
   { key: "appointments", label: "Appointments" },
   { key: "service_change", label: "Updates" },
   { key: "review_request", label: "Reviews" },
-  { key: "promotion", label: "Offers" },
 ] as const;
 
 export type CustomerNotificationFilterKey =

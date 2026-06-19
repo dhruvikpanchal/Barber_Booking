@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { ChevronDown, LogIn, Scissors, UserPlus } from "lucide-react";
 import { routes } from "@/config/routes/routes";
 
@@ -74,6 +74,7 @@ export default function PublicAccountMenu() {
                 <li key={item.href}>
                   <Link
                     href={item.href}
+                    prefetch={false}
                     role="menuitem"
                     onClick={() => setOpen(false)}
                     className="flex gap-3 px-4 py-3 text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
@@ -98,6 +99,7 @@ export default function PublicAccountMenu() {
           <div className="border-t border-outline-variant p-3">
             <Link
               href={routes.auth.register}
+              prefetch={false}
               onClick={() => setOpen(false)}
               className="font-label-caps block rounded-md bg-primary py-2.5 text-center text-sm text-on-primary transition-opacity hover:opacity-90"
             >

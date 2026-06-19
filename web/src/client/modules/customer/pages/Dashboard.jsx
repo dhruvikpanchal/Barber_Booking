@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
+import Link from "@/lib/AppLink";
+import { useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, CheckCircle2, CalendarClock, XCircle, CalendarPlus } from "lucide-react";
 import { toast } from "sonner";
 import { getGreeting, getTodayDateLabel } from "@/client/lib/format/formatDateTime.js";
 import { useHydrated } from "@/client/modules/shared/hooks/useHydrated.js";
+import { useStoredUser } from "@/client/modules/shared/hooks/useStoredUser.js";
 import { routes } from "@/client/config/routes/routes.js";
 import { customerHook } from "@/client/modules/customer/hooks/customerQuery.jsx";
-import StatTile from "@/client/modules/shared/components/ui/StatTile";
+import { seedDashboardQueryCache } from "@/client/modules/customer/helpers/customerCacheHelpers.js";
+import CustomerStatTile from "@/client/modules/customer/components/Dashboard/CustomerStatTile.jsx";
 import QuickActions from "@/client/modules/customer/components/Dashboard/QuickActions.jsx";
 import NextAppointmentCard from "@/client/modules/customer/components/Dashboard/NextAppointmentCard.jsx";
 import UpcomingBookingsWidget from "@/client/modules/customer/components/Dashboard/UpcomingBookingsWidget.jsx";
@@ -17,7 +20,13 @@ import NotificationsPreview from "@/client/modules/customer/components/Dashboard
 
 export default function Dashboard() {
   const hydrated = useHydrated();
+  const queryClient = useQueryClient();
+  const storedUser = useStoredUser();
   const { data, isPending, isError, error, refetch } = customerHook.Dashboard.useDashboard();
+
+  useEffect(() => {
+    if (data) seedDashboardQueryCache(queryClient, data);
+  }, [data, queryClient]);
 
   useEffect(() => {
     if (isError) {
@@ -27,7 +36,11 @@ export default function Dashboard() {
 
   const greeting = hydrated ? getGreeting() : "Hello";
   const today = hydrated ? getTodayDateLabel() : "";
-  const firstName = data?.profile?.firstName ?? data?.profile?.fullName?.split(" ")[0] ?? "there";
+  const firstName =
+    data?.profile?.firstName ??
+    storedUser?.firstName ??
+    storedUser?.fullName?.split(" ")[0] ??
+    "there";
 
   const stats = data?.stats ?? { total: 0, completed: 0, upcoming: 0, cancelled: 0 };
   const nextAppointment = data?.nextAppointment ?? null;
@@ -38,7 +51,7 @@ export default function Dashboard() {
 
   if (isPending) {
     return (
-      <div className="text-on-surface mx-auto w-full max-w-6xl min-w-0 space-y-6 pb-28 md:pb-8">
+      <div className="text-on-surface mx-auto w-full max-w-6xl min-w-0 space-y-6 md:space-y-8">
         <div className="bg-surface-container h-24 animate-pulse rounded-xl" />
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
@@ -66,7 +79,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="text-on-surface mx-auto w-full max-w-6xl min-w-0 space-y-6 pb-28 md:space-y-8 md:pb-8">
+    <div className="text-on-surface mx-auto w-full max-w-6xl min-w-0 space-y-6 md:space-y-8">
       <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="space-y-1">
           <p className="font-label-caps text-primary">Customer · Dashboard</p>
@@ -113,28 +126,28 @@ export default function Dashboard() {
         className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
         aria-label="Booking statistics"
       >
-        <StatTile
+        <CustomerStatTile
           label="Total bookings"
           value={stats.total}
           hint="All time on your account"
           Icon={CalendarDays}
           accent="text-primary bg-primary/15"
         />
-        <StatTile
+        <CustomerStatTile
           label="Completed"
           value={stats.completed}
           hint="Finished visits"
           Icon={CheckCircle2}
           accent="text-status-confirmed bg-status-confirmed/15"
         />
-        <StatTile
+        <CustomerStatTile
           label="Upcoming"
           value={stats.upcoming}
           hint="Pending and confirmed"
           Icon={CalendarClock}
           accent="text-status-pending bg-status-pending/15"
         />
-        <StatTile
+        <CustomerStatTile
           label="Cancelled"
           value={stats.cancelled}
           hint="Did not take place"

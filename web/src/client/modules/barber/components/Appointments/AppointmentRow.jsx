@@ -1,20 +1,16 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { Check, X, CalendarClock, Eye, Scissors, Clock, Phone } from "lucide-react";
 import { routes } from "@/client/config/routes/routes.js";
 import { formatDateLabel, formatTimeLabel } from "@/client/lib/format/formatDateTime.js";
+import { formatMoney } from "@/client/lib/format/formatMoney.js";
+import { customerInitials } from "@/client/lib/format/formatInitials.js";
 import StatusBadge from "@/client/modules/shared/components/ui/StatusBadge";
 import { STATUSES } from "@/client/modules/barber/constants/statusConstants.js";
 
 function initials(name) {
-  return name
-    .split(" ")
-    .map((p) => p[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  return customerInitials(name);
 }
 
 export function formatWhen(iso) {
@@ -30,14 +26,7 @@ export function formatWhen(iso) {
 const BTN =
   "inline-flex items-center justify-center gap-1.5 rounded-md text-xs font-semibold transition-colors disabled:opacity-40";
 
-function Actions({
-  appt,
-  layout = "inline",
-  onAccept,
-  onReject,
-  onReschedule,
-  onView,
-}) {
+function Actions({ appt, layout = "inline", onAccept, onReject, onReschedule, onView }) {
   const isPending = appt.status === "pending";
   const iconOnly = layout === "compact";
 
@@ -185,7 +174,7 @@ export function AppointmentTableRow({ appt, ...handlers }) {
           {appt.service}
         </p>
         <p className="text-on-surface-variant mt-0.5 text-xs">
-          ${appt.price} · {appt.duration} min
+          {formatMoney(appt.price)} · {appt.duration} min
         </p>
       </td>
       <td className="px-4 py-3">
@@ -234,7 +223,7 @@ export function AppointmentCard({ appt, ...handlers }) {
             <div className="text-on-surface-variant mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 text-[11px]">
               <WhenBlock startAt={appt.startAt} className="text-[11px]" />
               <span className="text-on-surface shrink-0 font-medium">
-                ${appt.price} · {appt.duration}m
+                {formatMoney(appt.price)} · {appt.duration}m
               </span>
             </div>
           </div>

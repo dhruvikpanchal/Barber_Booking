@@ -1,5 +1,5 @@
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { routes } from "@/config/routes/routes";
 
 const ctaImage =

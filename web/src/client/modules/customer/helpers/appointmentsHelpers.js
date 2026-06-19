@@ -1,4 +1,5 @@
-import { SERVICE_CHANGE_MIN_MS } from "@/lib/storage/serviceChangeStore.js";
+import { SERVICE_CHANGE_MIN_MS } from "@/client/modules/shared/constants/serviceChangeConstants.js";
+import { DISPLAY_LOCALE } from "@/client/lib/format/formatDateTime.js";
 
 function atFromTimeline(appt, key) {
   return appt.timeline?.find((s) => s.key === key)?.at ?? null;
@@ -97,13 +98,13 @@ export function buildProgressTracker(appt) {
 export function formatDateTime(iso) {
   const d = new Date(iso);
   return {
-    date: d.toLocaleDateString("en-US", {
+    date: d.toLocaleDateString(DISPLAY_LOCALE, {
       weekday: "short",
       month: "short",
       day: "numeric",
       year: "numeric",
     }),
-    time: d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }),
+    time: d.toLocaleTimeString(DISPLAY_LOCALE, { hour: "numeric", minute: "2-digit" }),
     relative: getRelative(d),
   };
 }

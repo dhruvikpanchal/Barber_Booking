@@ -1,6 +1,9 @@
-export function buildStartAt(dateIso, timeId) {
-  const d = new Date(dateIso);
-  const [h, m] = timeId.split(":").map(Number);
-  d.setHours(h, m, 0, 0);
-  return d.toISOString();
+import {
+  getBookingTimezoneOffsetMinutes,
+  wallClockToInstant,
+} from "@/client/modules/shared/helpers/calendarDate.js";
+
+/** Build ISO `startAt` from the customer's selected wall-clock date and time. */
+export function buildStartAt(dateKey, timeId, timezoneOffsetMinutes = getBookingTimezoneOffsetMinutes()) {
+  return wallClockToInstant(dateKey, timeId, timezoneOffsetMinutes).toISOString();
 }

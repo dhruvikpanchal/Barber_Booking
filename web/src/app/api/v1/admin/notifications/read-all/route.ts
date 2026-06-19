@@ -7,6 +7,6 @@ export const dynamic = "force-dynamic";
 
 const handler = adminAuthedRoute((req) => adminController.markAllNotificationsRead(req));
 
-export function PATCH(req: NextRequest) {
+export function POST(req: NextRequest) {
   return invoke(handler, req);
 }

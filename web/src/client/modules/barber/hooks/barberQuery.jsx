@@ -1,13 +1,37 @@
+import { useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { createQuery, createMutation } from "@/client/modules/shared/hooks/useTanstack.js";
 import { barberServices } from "@/client/modules/barber/services/barberServices.jsx";
+import {
+  isCompleteBarberProfile,
+  syncProfileAfterMutation,
+} from "@/client/modules/shared/helpers/profilePhotoHelpers.js";
+import { getProfilePlaceholderData } from "@/client/lib/auth/profileCache.js";
 
 export { useBarberInvalidation } from "@/client/modules/barber/hooks/useBarberInvalidation.js";
 
+const PROFILE_STALE_TIME = 5 * 60_000;
+const LIST_STALE_TIME = 60_000;
+const DASHBOARD_STALE_TIME = 45_000;
+const QUEUE_STALE_TIME = 20_000;
+
 export const barberHook = {
   Profile: {
-    useGetProfile: () => createQuery("barberGetProfile", barberServices.getProfile),
+    useGetProfile: () =>
+      createQuery("barberGetProfile", barberServices.getProfile, {
+        staleTime: PROFILE_STALE_TIME,
+        placeholderData: () => getProfilePlaceholderData("barber"),
+        refetchOnMount: (query) => !isCompleteBarberProfile(query.state.data),
+      }),
 
-    useUpdateProfile: () => createMutation("barberUpdateProfile", barberServices.updateProfile),
+    useUpdateProfile: () => {
+      const queryClient = useQueryClient();
+      return useMutation({
+        mutationKey: ["barberUpdateProfile"],
+        mutationFn: barberServices.updateProfile,
+        onSuccess: (data) => syncProfileAfterMutation(queryClient, "barber", data),
+      });
+    },
 
     useUploadPhoto: () => createMutation("barberUploadPhoto", barberServices.uploadPhoto),
 
@@ -29,8 +53,11 @@ export const barberHook = {
   },
 
   Services: {
-    useListServices: (params) =>
-      createQuery("barberListServices", barberServices.listServices, params),
+    useListServices: (params, options = {}) =>
+      createQuery("barberListServices", barberServices.listServices, params, {
+        staleTime: LIST_STALE_TIME,
+        ...options,
+      }),
 
     useCreateService: () => createMutation("barberCreateService", barberServices.createService),
 
@@ -49,7 +76,10 @@ export const barberHook = {
   },
 
   Schedule: {
-    useGetSchedule: () => createQuery("barberGetSchedule", barberServices.getSchedule),
+    useGetSchedule: () =>
+      createQuery("barberGetSchedule", barberServices.getSchedule, {
+        staleTime: LIST_STALE_TIME,
+      }),
 
     useSaveSchedule: () => createMutation("barberSaveSchedule", barberServices.saveSchedule),
 
@@ -63,11 +93,22 @@ export const barberHook = {
   },
 
   Appointments: {
-    useListAppointments: (params) =>
-      createQuery("barberListAppointments", barberServices.listAppointments, params),
+    useListAppointments: (params, options = {}) =>
+      createQuery("barberListAppointments", barberServices.listAppointments, params, {
+        staleTime: LIST_STALE_TIME,
+        ...options,
+      }),
 
     useGetAppointment: (id) =>
       createQuery("barberGetAppointment", barberServices.getAppointment, id),
+
+    useListPendingServiceChanges: (options = {}) =>
+      createQuery(
+        "barberListPendingServiceChanges",
+        barberServices.listPendingServiceChanges,
+        undefined,
+        { staleTime: LIST_STALE_TIME, ...options },
+      ),
 
     useUpdateAppointmentStatus: () =>
       createMutation("barberUpdateAppointmentStatus", ({ id, ...data }) =>
@@ -79,16 +120,33 @@ export const barberHook = {
         barberServices.rescheduleAppointment(id, data),
       ),
 
-    useRespondServiceChange: () =>
-      createMutation("barberRespondServiceChange", ({ appointmentId, reqId, ...data }) =>
-        barberServices.respondServiceChange(appointmentId, reqId, data),
-      ),
+    useRespondServiceChange: () => {
+      const queryClient = useQueryClient();
+      return useMutation({
+        mutationKey: ["barberRespondServiceChange"],
+        mutationFn: ({ appointmentId, reqId, ...data }) =>
+          barberServices.respondServiceChange(appointmentId, reqId, data),
+        onSuccess: (_data, variables) => {
+          queryClient.invalidateQueries({ queryKey: ["barberListPendingServiceChanges"] });
+          queryClient.invalidateQueries({ queryKey: ["barberListAppointments"] });
+          queryClient.invalidateQueries({ queryKey: ["barberGetDashboard"] });
+          queryClient.invalidateQueries({ queryKey: ["barberGetQueue"] });
+          if (variables?.appointmentId) {
+            queryClient.invalidateQueries({
+              queryKey: ["barberGetAppointment", variables.appointmentId],
+            });
+          }
+        },
+      });
+    },
   },
 
   Queue: {
-    useGetQueue: (params) => createQuery("barberGetQueue", barberServices.getQueue, params),
-
-    useAddToQueue: () => createMutation("barberAddToQueue", barberServices.addToQueue),
+    useGetQueue: (params, options = {}) =>
+      createQuery("barberGetQueue", barberServices.getQueue, params, {
+        staleTime: QUEUE_STALE_TIME,
+        ...options,
+      }),
 
     useUpdateQueueStatus: () =>
       createMutation("barberUpdateQueueStatus", ({ id, ...data }) =>
@@ -105,8 +163,11 @@ export const barberHook = {
   },
 
   WalkIns: {
-    useListWalkIns: (params) =>
-      createQuery("barberListWalkIns", barberServices.listWalkIns, params),
+    useListWalkIns: (params, options = {}) =>
+      createQuery("barberListWalkIns", barberServices.listWalkIns, params, {
+        staleTime: LIST_STALE_TIME,
+        ...options,
+      }),
 
     useCreateWalkIn: () => createMutation("barberCreateWalkIn", barberServices.createWalkIn),
 
@@ -117,8 +178,11 @@ export const barberHook = {
   },
 
   Reviews: {
-    useListReviews: (params) =>
-      createQuery("barberListReviews", barberServices.listReviews, params),
+    useListReviews: (params, options = {}) =>
+      createQuery("barberListReviews", barberServices.listReviews, params, {
+        staleTime: LIST_STALE_TIME,
+        ...options,
+      }),
 
     useGetReview: (id) => createQuery("barberGetReview", barberServices.getReview, id),
 
@@ -129,13 +193,19 @@ export const barberHook = {
   },
 
   Analytics: {
-    useGetAnalytics: (params) =>
-      createQuery("barberGetAnalytics", barberServices.getAnalytics, params),
+    useGetAnalytics: (params, options = {}) =>
+      createQuery("barberGetAnalytics", barberServices.getAnalytics, params, {
+        staleTime: LIST_STALE_TIME,
+        ...options,
+      }),
   },
 
   Notifications: {
-    useListNotifications: (params) =>
-      createQuery("barberListNotifications", barberServices.listNotifications, params),
+    useListNotifications: (params, options = {}) =>
+      createQuery("barberListNotifications", barberServices.listNotifications, params, {
+        staleTime: LIST_STALE_TIME,
+        ...options,
+      }),
 
     useMarkNotificationRead: () =>
       createMutation("barberMarkNotificationRead", ({ id, ...data }) =>
@@ -145,17 +215,30 @@ export const barberHook = {
     useMarkAllNotificationsRead: () =>
       createMutation("barberMarkAllNotificationsRead", barberServices.markAllNotificationsRead),
 
-    useUnreadNotificationCount: (options) =>
-      createQuery(
-        "barberUnreadNotificationCount",
-        barberServices.getUnreadNotificationCount,
-        options,
-      ),
+    useUnreadNotificationCount: (options = {}) =>
+      createQuery("barberUnreadNotificationCount", barberServices.getUnreadNotificationCount, {
+        staleTime: LIST_STALE_TIME,
+        ...options,
+      }),
+  },
+
+  NavBadges: {
+    useNavBadges: (options = {}) =>
+      createQuery("barberNavBadges", barberServices.getNavBadges, {
+        staleTime: 45_000,
+        ...options,
+      }),
+
+    useMarkNavSectionSeen: () =>
+      createMutation("markBarberNavSectionSeen", barberServices.markNavSectionSeen),
   },
 
   Dashboard: {
-    useGetDashboard: (params) =>
-      createQuery("barberGetDashboard", barberServices.getDashboard, params),
+    useGetDashboard: (params, options = {}) =>
+      createQuery("barberGetDashboard", barberServices.getDashboard, params, {
+        staleTime: DASHBOARD_STALE_TIME,
+        ...options,
+      }),
   },
 
   Settings: {

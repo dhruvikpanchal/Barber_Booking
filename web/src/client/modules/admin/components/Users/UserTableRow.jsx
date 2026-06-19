@@ -3,6 +3,7 @@ import ActionsMenu from "./ActionsMenu.jsx";
 import { USER_STATUS_CONFIG } from "@/client/modules/admin/constants/adminConstants.js";
 import { ActivityBadge, UserStatusBadge } from "@/client/modules/shared/components/ui/badges.jsx";
 import { formatRelativeAge } from "@/client/lib/format/formatDateTime.js";
+import { formatMoney } from "@/client/lib/format/formatMoney.js";
 import { StarRow } from "@/client/modules/shared/components/ui/StarRow.jsx";
 
 export default function UserTableRow({ user, onAction }) {
@@ -44,7 +45,7 @@ export default function UserTableRow({ user, onAction }) {
       </td>
       {/* Spent */}
       <td className="hidden px-4 py-4 xl:table-cell">
-        <p className="text-on-surface font-semibold">${user.totalSpent.toLocaleString()}</p>
+        <p className="text-on-surface font-semibold">{formatMoney(user.totalSpent)}</p>
         <p className="text-on-surface-variant text-xs">lifetime</p>
       </td>
       {/* Status */}

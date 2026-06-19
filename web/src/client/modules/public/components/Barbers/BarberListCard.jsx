@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { Star, Clock, Scissors, MapPin, ChevronRight, CalendarPlus } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";
 
@@ -64,7 +64,6 @@ export default function BarberListCard({ barber }) {
             <Clock className="text-primary/70 h-3.5 w-3.5" aria-hidden />
             {barber.experience} yrs
           </span>
-          <span className="text-primary font-semibold">from ${barber.startingPrice}</span>
         </div>
 
         <div className="mt-3">

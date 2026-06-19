@@ -48,6 +48,7 @@ const nextConfig = {
     "mariadb",
     "prisma",
     "@sentry/nextjs",
+    "socket.io",
   ],
 
   async headers() {

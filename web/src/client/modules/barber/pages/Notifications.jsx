@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Bell, BellOff, CheckCheck, Search, Scissors } from "lucide-react";
 import { toast } from "sonner";
 import { getNotificationDestination } from "@/client/modules/barber/helpers/notificationNavigation.js";
@@ -11,15 +12,22 @@ import BookingCard from "@/client/modules/barber/components/Notifications/Bookin
 import ModificationCard from "@/client/modules/barber/components/Notifications/ModificationCard.jsx";
 import ReviewCard from "@/client/modules/barber/components/Notifications/ReviewCard.jsx";
 import CancellationCard from "@/client/modules/barber/components/Notifications/CancellationCard.jsx";
+import GenericNotificationCard from "@/client/modules/barber/components/Notifications/GenericNotificationCard.jsx";
 import StatsBar from "@/client/modules/barber/components/Notifications/StatsBar.jsx";
-import { barberHook, useBarberInvalidation } from "@/client/modules/barber/hooks/barberQuery.jsx";
+import { barberHook } from "@/client/modules/barber/hooks/barberQuery.jsx";
 import { mapNotification } from "@/client/modules/barber/helpers/barberMappers.js";
+import { BARBER_NOTIFICATION_LIST_PARAMS } from "@/client/modules/barber/constants/barberQueryConstants.js";
+import {
+  markAllBarberNotificationsReadInCache,
+  patchBarberNotificationInCache,
+} from "@/client/modules/barber/helpers/notificationCacheHelpers.js";
 
 export default function Notifications() {
   const router = useRouter();
-  const invalidate = useBarberInvalidation();
+  const queryClient = useQueryClient();
   const { data, isPending, isError, error, refetch } =
-    barberHook.Notifications.useListNotifications({ limit: 100 });
+    barberHook.Notifications.useListNotifications(BARBER_NOTIFICATION_LIST_PARAMS);
+  const { data: unreadData } = barberHook.Notifications.useUnreadNotificationCount();
   const markReadMutation = barberHook.Notifications.useMarkNotificationRead();
   const markAllReadMutation = barberHook.Notifications.useMarkAllNotificationsRead();
 
@@ -40,14 +48,21 @@ export default function Notifications() {
     }
   }, [isError, error]);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = unreadData?.count ?? 0;
+
+  const patchReadInCache = useCallback(
+    (id) => {
+      patchBarberNotificationInCache(queryClient, id, { read: true });
+      queryClient.invalidateQueries({ queryKey: ["barberUnreadNotificationCount"] });
+    },
+    [queryClient],
+  );
 
   const markRead = async (id) => {
     if (busy) return;
     try {
       await markReadMutation.mutateAsync({ id });
-      await refetch();
-      await invalidate.notificationCount();
+      patchReadInCache(id);
     } catch {
       toast.error("Could not mark notification as read.");
     }
@@ -61,8 +76,11 @@ export default function Notifications() {
         success: "All notifications marked as read.",
         error: "Could not mark all as read.",
       });
-      await refetch();
-      await invalidate.notificationCount();
+      markAllBarberNotificationsReadInCache(queryClient);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["barberUnreadNotificationCount"] }),
+        queryClient.invalidateQueries({ queryKey: ["barberListNotifications"] }),
+      ]);
     } catch {
       /* toast handles error */
     }
@@ -78,7 +96,7 @@ export default function Notifications() {
     try {
       if (!notif.read) {
         await markReadMutation.mutateAsync({ id: notif.id });
-        await invalidate.notificationCount();
+        patchReadInCache(notif.id);
       }
       router.push(getNotificationDestination(notif));
     } catch {
@@ -117,7 +135,7 @@ export default function Notifications() {
       case "cancellation":
         return <CancellationCard {...props} />;
       default:
-        return null;
+        return <GenericNotificationCard {...props} />;
     }
   };
 

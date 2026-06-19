@@ -2,12 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { ArrowRight, Check, History, X, RefreshCw } from "lucide-react";
-import {
-  acceptServiceChangeRequest,
-  rejectServiceChangeRequest,
-  useServiceChangeStore,
-} from "@/lib/storage/serviceChangeStore.js";
+import { toast } from "sonner";
 import { formatMoney } from "@/client/lib/format/formatMoney.js";
+import { barberHook } from "@/client/modules/barber/hooks/barberQuery.jsx";
+import { useBarberInvalidation } from "@/client/modules/barber/hooks/useBarberInvalidation.js";
+import { mapBarberServiceChangeRequest } from "@/client/modules/barber/helpers/appointmentHelpers.js";
 
 function ServiceChips({ services, label }) {
   return (
@@ -40,7 +39,7 @@ function RequestStatusPill({ status }) {
   );
 }
 
-function RequestCard({ req, actingId, onAccept, onReject, highlight }) {
+function RequestCard({ req, actingId, onAccept, onReject, highlight, disabled }) {
   const snap = req.snapshot ?? {};
   const when = new Date(req.requestedAt).toLocaleString("en-US", {
     month: "short",
@@ -66,6 +65,7 @@ function RequestCard({ req, actingId, onAccept, onReject, highlight }) {
       })
     : null;
   const isPending = req.status === "pending";
+  const isActing = actingId === req.id;
 
   return (
     <li
@@ -108,8 +108,8 @@ function RequestCard({ req, actingId, onAccept, onReject, highlight }) {
         <div className="mt-3 flex flex-wrap justify-end gap-2">
           <button
             type="button"
-            disabled={actingId === req.id}
-            onClick={() => onReject(req.id)}
+            disabled={disabled || isActing}
+            onClick={() => onReject(req)}
             className="border-outline-variant text-on-surface-variant hover:border-status-cancelled/40 hover:text-status-cancelled inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-xs font-semibold transition-colors disabled:opacity-50"
           >
             <X className="h-3.5 w-3.5" aria-hidden />
@@ -117,8 +117,8 @@ function RequestCard({ req, actingId, onAccept, onReject, highlight }) {
           </button>
           <button
             type="button"
-            disabled={actingId === req.id}
-            onClick={() => onAccept(req.id)}
+            disabled={disabled || isActing}
+            onClick={() => onAccept(req)}
             className="bg-primary text-on-primary inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs font-bold transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             <Check className="h-3.5 w-3.5" aria-hidden />
@@ -131,21 +131,43 @@ function RequestCard({ req, actingId, onAccept, onReject, highlight }) {
 }
 
 /**
- * @param {{ appointmentId?: string | null, showHistory?: boolean, compact?: boolean }} props
- * appointmentId — customer booking id (bk-*) or barber id; filters to one appointment when set.
+ * @param {{
+ *   appointmentId?: string | null,
+ *   requests?: Array | null,
+ *   showHistory?: boolean,
+ *   compact?: boolean,
+ * }} props
  */
 export default function ServiceChangeRequestsSection({
   appointmentId = null,
+  requests: requestsProp = null,
   showHistory = false,
   compact = false,
 }) {
-  const { requests } = useServiceChangeStore();
+  const invalidate = useBarberInvalidation();
+  const respondMutation = barberHook.Appointments.useRespondServiceChange();
   const [actingId, setActingId] = useState(null);
 
+  const inboxQuery = barberHook.Appointments.useListPendingServiceChanges({
+    enabled: !requestsProp && !appointmentId,
+  });
+
+  const busy = respondMutation.isPending || (!requestsProp && !appointmentId && inboxQuery.isPending);
+
+  const allRequests = useMemo(() => {
+    if (requestsProp) {
+      return requestsProp.map((req) => mapBarberServiceChangeRequest(req));
+    }
+    if (!appointmentId) {
+      return (inboxQuery.data?.requests ?? []).map((req) => mapBarberServiceChangeRequest(req));
+    }
+    return [];
+  }, [requestsProp, appointmentId, inboxQuery.data?.requests]);
+
   const scoped = useMemo(() => {
-    if (!appointmentId) return requests;
-    return requests.filter((r) => r.appointmentId === appointmentId);
-  }, [requests, appointmentId]);
+    if (!appointmentId) return allRequests;
+    return allRequests.filter((r) => r.appointmentId === appointmentId);
+  }, [allRequests, appointmentId]);
 
   const pending = useMemo(
     () =>
@@ -166,24 +188,46 @@ export default function ServiceChangeRequestsSection({
     [scoped],
   );
 
-  function handleAccept(id) {
-    setActingId(id);
-    setTimeout(() => {
-      acceptServiceChangeRequest(id);
+  async function handleDecision(req, decision) {
+    if (busy) return;
+    setActingId(req.id);
+    try {
+      await toast.promise(
+        respondMutation.mutateAsync({
+          appointmentId: req.appointmentId,
+          reqId: req.id,
+          decision,
+        }),
+        {
+          loading: decision === "ACCEPTED" ? "Accepting change…" : "Rejecting change…",
+          success:
+            decision === "ACCEPTED"
+              ? "Service change accepted. The customer has been notified."
+              : "Service change rejected. The customer has been notified.",
+          error: "Could not update service change request.",
+        },
+      );
+      await invalidate.operations();
+      if (!requestsProp && !appointmentId) {
+        await inboxQuery.refetch();
+      }
+    } catch {
+      /* toast handles error */
+    } finally {
       setActingId(null);
-    }, 400);
-  }
-
-  function handleReject(id) {
-    setActingId(id);
-    setTimeout(() => {
-      rejectServiceChangeRequest(id);
-      setActingId(null);
-    }, 400);
+    }
   }
 
   const showPendingBlock = pending.length > 0 || !appointmentId;
   const showHistoryBlock = showHistory && history.length > 0;
+
+  if (!requestsProp && !appointmentId && inboxQuery.isError) {
+    return (
+      <section className="border-outline-variant bg-surface-container-low text-on-surface-variant rounded-xl border px-4 py-8 text-center text-sm sm:px-5">
+        Could not load service change requests.
+      </section>
+    );
+  }
 
   if (appointmentId && pending.length === 0 && !showHistoryBlock) {
     return (
@@ -193,7 +237,7 @@ export default function ServiceChangeRequestsSection({
     );
   }
 
-  if (!appointmentId && pending.length === 0 && !showHistoryBlock) {
+  if (!appointmentId && pending.length === 0 && !showHistoryBlock && !inboxQuery.isPending) {
     return (
       <section className="border-outline-variant bg-surface-container-low min-w-0 overflow-hidden rounded-xl border">
         <header className="border-outline-variant flex flex-col gap-3 border-b px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
@@ -262,15 +306,22 @@ export default function ServiceChangeRequestsSection({
               key={req.id}
               req={req}
               actingId={actingId}
-              onAccept={handleAccept}
-              onReject={handleReject}
+              onAccept={(r) => handleDecision(r, "ACCEPTED")}
+              onReject={(r) => handleDecision(r, "REJECTED")}
               highlight={Boolean(appointmentId)}
+              disabled={busy}
             />
           ))}
         </ul>
       )}
 
-      {showPendingBlock && pending.length === 0 && !appointmentId && (
+      {showPendingBlock && pending.length === 0 && !appointmentId && inboxQuery.isPending && (
+        <div className="text-on-surface-variant px-4 py-10 text-center text-sm sm:px-5">
+          Loading service change requests…
+        </div>
+      )}
+
+      {showPendingBlock && pending.length === 0 && !appointmentId && !inboxQuery.isPending && (
         <div className="text-on-surface-variant px-4 py-10 text-center text-sm sm:px-5">
           No pending service change requests.
         </div>
@@ -288,9 +339,10 @@ export default function ServiceChangeRequestsSection({
                 key={req.id}
                 req={req}
                 actingId={actingId}
-                onAccept={handleAccept}
-                onReject={handleReject}
+                onAccept={(r) => handleDecision(r, "ACCEPTED")}
+                onReject={(r) => handleDecision(r, "REJECTED")}
                 highlight={false}
+                disabled={busy}
               />
             ))}
           </ul>

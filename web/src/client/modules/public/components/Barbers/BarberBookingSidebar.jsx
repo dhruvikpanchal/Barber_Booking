@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { CalendarPlus, Images, MessageSquare, Star, Clock } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";
 
@@ -28,6 +28,12 @@ export default function BarberBookingSidebar({ barber, disabled = false }) {
             <Clock className="h-4 w-4 text-primary/70" aria-hidden />
             {barber.experience} years experience
           </p>
+          {barber.startingPrice > 0 && (
+            <p className="text-primary font-serif text-lg font-bold">
+              ₹{barber.startingPrice}{" "}
+              <span className="text-on-surface-variant text-xs font-normal font-sans">onwards</span>
+            </p>
+          )}
         </div>
 
         {barber.available ? (

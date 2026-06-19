@@ -1,7 +1,3 @@
-import {
-  DEFAULT_WORKING_HOURS,
-  DEFAULT_SKILLS,
-} from "@/client/modules/admin/constants/barberRequestsConstants.js";
 import { EXPERIENCE_LABELS } from "@/client/modules/admin/constants/barberRequestsConstants.js";
 
 function categorizeDocuments(documents = []) {
@@ -33,37 +29,18 @@ function categorizeDocuments(documents = []) {
 /** Enrich list row with detail-only fields for the full application view. */
 export function buildBarberRequestDetail(raw) {
   const experienceLabel = EXPERIENCE_LABELS[raw.experience] ?? raw.experience;
-
-  const certifications =
-    raw.certifications ??
-    (raw.experience === "10+"
-      ? ["Master Barber License", "State Board Certified"]
-      : raw.experience === "5-10"
-        ? ["Licensed Barber", "Health & Safety Certified"]
-        : ["State Barber License (pending renewal)"]);
-
-  const previousWork =
-    raw.previousWork ??
-    (raw.bio ? raw.bio : `Previously operated in ${raw.city} before applying to Iron & Oak.`);
-
-  const address = raw.address ?? `${raw.shopName}, ${raw.city}`;
-
-  const skills = raw.skills?.length
-    ? raw.skills
-    : [...(raw.specialties ?? []), ...DEFAULT_SKILLS].slice(0, 8);
-
   const documentGroups = categorizeDocuments(raw.documents);
 
   return {
     ...raw,
     fullName: raw.fullName ?? raw.ownerName,
-    address,
+    address: raw.address ?? null,
     profilePhotoUrl: raw.profilePhotoUrl ?? null,
     experienceLabel,
-    skills,
-    workingHours: raw.workingHours ?? DEFAULT_WORKING_HOURS,
-    previousWork,
-    certifications,
+    skills: raw.skills?.length ? raw.skills : (raw.specialties ?? []),
+    workingHours: raw.workingHours ?? null,
+    previousWork: raw.previousWork ?? null,
+    certifications: raw.certifications ?? [],
     documentGroups,
   };
 }

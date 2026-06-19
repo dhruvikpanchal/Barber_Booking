@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarClock } from "lucide-react";
 import { toast } from "sonner";
@@ -17,35 +17,64 @@ import {
   ErrorState,
 } from "@/client/modules/customer/components/MyAppointments/ApptStates.jsx";
 import { TABLE_HEADERS } from "@/client/modules/customer/constants/myAppointmentsConstants.js";
+import { CUSTOMER_NAV_SECTIONS } from "@/client/modules/customer/constants/customerNavSeenConstants.js";
+import { useMarkCustomerNavSeen } from "@/client/modules/customer/hooks/useMarkCustomerNavSeen.js";
+
+const TAB_KEYS = ["upcoming", "past", "cancelled"];
+const FULL_LIMIT = 100;
+const COUNT_LIMIT = 1;
+
+function tabCount(query, countQuery, tabLoaded) {
+  if (tabLoaded) {
+    return query.data?.meta?.total ?? query.data?.items?.length ?? 0;
+  }
+  return countQuery.data?.meta?.total ?? 0;
+}
 
 export default function MyAppointments() {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState("upcoming");
+  const [loadedTabs, setLoadedTabs] = useState(() => new Set(["upcoming"]));
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [reviewTarget, setReviewTarget] = useState(null);
 
-  const upcomingQuery = customerHook.Appointments.useListAppointments({
-    tab: "upcoming",
-    limit: 100,
-  });
-  const pastQuery = customerHook.Appointments.useListAppointments({ tab: "past", limit: 100 });
-  const cancelledQuery = customerHook.Appointments.useListAppointments({
-    tab: "cancelled",
-    limit: 100,
-  });
+  const upcomingQuery = customerHook.Appointments.useListAppointments(
+    { tab: "upcoming", limit: FULL_LIMIT },
+    { enabled: loadedTabs.has("upcoming") },
+  );
+  const pastQuery = customerHook.Appointments.useListAppointments(
+    { tab: "past", limit: FULL_LIMIT },
+    { enabled: loadedTabs.has("past") },
+  );
+  const cancelledQuery = customerHook.Appointments.useListAppointments(
+    { tab: "cancelled", limit: FULL_LIMIT },
+    { enabled: loadedTabs.has("cancelled") },
+  );
+
+  const pastCountQuery = customerHook.Appointments.useListAppointments(
+    { tab: "past", limit: COUNT_LIMIT },
+    { enabled: !loadedTabs.has("past") },
+  );
+  const cancelledCountQuery = customerHook.Appointments.useListAppointments(
+    { tab: "cancelled", limit: COUNT_LIMIT },
+    { enabled: !loadedTabs.has("cancelled") },
+  );
 
   const cancelMutation = customerHook.Appointments.useCancelAppointment();
   const reviewMutation = customerHook.Appointments.useCreateReviewForAppointment();
 
-  const [activeTab, setActiveTab] = useState("upcoming");
-  const [cancelTarget, setCancelTarget] = useState(null);
-  const [reviewTarget, setReviewTarget] = useState(null);
+  const tabQueries = {
+    upcoming: upcomingQuery,
+    past: pastQuery,
+    cancelled: cancelledQuery,
+  };
 
-  const isPending =
-    upcomingQuery.isPending ||
-    pastQuery.isPending ||
-    cancelledQuery.isPending ||
-    cancelMutation.isPending ||
-    reviewMutation.isPending;
+  const activeQuery = tabQueries[activeTab];
 
-  const isError = upcomingQuery.isError || pastQuery.isError || cancelledQuery.isError;
+  const listLoading = activeQuery.isPending && (activeQuery.data?.items?.length ?? 0) === 0;
+  const actionBusy = cancelMutation.isPending || reviewMutation.isPending;
+
+  const isError = activeQuery.isError;
 
   const grouped = useMemo(
     () => ({
@@ -58,28 +87,57 @@ export default function MyAppointments() {
 
   const counts = useMemo(
     () => ({
-      upcoming: grouped.upcoming.length,
-      past: grouped.past.length,
-      cancelled: grouped.cancelled.length,
+      upcoming: tabCount(upcomingQuery, upcomingQuery, loadedTabs.has("upcoming")),
+      past: tabCount(pastQuery, pastCountQuery, loadedTabs.has("past")),
+      cancelled: tabCount(cancelledQuery, cancelledCountQuery, loadedTabs.has("cancelled")),
     }),
-    [grouped],
+    [
+      upcomingQuery,
+      pastQuery,
+      cancelledQuery,
+      pastCountQuery,
+      cancelledCountQuery,
+      loadedTabs,
+    ],
   );
 
   const visible = grouped[activeTab] ?? [];
 
-  async function refetchAll() {
-    await Promise.all([upcomingQuery.refetch(), pastQuery.refetch(), cancelledQuery.refetch()]);
+  const allAppointments = useMemo(
+    () => [...grouped.upcoming, ...grouped.past, ...grouped.cancelled],
+    [grouped],
+  );
+
+  useMarkCustomerNavSeen(
+    CUSTOMER_NAV_SECTIONS.appointments,
+    allAppointments,
+    (item) => item.bookedAt,
+  );
+
+  const handleTabChange = useCallback((tab) => {
+    if (!TAB_KEYS.includes(tab)) return;
+    setLoadedTabs((prev) => new Set([...prev, tab]));
+    setActiveTab(tab);
+  }, []);
+
+  async function refetchLoadedTabs() {
+    const tasks = TAB_KEYS.filter((tab) => loadedTabs.has(tab)).map((tab) =>
+      tabQueries[tab].refetch(),
+    );
+    if (!loadedTabs.has("past")) tasks.push(pastCountQuery.refetch());
+    if (!loadedTabs.has("cancelled")) tasks.push(cancelledCountQuery.refetch());
+    await Promise.all(tasks);
   }
 
-  async function handleCancelConfirm() {
+  async function handleCancelConfirm(reason = "") {
     if (!cancelTarget || cancelMutation.isPending) return;
     try {
-      await toast.promise(cancelMutation.mutateAsync({ id: cancelTarget.id, reason: "" }), {
+      await toast.promise(cancelMutation.mutateAsync({ id: cancelTarget.id, reason }), {
         loading: "Cancelling booking…",
         success: "Booking cancelled successfully.",
         error: "Could not cancel booking.",
       });
-      await refetchAll();
+      await refetchLoadedTabs();
       setCancelTarget(null);
     } catch {
       /* toast handles error */
@@ -94,7 +152,7 @@ export default function MyAppointments() {
         success: `Review submitted — ${rating} stars. Thanks!`,
         error: "Could not submit review.",
       });
-      await refetchAll();
+      await refetchLoadedTabs();
       setReviewTarget(null);
     } catch {
       /* toast handles error */
@@ -102,17 +160,12 @@ export default function MyAppointments() {
   }
 
   function handleView(appt) {
-    if (isPending) return;
+    if (actionBusy) return;
     router.push(routes.customer.appointmentsDetail(appt.id));
   }
 
-  function handleRebook() {
-    if (isPending) return;
-    router.push(routes.customer.bookAppointment);
-  }
-
   return (
-    <div className="mx-auto max-w-6xl pb-28 md:pb-10">
+    <div className="mx-auto max-w-6xl">
       <header className="mb-6">
         <div className="mb-1 flex items-center gap-2">
           <CalendarClock className="text-primary h-4 w-4" />
@@ -132,15 +185,15 @@ export default function MyAppointments() {
         <AppointmentTabs
           activeTab={activeTab}
           counts={counts}
-          onTabChange={(t) => !isPending && setActiveTab(t)}
-          disabled={isPending}
+          onTabChange={(t) => !actionBusy && handleTabChange(t)}
+          disabled={actionBusy}
         />
       </div>
 
-      {isPending && visible.length === 0 ? (
+      {listLoading ? (
         <LoadingSkeleton />
       ) : isError ? (
-        <ErrorState onRetry={() => refetchAll()} />
+        <ErrorState onRetry={() => refetchLoadedTabs()} />
       ) : visible.length === 0 ? (
         <EmptyState tab={activeTab} />
       ) : (
@@ -152,9 +205,8 @@ export default function MyAppointments() {
                 appt={appt}
                 onView={handleView}
                 onCancel={setCancelTarget}
-                onRebook={handleRebook}
                 onReview={setReviewTarget}
-                disabled={isPending}
+                disabled={actionBusy}
               />
             ))}
           </div>
@@ -181,9 +233,8 @@ export default function MyAppointments() {
                       appt={appt}
                       onView={handleView}
                       onCancel={setCancelTarget}
-                      onRebook={handleRebook}
                       onReview={setReviewTarget}
-                      disabled={isPending}
+                      disabled={actionBusy}
                     />
                   ))}
                 </tbody>

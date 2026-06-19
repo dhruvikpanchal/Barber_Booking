@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import {
   ArrowLeft,
   Award,
@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
 import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
+import { useAdminInvalidation } from "@/client/modules/admin/hooks/useAdminInvalidation.js";
 import { mapBarberRequestDetail } from "@/client/modules/admin/helpers/adminMappers.js";
 import StatusBadge from "@/client/modules/shared/components/ui/StatusBadge";
 import { BARBER_REQUEST_STATUSES } from "@/client/modules/admin/constants/adminConstants.js";
@@ -38,6 +39,7 @@ import {
  * @param {{ id: string }} props
  */
 export default function BarberRequestDetail({ id }) {
+  const invalidate = useAdminInvalidation();
   const {
     data,
     isPending,
@@ -70,7 +72,7 @@ export default function BarberRequestDetail({ id }) {
         success: "Application approved. Barber will receive onboarding email.",
         error: "Could not approve application.",
       });
-      await refetch();
+      await Promise.all([refetch(), invalidate.barberRequests()]);
     } catch {
       /* toast handles error */
     }
@@ -88,7 +90,7 @@ export default function BarberRequestDetail({ id }) {
         },
       );
       setRejectOpen(false);
-      await refetch();
+      await Promise.all([refetch(), invalidate.barberRequests()]);
     } catch {
       /* toast handles error */
     }
@@ -241,20 +243,22 @@ export default function BarberRequestDetail({ id }) {
               </div>
             )}
 
-            <div className="pt-3.5">
-              <p className="font-label-caps text-on-surface-variant text-[11px]">Working hours</p>
-              <ul className="divide-outline-variant/60 border-outline-variant bg-surface-container mt-2 divide-y rounded-lg border">
-                {request.workingHours.map((row) => (
-                  <li
-                    key={row.day}
-                    className="flex items-center justify-between gap-4 px-3 py-2.5 text-sm"
-                  >
-                    <span className="text-on-surface font-medium">{row.day}</span>
-                    <span className="text-on-surface-variant">{row.hours}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {request.workingHours?.length > 0 && (
+              <div className="pt-3.5">
+                <p className="font-label-caps text-on-surface-variant text-[11px]">Working hours</p>
+                <ul className="divide-outline-variant/60 border-outline-variant bg-surface-container mt-2 divide-y rounded-lg border">
+                  {request.workingHours.map((row) => (
+                    <li
+                      key={row.day}
+                      className="flex items-center justify-between gap-4 px-3 py-2.5 text-sm"
+                    >
+                      <span className="text-on-surface font-medium">{row.day}</span>
+                      <span className="text-on-surface-variant">{row.hours}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {request.portfolio && (
               <div className="border-outline-variant/60 mt-4 border-t pt-4">

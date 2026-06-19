@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { ThumbsUp, Flag, Reply, ChevronRight } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";
 import { formatShortDate } from "@/client/lib/format/formatDateTime.js";

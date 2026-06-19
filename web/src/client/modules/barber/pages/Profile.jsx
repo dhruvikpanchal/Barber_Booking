@@ -1,11 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Camera,
-  Eye,
   ImagePlus,
   Mail,
   MapPin,
@@ -21,15 +20,27 @@ import {
   INPUT_CLASS,
   EXP_TIERS,
   SPECIALTIES,
+  MAX_PORTFOLIO_IMAGES,
+  PHONE_PATTERN,
 } from "@/client/modules/barber/constants/barberConstants.js";
 import { Field, IconInput } from "@/client/modules/shared/components/forms/FormPrimitives.jsx";
-import PublicPreview from "@/client/modules/barber/components/Profile/PublicPreview.jsx";
 import SectionCard from "@/client/modules/shared/components/ui/SectionCard";
 import { barberHook } from "@/client/modules/barber/hooks/barberQuery.jsx";
 import {
   mapProfileFromApi,
   mapProfileToApi,
 } from "@/client/modules/barber/helpers/barberMappers.js";
+import {
+  cacheBustUrl,
+  extractPhotoUrl,
+  mergeBarberProfileWithSession,
+  syncProfileAfterMutation,
+  syncProfilePhotoEverywhere,
+} from "@/client/modules/shared/helpers/profilePhotoHelpers.js";
+import { getProfileQueryKey } from "@/client/lib/auth/profileCache.js";
+
+const PORTAL_ROLE = "barber";
+const PROFILE_QUERY_KEY = getProfileQueryKey(PORTAL_ROLE);
 
 function isLocalImage(url) {
   return typeof url === "string" && url.startsWith("blob:");
@@ -43,16 +54,31 @@ function mapGalleryItemFromApi(item) {
   };
 }
 
-function cacheBustUrl(url) {
-  if (!url || url.startsWith("blob:")) return url;
-  const separator = url.includes("?") ? "&" : "?";
-  return `${url}${separator}v=${Date.now()}`;
+function isValidPhone(value) {
+  const trimmed = value?.trim() ?? "";
+  return !trimmed || PHONE_PATTERN.test(trimmed);
 }
 
-function patchProfileCache(queryClient, updates) {
-  queryClient.setQueryData(["barberGetProfile"], (current) =>
-    current ? { ...current, ...updates } : current,
-  );
+function formatSaveError(err) {
+  if (err?.fields && typeof err.fields === "object") {
+    const first = Object.values(err.fields).find(Boolean);
+    if (first) return String(first);
+  }
+  return err?.message || "Could not save profile";
+}
+
+function applyServerProfile(dto, prev) {
+  const mapped = mapProfileFromApi(mergeBarberProfileWithSession(dto));
+  if (!mapped) return prev ?? null;
+
+  const keepPreview =
+    prev?.photoPreview?.startsWith("blob:") ||
+    (prev?.photoPreview && prev.photoPreview !== mapped.photoUrl);
+
+  return {
+    ...mapped,
+    photoPreview: keepPreview ? prev.photoPreview : mapped.photoUrl || mapped.photoPreview || "",
+  };
 }
 
 export default function BarberProfile() {
@@ -73,6 +99,8 @@ export default function BarberProfile() {
   const [profile, setProfile] = useState(null);
   const [saved, setSaved] = useState(false);
   const [activeSection, setActiveSection] = useState("shop");
+  const [isDirty, setIsDirty] = useState(false);
+  const isDirtyRef = useRef(false);
 
   const busy =
     isPending ||
@@ -89,33 +117,26 @@ export default function BarberProfile() {
   }, [isError, error]);
 
   useEffect(() => {
-    if (profileData) setProfile(mapProfileFromApi(profileData));
+    if (!profileData || isDirtyRef.current) return;
+    setProfile((prev) => applyServerProfile(profileData, prev));
   }, [profileData]);
-
-  const displayName = useMemo(
-    () =>
-      profile ? `${profile.firstName} ${profile.lastName}`.trim() || "Your name" : "Your name",
-    [profile],
-  );
-
-  const experienceLabel = useMemo(
-    () => EXP_TIERS.find((t) => t.value === profile?.experience)?.label ?? "—",
-    [profile?.experience],
-  );
 
   const sections = [
     { id: "shop", label: "Shop" },
     { id: "barber", label: "Barber" },
     { id: "portfolio", label: "Gallery" },
     { id: "contact", label: "Contact" },
-    { id: "preview", label: "Preview" },
   ];
 
   const patch = useCallback((updates) => {
+    isDirtyRef.current = true;
+    setIsDirty(true);
     setProfile((prev) => (prev ? { ...prev, ...updates } : prev));
   }, []);
 
   const toggleSpecialty = useCallback((name) => {
+    isDirtyRef.current = true;
+    setIsDirty(true);
     setProfile((prev) =>
       prev
         ? {
@@ -139,12 +160,11 @@ export default function BarberProfile() {
 
       try {
         const result = await uploadMutation.mutateAsync(file);
-        const photoUrl = result?.photoUrl ?? result?.url;
+        const photoUrl = extractPhotoUrl(result);
         if (photoUrl) {
-          patch({ photoPreview: cacheBustUrl(photoUrl) });
-          patchProfileCache(queryClient, { photoUrl });
+          const displayUrl = syncProfilePhotoEverywhere(queryClient, PORTAL_ROLE, photoUrl);
+          patch({ photoPreview: displayUrl });
         }
-        await queryClient.refetchQueries({ queryKey: ["barberGetProfile"] });
         toast.success("Profile photo updated");
         setSaved(true);
         window.setTimeout(() => setSaved(false), 2400);
@@ -164,7 +184,7 @@ export default function BarberProfile() {
       if (!files.length || !profile || busy) return;
       e.target.value = "";
 
-      const slotsLeft = 8 - profile.portfolio.length;
+      const slotsLeft = MAX_PORTFOLIO_IMAGES - profile.portfolio.length;
       const toUpload = files.slice(0, slotsLeft);
 
       for (const file of toUpload) {
@@ -174,7 +194,7 @@ export default function BarberProfile() {
           setProfile((prev) =>
             prev ? { ...prev, portfolio: [...prev.portfolio, mapped] } : prev,
           );
-          queryClient.setQueryData(["barberGetProfile"], (current) => {
+          queryClient.setQueryData(PROFILE_QUERY_KEY, (current) => {
             if (!current) return current;
             const gallery = current.gallery ?? [];
             return {
@@ -196,8 +216,6 @@ export default function BarberProfile() {
           break;
         }
       }
-
-      await queryClient.refetchQueries({ queryKey: ["barberGetProfile"] });
     },
     [profile, busy, uploadGalleryMutation, queryClient],
   );
@@ -241,28 +259,96 @@ export default function BarberProfile() {
 
       try {
         await updateGalleryMutation.mutateAsync({ id, alt: caption });
+        queryClient.setQueryData(PROFILE_QUERY_KEY, (current) => {
+          if (!current?.gallery) return current;
+          return {
+            ...current,
+            gallery: current.gallery.map((image) =>
+              image.id === id ? { ...image, alt: caption } : image,
+            ),
+          };
+        });
       } catch {
         toast.error("Could not save caption");
       }
     },
-    [profile?.portfolio, busy, updateGalleryMutation],
+    [profile?.portfolio, busy, updateGalleryMutation, queryClient],
   );
+
+  const saveAllCaptions = useCallback(async () => {
+    if (!profile?.portfolio?.length || busy) return;
+
+    const tasks = profile.portfolio
+      .filter((item) => item.id && !isLocalImage(item.url))
+      .map((item) => updateGalleryMutation.mutateAsync({ id: item.id, alt: item.caption ?? "" }));
+
+    if (!tasks.length) return;
+
+    try {
+      await Promise.all(tasks);
+      queryClient.setQueryData(PROFILE_QUERY_KEY, (current) => {
+        if (!current?.gallery) return current;
+        const captions = new Map(profile.portfolio.map((item) => [item.id, item.caption ?? ""]));
+        return {
+          ...current,
+          gallery: current.gallery.map((image) => ({
+            ...image,
+            alt: captions.get(image.id) ?? image.alt,
+          })),
+        };
+      });
+    } catch {
+      toast.error("Some gallery captions could not be saved");
+    }
+  }, [profile?.portfolio, busy, updateGalleryMutation, queryClient]);
 
   const handleSave = useCallback(async () => {
     if (!profile || busy) return;
+
+    const firstName = profile.firstName?.trim() ?? "";
+    const lastName = profile.lastName?.trim() ?? "";
+    const email = profile.email?.trim() ?? "";
+
+    if (!firstName) {
+      toast.error("First name is required.");
+      return;
+    }
+    if (!lastName) {
+      toast.error("Last name is required.");
+      return;
+    }
+    if (!email) {
+      toast.error("Email is missing. Refresh the page and try again.");
+      return;
+    }
+    if (!isValidPhone(profile.phone) || !isValidPhone(profile.shopPhone)) {
+      toast.error("Enter a valid phone number (7–20 digits).");
+      return;
+    }
+
+    const payload = mapProfileToApi(profile);
+
     try {
-      const updated = await toast.promise(updateMutation.mutateAsync(mapProfileToApi(profile)), {
+      const updated = await toast.promise(updateMutation.mutateAsync(payload), {
         loading: "Saving profile…",
         success: "Profile saved",
-        error: "Could not save profile",
+        error: (err) => formatSaveError(err),
       });
-      setProfile(mapProfileFromApi(updated));
-      setSaved(true);
-      window.setTimeout(() => setSaved(false), 2400);
+
+      await saveAllCaptions();
+
+      const mapped = applyServerProfile(updated, profile);
+      if (mapped) {
+        isDirtyRef.current = false;
+        setIsDirty(false);
+        setProfile(mapped);
+        setSaved(true);
+        window.setTimeout(() => setSaved(false), 2400);
+      }
     } catch {
       /* toast handles error */
     }
-  }, [profile, busy, updateMutation]);
+  }, [profile, busy, updateMutation, queryClient, saveAllCaptions]);
 
   function scrollToSection(id) {
     setActiveSection(id);
@@ -305,8 +391,7 @@ export default function BarberProfile() {
             My profile
           </h1>
           <p className="text-on-surface-variant max-w-2xl text-sm leading-relaxed">
-            Manage your shop, barber card, portfolio, and contact details. Clients see the preview
-            when browsing and booking.
+            Manage your shop, barber card, portfolio, and contact details.
           </p>
         </div>
 
@@ -332,8 +417,7 @@ export default function BarberProfile() {
         </nav>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_minmax(240px,300px)] lg:items-start lg:gap-6">
-        <div className="space-y-6">
+      <div className="space-y-6">
           <SectionCard
             id="shop"
             icon={Store}
@@ -552,7 +636,7 @@ export default function BarberProfile() {
             id="portfolio"
             icon={ImagePlus}
             title="Portfolio / gallery"
-            description="Photos upload immediately — up to 8 on your public profile."
+            description={`Photos upload immediately — up to ${MAX_PORTFOLIO_IMAGES} on your public profile.`}
           >
             <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {profile.portfolio.map((item) => (
@@ -591,7 +675,7 @@ export default function BarberProfile() {
                   />
                 </li>
               ))}
-              {profile.portfolio.length < 8 ? (
+              {profile.portfolio.length < MAX_PORTFOLIO_IMAGES ? (
                 <li>
                   <label
                     className={`border-outline-variant bg-surface-container text-on-surface-variant flex aspect-square flex-col items-center justify-center gap-2 rounded-lg border border-dashed transition-colors ${fieldDisabled ? "pointer-events-none opacity-50" : "hover:border-primary hover:text-primary cursor-pointer"}`}
@@ -662,23 +746,6 @@ export default function BarberProfile() {
               </div>
             </div>
           </SectionCard>
-        </div>
-
-        <aside id="preview" className="scroll-mt-24 lg:sticky lg:top-4">
-          <SectionCard
-            icon={Eye}
-            title="Public preview"
-            description="Matches your customer-facing profile card."
-          >
-            <div className="-mx-1 sm:mx-0">
-              <PublicPreview
-                profile={profile}
-                displayName={displayName}
-                experienceLabel={experienceLabel}
-              />
-            </div>
-          </SectionCard>
-        </aside>
       </div>
 
       <div className="border-outline-variant bg-surface/95 fixed inset-x-0 bottom-[var(--bottom-nav-height)] z-30 border-t px-4 py-3 backdrop-blur md:static md:bottom-auto md:z-auto md:border-t md:bg-transparent md:px-0 md:py-0 md:pt-6">
@@ -686,7 +753,9 @@ export default function BarberProfile() {
           <p className="text-on-surface-variant text-center text-xs sm:text-left">
             {saved
               ? "Profile saved."
-              : "Gallery photos save on upload. Tap Save profile for other changes."}
+              : isDirty
+                ? "You have unsaved changes."
+                : "Gallery photos save on upload. Tap Save profile for other changes."}
           </p>
           <button
             type="button"

@@ -1,16 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo } from "react";
+import Link from "@/lib/AppLink";
 import {
   Activity,
   ArrowLeft,
   Calendar,
   CalendarCheck,
-  CheckCircle2,
-  DollarSign,
-  Edit3,
-  Eye,
   Loader2,
   Mail,
   MapPin,
@@ -18,10 +14,7 @@ import {
   Scissors,
   Star,
   Store,
-  TrendingUp,
   User,
-  Users,
-  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
@@ -32,7 +25,6 @@ import {
 } from "@/client/modules/admin/helpers/adminMappers.js";
 import { StarRow } from "@/client/modules/shared/components/ui/StarRow.jsx";
 import { formatShortDate } from "@/client/lib/format/formatDateTime.js";
-import { Toast } from "@/client/modules/shared/components/settings/TinyPrimitives.jsx";
 import {
   ACCOUNT_STATUS_CONFIG,
   ACTIVITY_ICONS,
@@ -46,7 +38,6 @@ import {
   Breadcrumb,
   LoadingSkeleton,
   ProfileAvatar,
-  EditBarberModal,
 } from "@/client/modules/admin/components/BarberDetail/Primitives.jsx";
 
 /**
@@ -58,9 +49,6 @@ export default function BarberDetail({ id }) {
 
   const busy = isPending || statusMutation.isPending;
 
-  const [editOpen, setEditOpen] = useState(false);
-  const [localToast, setLocalToast] = useState(null);
-
   useEffect(() => {
     if (isError) {
       toast.error(error?.message || "Could not load barber profile.");
@@ -69,13 +57,8 @@ export default function BarberDetail({ id }) {
 
   const barber = useMemo(() => (data ? mapAdminBarberDetail(data) : null), [data]);
 
-  const showLocalToast = (message, type = "success") => {
-    setLocalToast({ message, type });
-    setTimeout(() => setLocalToast(null), 4000);
-  };
-
   async function handleStatusChange(next) {
-    if (busy) return;
+    if (busy || barber?.accountStatus === next) return;
     try {
       await toast.promise(statusMutation.mutateAsync({ id, status: toBarberStatusApi(next) }), {
         loading: "Updating barber status…",
@@ -86,11 +69,6 @@ export default function BarberDetail({ id }) {
     } catch {
       /* toast handles error */
     }
-  }
-
-  function handleEditSave() {
-    showLocalToast("Profile edits are not yet supported via API.", "info");
-    setEditOpen(false);
   }
 
   if (isPending) {
@@ -163,15 +141,6 @@ export default function BarberDetail({ id }) {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => setEditOpen(true)}
-            className="border-outline-variant bg-surface-container text-on-surface hover:bg-surface-container-high inline-flex items-center gap-2 rounded-md border px-4 py-2.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Edit3 className="h-4 w-4" aria-hidden />
-            Edit barber
-          </button>
           <Link
             href={routes.admin.barbers}
             className="border-outline-variant bg-surface-container text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface inline-flex items-center gap-2 rounded-md border px-4 py-2.5 text-xs font-semibold transition-colors"
@@ -186,7 +155,7 @@ export default function BarberDetail({ id }) {
         <h2 id="performance-heading" className="font-label-caps text-on-surface-variant mb-3">
           Performance overview
         </h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <StatCard
             label="Total appointments"
             value={stats.totalAppointments.toLocaleString()}
@@ -194,40 +163,16 @@ export default function BarberDetail({ id }) {
             icon={CalendarCheck}
           />
           <StatCard
-            label="Completed"
-            value={stats.completed.toLocaleString()}
-            sub={`${Math.round((stats.completed / stats.totalAppointments) * 100) || 0}% completion rate`}
-            icon={CheckCircle2}
-            accent="bg-status-confirmed/15 text-status-confirmed"
+            label="Average rating"
+            value={barber.rating.toFixed(1)}
+            sub={`${barber.reviewCount} review${barber.reviewCount !== 1 ? "s" : ""}`}
+            icon={Star}
           />
           <StatCard
-            label="Customers served"
-            value={stats.customersServed.toLocaleString()}
-            sub="Unique clients"
-            icon={Users}
+            label="Services offered"
+            value={barber.servicesCount}
+            icon={Scissors}
           />
-          <StatCard
-            label="Est. revenue"
-            value={`$${stats.revenue.toLocaleString()}`}
-            sub="Lifetime"
-            icon={DollarSign}
-            accent="bg-primary/15 text-primary"
-          />
-        </div>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          <StatCard
-            label="Cancelled"
-            value={stats.cancelled.toLocaleString()}
-            icon={XCircle}
-            accent="bg-status-cancelled/15 text-status-cancelled"
-          />
-          <StatCard
-            label="Profile views"
-            value={stats.profileViews.toLocaleString()}
-            sub="Last 90 days"
-            icon={Eye}
-          />
-          <StatCard label="Services offered" value={barber.services.length} icon={Scissors} />
         </div>
       </section>
 
@@ -240,33 +185,34 @@ export default function BarberDetail({ id }) {
             <div className="grid gap-0 sm:grid-cols-2">
               <DetailRow label="Full name" value={barber.name} icon={User} />
               <DetailRow label="Barber ID" value={barber.id} icon={User} />
-              <DetailRow label="Gender" value={barber.gender} icon={User} />
               <DetailRow
                 label="Date joined"
                 value={formatShortDate(barber.joinedAt)}
                 icon={Calendar}
               />
             </div>
-            <div className="border-outline-variant/60 mt-4 border-t pt-4">
-              <p className="font-label-caps text-on-surface-variant text-[11px]">Bio / about</p>
-              <p className="text-on-surface mt-2 text-sm leading-relaxed">{barber.bio}</p>
-            </div>
+            {barber.bio ? (
+              <div className="border-outline-variant/60 mt-4 border-t pt-4">
+                <p className="font-label-caps text-on-surface-variant text-[11px]">Bio / about</p>
+                <p className="text-on-surface mt-2 text-sm leading-relaxed">{barber.bio}</p>
+              </div>
+            ) : null}
           </SectionCard>
 
           <SectionCard title="Contact information" description="Reach the barber directly.">
             <DetailRow label="Email" value={barber.email} icon={Mail} />
             <DetailRow label="Phone" value={barber.phone} icon={Phone} />
-            <DetailRow label="Address" value={barber.shop.address} icon={MapPin} />
+            <DetailRow label="City" value={barber.shop.city} icon={MapPin} />
           </SectionCard>
 
-          <SectionCard title="Professional information" description="Shop, services, and schedule.">
+          <SectionCard title="Professional information" description="Shop and specializations.">
             <DetailRow label="Shop name" value={barber.shop.name} icon={Store} />
             <DetailRow
-              label="Years of experience"
-              value={barber.yearsExperience}
-              icon={TrendingUp}
+              label="Services on menu"
+              value={String(barber.servicesCount)}
+              icon={Scissors}
             />
-            {barber.specialties?.length > 0 && (
+            {barber.specialties?.length > 0 ? (
               <div className="border-outline-variant/60 border-b py-3.5">
                 <p className="font-label-caps text-on-surface-variant text-[11px]">
                   Specializations
@@ -283,100 +229,28 @@ export default function BarberDetail({ id }) {
                   ))}
                 </div>
               </div>
-            )}
-            {barber.services.length > 0 ? (
-              <div className="border-outline-variant/60 border-b py-3.5">
-                <p className="font-label-caps text-on-surface-variant text-[11px]">
-                  Services offered
-                </p>
-                <ul className="divide-outline-variant/50 border-outline-variant mt-2 divide-y rounded-lg border">
-                  {barber.services.map((svc) => (
-                    <li
-                      key={svc.id}
-                      className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm"
-                    >
-                      <span className="text-on-surface font-medium">{svc.name}</span>
-                      <span className="text-on-surface-variant shrink-0">
-                        ${svc.price} · {svc.duration} min
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
             ) : (
-              <p className="text-on-surface-variant py-3 text-sm">No services configured.</p>
+              <p className="text-on-surface-variant py-3 text-sm">No specializations listed.</p>
             )}
-            <div className="pt-3.5">
-              <p className="font-label-caps text-on-surface-variant text-[11px]">Working hours</p>
-              <ul className="divide-outline-variant/60 border-outline-variant bg-surface-container mt-2 divide-y rounded-lg border">
-                {barber.workingHours.map((row) => (
-                  <li key={row.day} className="flex justify-between gap-4 px-3 py-2 text-sm">
-                    <span className="text-on-surface font-medium">{row.day}</span>
-                    <span className="text-on-surface-variant">{row.hours}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
           </SectionCard>
 
-          <SectionCard title="Ratings & reviews" description="Customer feedback summary.">
-            <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
-              <div className="shrink-0 text-center sm:w-36">
-                <p className="text-on-surface font-serif text-4xl font-bold">
-                  {barber.rating.toFixed(1)}
-                </p>
-                <div className="mt-2 flex justify-center">
-                  <StarRow rating={barber.rating} />
-                </div>
-                <p className="text-on-surface-variant mt-1 text-xs">
-                  {barber.reviewCount} total reviews
-                </p>
+          <SectionCard title="Ratings & reviews" description="Aggregate rating from customer reviews.">
+            <div className="flex flex-col items-center gap-2 py-2 text-center sm:items-start sm:text-left">
+              <p className="text-on-surface font-serif text-4xl font-bold">
+                {barber.rating.toFixed(1)}
+              </p>
+              <div className="flex justify-center sm:justify-start">
+                <StarRow rating={barber.rating} />
               </div>
-              <div className="min-w-0 flex-1 space-y-2">
-                {barber.ratingBreakdown.map((row) => (
-                  <div key={row.star} className="flex items-center gap-2 text-xs">
-                    <span className="text-on-surface w-8 shrink-0 font-medium">{row.star}★</span>
-                    <div className="bg-surface-container-high h-2 min-w-0 flex-1 overflow-hidden rounded-full">
-                      <div
-                        className="bg-primary h-full rounded-full transition-all"
-                        style={{ width: `${row.percent}%` }}
-                      />
-                    </div>
-                    <span className="text-on-surface-variant w-10 shrink-0 text-right">
-                      {row.count}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="border-outline-variant/60 mt-6 border-t pt-6">
-              <p className="font-label-caps text-on-surface-variant text-[11px]">Recent reviews</p>
-              {barber.recentReviews.length === 0 ? (
-                <p className="text-on-surface-variant mt-4 text-sm">No reviews yet.</p>
+              <p className="text-on-surface-variant text-xs">
+                {barber.reviewCount} total review{barber.reviewCount !== 1 ? "s" : ""}
+              </p>
+              {barber.reviewCount === 0 ? (
+                <p className="text-on-surface-variant mt-2 text-sm">No reviews yet.</p>
               ) : (
-                <ul className="mt-3 space-y-3">
-                  {barber.recentReviews.map((review) => (
-                    <li
-                      key={review.id}
-                      className="border-outline-variant bg-surface-container rounded-lg border p-4"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-on-surface text-sm font-semibold">{review.author}</p>
-                        <span className="text-on-surface-variant inline-flex items-center gap-0.5 text-xs">
-                          <Star className="fill-primary text-primary h-3 w-3" />
-                          {review.rating}
-                        </span>
-                      </div>
-                      <p className="text-on-surface-variant mt-2 text-sm leading-relaxed">
-                        {review.text}
-                      </p>
-                      <p className="text-on-surface-variant/80 mt-2 text-[11px]">
-                        {formatShortDate(review.date)}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
+                <p className="text-on-surface-variant mt-2 text-sm">
+                  Individual review text is not included in the admin barber API.
+                </p>
               )}
             </div>
           </SectionCard>
@@ -427,7 +301,7 @@ export default function BarberDetail({ id }) {
               {statusCfg.description}
             </p>
             <div className="mt-4 space-y-2">
-              {["active", "inactive", "suspended"].map((key) => {
+              {["active", "inactive", "disabled"].map((key) => {
                 const cfg = ACCOUNT_STATUS_CONFIG[key];
                 const selected = barber.accountStatus === key;
                 return (
@@ -461,18 +335,6 @@ export default function BarberDetail({ id }) {
                   {stats.totalAppointments.toLocaleString()}
                 </dd>
               </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-on-surface-variant">Completed</dt>
-                <dd className="text-status-confirmed font-semibold">
-                  {stats.completed.toLocaleString()}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-on-surface-variant">Cancelled</dt>
-                <dd className="text-status-cancelled font-semibold">
-                  {stats.cancelled.toLocaleString()}
-                </dd>
-              </div>
               <div className="border-outline-variant/60 flex justify-between gap-2 border-t pt-3">
                 <dt className="text-on-surface-variant">This month</dt>
                 <dd className="text-on-surface font-semibold">{stats.thisMonth}</dd>
@@ -481,22 +343,6 @@ export default function BarberDetail({ id }) {
           </div>
         </aside>
       </div>
-
-      {editOpen && (
-        <EditBarberModal
-          barber={barber}
-          onClose={() => setEditOpen(false)}
-          onSave={handleEditSave}
-        />
-      )}
-
-      {localToast && (
-        <Toast
-          message={localToast.message}
-          type={localToast.type}
-          onClose={() => setLocalToast(null)}
-        />
-      )}
     </div>
   );
 }

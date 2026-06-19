@@ -1,17 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
-import { CalendarCheck } from "lucide-react";
+import { CalendarCheck, ChevronLeft, ChevronRight, X } from "lucide-react";
 import AppointmentStats from "@/client/modules/admin/components/Appointments/AppointmentStats.jsx";
 import AppointmentFilters from "@/client/modules/admin/components/Appointments/AppointmentFilters.jsx";
 import {
   AppointmentCard,
   AppointmentTableRow,
 } from "@/client/modules/admin/components/Appointments/AppointmentTableRow.jsx";
-import AppointmentDetailDrawer from "@/client/modules/admin/components/Appointments/AppointmentDetailDrawer.jsx";
 import MonitorUpdatesModal from "@/client/modules/admin/components/Appointments/MonitorUpdatesModal.jsx";
 import ModificationHistoryModal from "@/client/modules/admin/components/Appointments/ModificationHistoryModal.jsx";
 import ServiceUpdatedModal from "@/client/modules/admin/components/Appointments/ServiceUpdatedModal.jsx";
@@ -21,15 +20,19 @@ import {
   mapAdminAppointmentStats,
 } from "@/client/modules/admin/helpers/adminMappers.js";
 import { buildStatusCounts } from "@/client/modules/admin/components/Appointments/helpers.jsx";
+import { APPOINTMENTS_PAGE_SIZE } from "@/client/modules/admin/constants/adminConstants.js";
 
 export default function Appointments() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlBarberId = searchParams.get("barberId");
   const [status, setStatus] = useState("all");
   const [dateRange, setDateRange] = useState("all");
   const [city, setCity] = useState("all");
   const [barberId, setBarberId] = useState("all");
   const [query, setQuery] = useState("");
-  const [detailFor, setDetailFor] = useState(null);
+  const [page, setPage] = useState(1);
+  const activeBarberId = urlBarberId ?? barberId;
   const [monitorFor, setMonitorFor] = useState(null);
   const [historyFor, setHistoryFor] = useState(null);
   const [serviceFor, setServiceFor] = useState(null);
@@ -39,18 +42,18 @@ export default function Appointments() {
       status: status === "all" ? undefined : status,
       dateRange: dateRange === "all" ? undefined : dateRange,
       city: city === "all" ? undefined : city,
-      barberId: barberId === "all" ? undefined : barberId,
+      barberId: activeBarberId === "all" ? undefined : activeBarberId,
       q: query.trim() || undefined,
-      page: 1,
-      limit: 100,
+      page,
+      limit: APPOINTMENTS_PAGE_SIZE,
     }),
-    [status, dateRange, city, barberId, query],
+    [status, dateRange, city, activeBarberId, query, page],
   );
 
-  const statsQuery = adminHook.Appointments.useAppointmentStats();
   const listQuery = adminHook.Appointments.useListAppointments(listParams);
+  const barbersQuery = adminHook.Barbers.useListBarbers({ page: 1, limit: 200, sort: "name_asc" });
 
-  const busy = statsQuery.isPending || listQuery.isPending;
+  const busy = listQuery.isPending;
 
   useEffect(() => {
     if (listQuery.isError) {
@@ -58,28 +61,50 @@ export default function Appointments() {
     }
   }, [listQuery.isError, listQuery.error]);
 
-  useEffect(() => {
-    if (statsQuery.isError) {
-      toast.error(statsQuery.error?.message || "Could not load appointment stats.");
-    }
-  }, [statsQuery.isError, statsQuery.error]);
-
   const appointments = useMemo(
     () => (listQuery.data?.items ?? []).map(mapAdminAppointmentListItem),
     [listQuery.data],
   );
 
   const stats = useMemo(
-    () => mapAdminAppointmentStats(statsQuery.data),
-    [statsQuery.data],
+    () => mapAdminAppointmentStats(listQuery.data?.meta?.stats),
+    [listQuery.data?.meta?.stats],
   );
 
   const statusCounts = useMemo(() => buildStatusCounts(appointments), [appointments]);
+
+  const barberOptions = useMemo(
+    () =>
+      (barbersQuery.data?.items ?? []).map((barber) => ({
+        id: barber.id,
+        name: barber.name,
+        shop: typeof barber.shop === "string" ? barber.shop : (barber.shop?.name ?? "Independent"),
+      })),
+    [barbersQuery.data?.items],
+  );
 
   const filtered = useMemo(
     () => [...appointments].sort((a, b) => new Date(b.startAt) - new Date(a.startAt)),
     [appointments],
   );
+
+  const totalPages = listQuery.data?.meta?.totalPages ?? 1;
+  const totalCount = listQuery.data?.meta?.total ?? filtered.length;
+
+  const filteredBarberName = useMemo(() => {
+    if (!urlBarberId || activeBarberId === "all") return null;
+    return barberOptions.find((barber) => barber.id === activeBarberId)?.name ?? null;
+  }, [urlBarberId, activeBarberId, barberOptions]);
+
+  function clearBarberFilter() {
+    setBarberId("all");
+    router.replace(routes.admin.appointments);
+    resetPage();
+  }
+
+  function resetPage() {
+    setPage(1);
+  }
 
   function handleView(appt) {
     if (busy) return;
@@ -131,6 +156,24 @@ export default function Appointments() {
         </p>
       </header>
 
+      {filteredBarberName ? (
+        <div className="border-primary/25 bg-primary/8 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3">
+          <p className="text-on-surface text-sm">
+            Showing appointments for{" "}
+            <span className="font-semibold">{filteredBarberName}</span>
+          </p>
+          <button
+            type="button"
+            onClick={clearBarberFilter}
+            disabled={busy}
+            className="text-primary inline-flex items-center gap-1 text-xs font-semibold hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <X className="h-3.5 w-3.5" aria-hidden />
+            Clear barber filter
+          </button>
+        </div>
+      ) : null}
+
       <AppointmentStats stats={stats} />
 
       <section className="border-outline-variant bg-surface-container-low rounded-xl border">
@@ -142,7 +185,7 @@ export default function Appointments() {
             <div>
               <h2 className="text-on-surface font-serif text-lg font-bold">All bookings</h2>
               <p className="text-on-surface-variant text-sm">
-                {filtered.length} of {listQuery.data?.meta?.total ?? filtered.length} shown
+                {filtered.length} of {totalCount} shown
               </p>
             </div>
           </div>
@@ -150,16 +193,36 @@ export default function Appointments() {
 
         <AppointmentFilters
           status={status}
-          onStatusChange={setStatus}
+          onStatusChange={(value) => {
+            setStatus(value);
+            resetPage();
+          }}
           dateRange={dateRange}
-          onDateRangeChange={setDateRange}
+          onDateRangeChange={(value) => {
+            setDateRange(value);
+            resetPage();
+          }}
           city={city}
-          onCityChange={setCity}
-          barberId={barberId}
-          onBarberChange={setBarberId}
+          onCityChange={(value) => {
+            setCity(value);
+            resetPage();
+          }}
+          barberId={activeBarberId}
+          onBarberChange={(value) => {
+            setBarberId(value);
+            if (urlBarberId) {
+              router.replace(routes.admin.appointments);
+            }
+            resetPage();
+          }}
           query={query}
-          onQueryChange={setQuery}
+          onQueryChange={(value) => {
+            setQuery(value);
+            resetPage();
+          }}
           counts={statusCounts}
+          barbers={barberOptions}
+          barbersLoading={barbersQuery.isPending}
           disabled={busy}
         />
 
@@ -203,9 +266,46 @@ export default function Appointments() {
             </div>
           </>
         )}
+
+        {totalPages > 1 && (
+          <div className="border-outline-variant flex items-center justify-between border-t px-5 py-3 md:px-6">
+            <p className="text-on-surface-variant text-xs">
+              Showing {(page - 1) * APPOINTMENTS_PAGE_SIZE + 1}–
+              {Math.min(page * APPOINTMENTS_PAGE_SIZE, totalCount)} of {totalCount}
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={page === 1 || busy}
+                onClick={() => setPage((p) => p - 1)}
+                className="border-outline-variant text-on-surface-variant hover:bg-surface-container flex h-8 w-8 items-center justify-center rounded-md border transition-colors disabled:opacity-40"
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden />
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setPage(n)}
+                  disabled={busy}
+                  className={`flex h-8 w-8 items-center justify-center rounded-md text-xs font-medium transition-colors ${n === page ? "bg-primary text-on-primary" : "border-outline-variant text-on-surface-variant hover:bg-surface-container border"}`}
+                >
+                  {n}
+                </button>
+              ))}
+              <button
+                type="button"
+                disabled={page === totalPages || busy}
+                onClick={() => setPage((p) => p + 1)}
+                className="border-outline-variant text-on-surface-variant hover:bg-surface-container flex h-8 w-8 items-center justify-center rounded-md border transition-colors disabled:opacity-40"
+              >
+                <ChevronRight className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
-      <AppointmentDetailDrawer appt={detailFor} onClose={() => setDetailFor(null)} />
       <MonitorUpdatesModal appt={monitorFor} onClose={() => setMonitorFor(null)} />
       <ModificationHistoryModal appt={historyFor} onClose={() => setHistoryFor(null)} />
       <ServiceUpdatedModal appt={serviceFor} onClose={() => setServiceFor(null)} />

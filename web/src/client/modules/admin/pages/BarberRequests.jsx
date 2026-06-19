@@ -10,16 +10,16 @@ import {
   RequestCard,
   RequestTableRow,
 } from "@/client/modules/admin/components/BarberRequests/RequestTableRow.jsx";
-import RequestDetailDrawer from "@/client/modules/admin/components/BarberRequests/RequestDetailDrawer.jsx";
 import RejectModal from "@/client/modules/admin/components/BarberRequests/RejectModal.jsx";
 import { BARBER_REQUEST_TABS } from "@/client/modules/admin/constants/adminConstants.js";
 import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
+import { useAdminInvalidation } from "@/client/modules/admin/hooks/useAdminInvalidation.js";
 
 export default function BarberRequests() {
   const router = useRouter();
+  const invalidate = useAdminInvalidation();
   const [tab, setTab] = useState("pending");
   const [query, setQuery] = useState("");
-  const [detailFor, setDetailFor] = useState(null);
   const [rejectFor, setRejectFor] = useState(null);
 
   const listParams = useMemo(
@@ -32,13 +32,11 @@ export default function BarberRequests() {
     [tab, query],
   );
 
-  const statsQuery = adminHook.BarberRequests.useBarberRequestStats();
   const listQuery = adminHook.BarberRequests.useListBarberRequests(listParams);
   const approveMutation = adminHook.BarberRequests.useApproveBarberRequest();
   const rejectMutation = adminHook.BarberRequests.useRejectBarberRequest();
 
   const busy =
-    statsQuery.isPending ||
     listQuery.isPending ||
     approveMutation.isPending ||
     rejectMutation.isPending;
@@ -49,20 +47,16 @@ export default function BarberRequests() {
     }
   }, [listQuery.isError, listQuery.error]);
 
-  useEffect(() => {
-    if (statsQuery.isError) {
-      toast.error(statsQuery.error?.message || "Could not load request stats.");
-    }
-  }, [statsQuery.isError, statsQuery.error]);
-
   const requests = useMemo(() => listQuery.data?.items ?? [], [listQuery.data]);
 
   const stats = useMemo(() => {
-    const pending = statsQuery.data?.pending ?? 0;
-    const approved = statsQuery.data?.approved ?? 0;
-    const rejected = statsQuery.data?.rejected ?? 0;
-    return { pending, approved, rejected };
-  }, [statsQuery.data]);
+    const data = listQuery.data?.meta?.stats;
+    return {
+      pending: data?.pending ?? 0,
+      approved: data?.approved ?? 0,
+      rejected: data?.rejected ?? 0,
+    };
+  }, [listQuery.data?.meta?.stats]);
 
   const tabCounts = useMemo(
     () => ({
@@ -80,7 +74,7 @@ export default function BarberRequests() {
   );
 
   async function refetch() {
-    await Promise.all([listQuery.refetch(), statsQuery.refetch()]);
+    await listQuery.refetch();
   }
 
   async function approve(id) {
@@ -91,9 +85,8 @@ export default function BarberRequests() {
         success: "Application approved. Barber will receive onboarding email.",
         error: "Could not approve application.",
       });
-      setDetailFor((cur) => (cur?.id === id ? { ...cur, status: "approved" } : cur));
       setRejectFor(null);
-      await refetch();
+      await Promise.all([refetch(), invalidate.barberRequests()]);
     } catch {
       /* toast handles error */
     }
@@ -113,9 +106,8 @@ export default function BarberRequests() {
           error: "Could not reject application.",
         },
       );
-      setDetailFor(null);
       setRejectFor(null);
-      await refetch();
+      await Promise.all([refetch(), invalidate.barberRequests()]);
     } catch {
       /* toast handles error */
     }
@@ -273,15 +265,6 @@ export default function BarberRequests() {
         )}
       </section>
 
-      <RequestDetailDrawer
-        request={detailFor}
-        onClose={() => setDetailFor(null)}
-        onApprove={approve}
-        onReject={(req) => {
-          setDetailFor(null);
-          setRejectFor(req);
-        }}
-      />
       <RejectModal request={rejectFor} onClose={() => setRejectFor(null)} onConfirm={reject} />
     </div>
   );

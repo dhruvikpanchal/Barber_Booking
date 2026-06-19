@@ -39,27 +39,39 @@ export default function ServiceChangeCard({ notif, onRead, onDelete }) {
           </div>
         </div>
 
-        <div className="border-outline-variant bg-surface-container-lowest mt-3 ml-11 space-y-3 rounded-md border p-3">
-          <div className="flex items-center gap-2">
-            <BarberAvatar initials={notif.barber.initials} size="sm" />
-            <p className="text-on-surface text-sm font-semibold">{notif.barber.name}</p>
+        {(notif.barber || notif.previousServices || notif.updatedServices) && (
+          <div className="border-outline-variant bg-surface-container-lowest mt-3 ml-11 space-y-3 rounded-md border p-3">
+            {notif.barber && (
+              <div className="flex items-center gap-2">
+                <BarberAvatar initials={notif.barber.initials} size="sm" />
+                <p className="text-on-surface text-sm font-semibold">{notif.barber.name}</p>
+              </div>
+            )}
+            {(notif.previousServices || notif.updatedServices) && (
+              <div className="text-on-surface-variant flex flex-wrap items-center gap-2 text-xs">
+                {notif.previousServices ? (
+                  <span className="border-outline-variant bg-surface-container rounded border px-2 py-1">
+                    {notif.previousServices}
+                  </span>
+                ) : null}
+                {notif.previousServices && notif.updatedServices ? (
+                  <ArrowRight className="text-primary/60 h-3.5 w-3.5 shrink-0" />
+                ) : null}
+                {notif.updatedServices ? (
+                  <span
+                    className={`rounded border px-2 py-1 ${
+                      accepted
+                        ? "border-status-confirmed/30 bg-status-confirmed/10 text-status-confirmed"
+                        : "border-outline-variant bg-surface-container line-through opacity-70"
+                    }`}
+                  >
+                    {notif.updatedServices}
+                  </span>
+                ) : null}
+              </div>
+            )}
           </div>
-          <div className="text-on-surface-variant flex flex-wrap items-center gap-2 text-xs">
-            <span className="border-outline-variant bg-surface-container rounded border px-2 py-1">
-              {notif.previousServices}
-            </span>
-            <ArrowRight className="text-primary/60 h-3.5 w-3.5 shrink-0" />
-            <span
-              className={`rounded border px-2 py-1 ${
-                accepted
-                  ? "border-status-confirmed/30 bg-status-confirmed/10 text-status-confirmed"
-                  : "border-outline-variant bg-surface-container line-through opacity-70"
-              }`}
-            >
-              {notif.updatedServices}
-            </span>
-          </div>
-        </div>
+        )}
 
         <div className="mt-3 ml-11 flex flex-wrap items-center justify-between gap-2">
           <ViewLink href={href} label="View appointment" />

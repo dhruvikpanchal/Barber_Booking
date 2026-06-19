@@ -1,67 +1,47 @@
-import { Star, TrendingUp, ThumbsUp, Award } from "lucide-react";
+import { Star, TrendingUp, ThumbsUp } from "lucide-react";
 import { StarRow } from "@/client/modules/shared/components/ui/StarRow.jsx";
 
-export function ReviewStats({ reviews }) {
-  const avg =
-    reviews.length === 0
-      ? 0
-      : reviews.reduce((s, r) => s + r.rating, 0) / reviews.length;
+export function ReviewStats({ breakdown, replySummary }) {
+  const total = breakdown?.total ?? 0;
+  const avg = breakdown?.average ?? 0;
 
   const distribution = [5, 4, 3, 2, 1].map((star) => {
-    const count = reviews.filter((r) => r.rating === star).length;
-    const pct = reviews.length === 0 ? 0 : (count / reviews.length) * 100;
+    const count = breakdown?.[String(star)] ?? 0;
+    const pct = total === 0 ? 0 : (count / total) * 100;
     return { star, count, pct };
   });
 
-  const replied = reviews.filter((r) => r.reply).length;
-  const totalHelpful = reviews.reduce((s, r) => s + r.helpful, 0);
-
-  const topService = (() => {
-    const freq = {};
-    reviews.forEach((r) => {
-      if (r.rating >= 4) freq[r.service] = (freq[r.service] ?? 0) + 1;
-    });
-    const top = Object.entries(freq).sort((a, b) => b[1] - a[1])[0];
-    return top ? top[0] : "—";
-  })();
+  const replied = replySummary?.replied ?? 0;
+  const replyRate = total === 0 ? 0 : Math.round((replied / total) * 100);
 
   return (
     <div className="grid gap-4 lg:grid-cols-[auto_1fr]">
-      {/* Overall score */}
-      <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-outline-variant bg-surface-container-low px-8 py-6">
+      <div className="border-outline-variant bg-surface-container-low flex flex-col items-center justify-center gap-3 rounded-xl border px-8 py-6">
         <p className="font-label-caps text-on-surface-variant">Overall</p>
-        <p className="font-serif text-6xl font-bold text-on-surface">
-          {avg.toFixed(1)}
-        </p>
+        <p className="text-on-surface font-serif text-6xl font-bold">{avg.toFixed(1)}</p>
         <StarRow rating={Math.round(avg)} size="lg" />
-        <p className="text-sm text-on-surface-variant">
-          {reviews.length} review{reviews.length !== 1 ? "s" : ""}
+        <p className="text-on-surface-variant text-sm">
+          {total} review{total !== 1 ? "s" : ""}
         </p>
       </div>
 
       <div className="space-y-4">
-        {/* Rating distribution */}
-        <div className="rounded-xl border border-outline-variant bg-surface-container-low p-5">
-          <p className="font-label-caps mb-3 text-on-surface-variant">
-            Rating Breakdown
-          </p>
+        <div className="border-outline-variant bg-surface-container-low rounded-xl border p-5">
+          <p className="font-label-caps text-on-surface-variant mb-3">Rating Breakdown</p>
           <div className="space-y-2">
             {distribution.map(({ star, count, pct }) => (
               <div key={star} className="flex items-center gap-3">
-                <span className="flex w-14 shrink-0 items-center gap-1 text-xs text-on-surface-variant">
-                  <Star
-                    className="h-3 w-3 fill-primary text-primary"
-                    aria-hidden
-                  />
+                <span className="text-on-surface-variant flex w-14 shrink-0 items-center gap-1 text-xs">
+                  <Star className="fill-primary text-primary h-3 w-3" aria-hidden />
                   {star}
                 </span>
-                <div className="flex-1 overflow-hidden rounded-full bg-surface-container-high h-2">
+                <div className="bg-surface-container-high h-2 flex-1 overflow-hidden rounded-full">
                   <div
-                    className="h-2 rounded-full bg-primary transition-all duration-500"
+                    className="bg-primary h-2 rounded-full transition-all duration-500"
                     style={{ width: `${pct}%` }}
                   />
                 </div>
-                <span className="w-8 shrink-0 text-right text-xs text-on-surface-variant">
+                <span className="text-on-surface-variant w-8 shrink-0 text-right text-xs">
                   {count}
                 </span>
               </div>
@@ -69,34 +49,29 @@ export function ReviewStats({ reviews }) {
           </div>
         </div>
 
-        {/* Quick stats */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {[
             {
               icon: TrendingUp,
               label: "Reply Rate",
-              value:
-                reviews.length === 0
-                  ? "—"
-                  : `${Math.round((replied / reviews.length) * 100)}%`,
+              value: total === 0 ? "—" : `${replyRate}%`,
             },
-            { icon: ThumbsUp, label: "Helpful Votes", value: totalHelpful },
-            { icon: Award, label: "Top Service", value: topService },
+            {
+              icon: ThumbsUp,
+              label: "Awaiting Reply",
+              value: replySummary?.unreplied ?? 0,
+            },
           ].map(({ icon: Icon, label, value }) => (
             <div
               key={label}
-              className="flex flex-col items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-low p-3 text-center"
+              className="border-outline-variant bg-surface-container-low flex flex-col items-center gap-2 rounded-xl border p-3 text-center"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/15 text-primary">
+              <span className="bg-primary/15 text-primary flex h-9 w-9 items-center justify-center rounded-lg">
                 <Icon className="h-4 w-4" aria-hidden />
               </span>
               <div>
-                <p className="font-label-caps text-on-surface-variant">
-                  {label}
-                </p>
-                <p className="font-serif text-base font-bold text-on-surface truncate">
-                  {value}
-                </p>
+                <p className="font-label-caps text-on-surface-variant">{label}</p>
+                <p className="text-on-surface truncate font-serif text-base font-bold">{value}</p>
               </div>
             </div>
           ))}

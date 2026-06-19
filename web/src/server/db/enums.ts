@@ -57,6 +57,7 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "BOOKING_MODIFICATION_REQUEST",
   "SERVICE_CHANGE_REQUESTED",
   "BOOKING_CANCELLED_BY_CUSTOMER",
+  "NEW_CUSTOMER_REVIEW",
   "BARBER_REQUEST_SUBMITTED",
   "BARBER_REQUEST_APPROVED",
   "BARBER_REQUEST_REJECTED",
@@ -66,4 +67,11 @@ export const notificationTypeEnum = pgEnum("notification_type", [
 export const contactReplyStatusEnum = pgEnum("contact_reply_status", [
   "UNREPLIED",
   "REPLIED",
+]);
+
+export const contactWorkflowStatusEnum = pgEnum("contact_workflow_status", [
+  "NEW",
+  "IN_PROGRESS",
+  "REPLIED",
+  "CLOSED",
 ]);

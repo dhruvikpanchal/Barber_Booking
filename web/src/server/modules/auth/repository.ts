@@ -2,6 +2,7 @@ import { and, eq, gt } from "drizzle-orm";
 import { db, barberRequests, notifications, users } from "@/server/db";
 import { NOTIFICATION_TYPE } from "@/server/modules/shared/constants/notificationTypes";
 import { ROLES } from "@/server/modules/shared/constants/roles";
+import { realtimeToRole } from "@/server/modules/shared/realtime/emit";
 import { BARBER_REQUEST_STATUS } from "@/server/modules/shared/constants/statuses";
 import type { Role } from "@/server/modules/shared/constants/roles";
 
@@ -168,6 +169,14 @@ export const authRepository = {
         metadata: { requestId },
       })),
     );
+
+    realtimeToRole(ROLES.ADMIN, ["notifications", "barber_requests", "nav_badges", "dashboard"], {
+      entityId: requestId,
+      toast: {
+        title: "New barber application",
+        message: `${ownerName} submitted a registration request.`,
+      },
+    });
   },
 
   hasPendingBarberRequest(email: string) {

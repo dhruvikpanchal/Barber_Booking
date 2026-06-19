@@ -2,6 +2,7 @@
 
 import { Activity, Eye, History, MapPin, Scissors, Sparkles, User } from "lucide-react";
 import StatusBadge from "@/client/modules/shared/components/ui/StatusBadge";
+import { formatMoney } from "@/client/lib/format/formatMoney.js";
 import { APPOINTMENT_STATUSES } from "@/client/modules/admin/constants/adminConstants.js";
 
 export function formatWhen(iso) {
@@ -125,7 +126,7 @@ export function AppointmentTableRow({ appt, ...handlers }) {
           <p className="text-primary mt-0.5 text-[11px]">Service updated</p>
         )}
         <p className="text-on-surface-variant mt-0.5 text-xs">
-          ${appt.price} · {appt.duration}m
+          {formatMoney(appt.price)} · {appt.duration}m
         </p>
       </td>
       <td className="px-4 py-3 text-sm">
@@ -167,7 +168,7 @@ export function AppointmentCard({ appt, ...handlers }) {
       </div>
       <p className="text-on-surface mt-3 text-sm">
         {appt.service}
-        <span className="text-on-surface-variant"> · ${appt.price}</span>
+        <span className="text-on-surface-variant"> · {formatMoney(appt.price)}</span>
       </p>
       <div className="mt-3 flex justify-end">
         <AdminActions appt={appt} {...handlers} />

@@ -1,7 +1,7 @@
 "use client";
 
-import { ResponsiveContainer, AreaChart, Area } from "recharts";
-import { ChartContainer } from "./ChartContainer.jsx";
+import { AreaChart, Area } from "recharts";
+import { ChartContainer, ChartResponsiveContainer } from "./ChartContainer.jsx";
 
 export default function SparklineChart({ data = [] }) {
   const chartData = data.map((value, index) => ({
@@ -11,7 +11,7 @@ export default function SparklineChart({ data = [] }) {
 
   return (
       <ChartContainer className="h-14 w-full min-w-0">
-      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+      <ChartResponsiveContainer>
         <AreaChart data={chartData}>
           <defs>
             <linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
@@ -30,7 +30,7 @@ export default function SparklineChart({ data = [] }) {
             activeDot={false}
           />
         </AreaChart>
-      </ResponsiveContainer>
+      </ChartResponsiveContainer>
     </ChartContainer>
   );
 }

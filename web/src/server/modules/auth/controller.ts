@@ -1,7 +1,19 @@
 import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { appConfig } from "@/server/config";
 import { verifyTurnstile } from "@/server/infra/security/turnstile";
 import { authService } from "@/server/modules/auth/service";
+import {
+  buildGoogleAuthorizeUrl,
+  createGoogleOAuthState,
+  exchangeGoogleCodeForIdToken,
+  getRequestOrigin,
+  GOOGLE_HANDOFF_COOKIE,
+  GOOGLE_OAUTH_STATE_COOKIE,
+  oauthCookieOptions,
+  signGoogleHandoff,
+  verifyGoogleHandoff,
+} from "@/server/modules/auth/googleOAuth";
 import {
   barberRegisterSchema,
   customerRegisterSchema,
@@ -15,7 +27,7 @@ import {
 } from "@/server/modules/auth/schema";
 import { created, ok } from "@/server/modules/shared/responses";
 import { parseBody } from "@/server/modules/shared/validation";
-import { ValidationError } from "@/server/modules/shared/helpers/AppError";
+import { AppError, UnauthorizedError, ValidationError } from "@/server/modules/shared/helpers/AppError";
 
 const ALLOWED_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
@@ -108,6 +120,83 @@ export const authController = {
     const input = await parseBody(req, googleAuthSchema);
     const data = await authService.googleSignIn(input);
     return ok(data);
+  },
+
+  async googleAuthorize(req: NextRequest) {
+    const state = createGoogleOAuthState();
+    const redirectUrl = buildGoogleAuthorizeUrl(req, state);
+    const response = NextResponse.redirect(redirectUrl);
+    response.cookies.set(GOOGLE_OAUTH_STATE_COOKIE, state, {
+      ...oauthCookieOptions(),
+      maxAge: 600,
+    });
+    return response;
+  },
+
+  async googleCallback(req: NextRequest) {
+    const origin = getRequestOrigin(req);
+    const loginUrl = new URL("/login", origin);
+    const completeUrl = new URL("/login/google-complete", origin);
+    const error = req.nextUrl.searchParams.get("error");
+    const code = req.nextUrl.searchParams.get("code");
+    const state = req.nextUrl.searchParams.get("state");
+    const savedState = req.cookies.get(GOOGLE_OAUTH_STATE_COOKIE)?.value;
+
+    const clearStateCookie = (response: NextResponse) => {
+      response.cookies.set(GOOGLE_OAUTH_STATE_COOKIE, "", {
+        ...oauthCookieOptions(),
+        maxAge: 0,
+      });
+      return response;
+    };
+
+    if (error) {
+      loginUrl.searchParams.set("error", "Google sign-in was cancelled.");
+      return clearStateCookie(NextResponse.redirect(loginUrl));
+    }
+
+    if (!code || !state || !savedState || state !== savedState) {
+      loginUrl.searchParams.set("error", "Google sign-in failed. Please try again.");
+      return clearStateCookie(NextResponse.redirect(loginUrl));
+    }
+
+    try {
+      const idToken = await exchangeGoogleCodeForIdToken(req, code);
+      const data = await authService.googleSignIn({ idToken });
+      const handoff = signGoogleHandoff(data);
+      const response = NextResponse.redirect(completeUrl);
+      clearStateCookie(response);
+      response.cookies.set(GOOGLE_HANDOFF_COOKIE, handoff, {
+        ...oauthCookieOptions(),
+        maxAge: 120,
+      });
+      return response;
+    } catch (err) {
+      const message =
+        err instanceof AppError
+          ? err.message
+          : "Google sign-in failed. Please try again.";
+      loginUrl.searchParams.set("error", message);
+      return clearStateCookie(NextResponse.redirect(loginUrl));
+    }
+  },
+
+  async googleComplete(req: NextRequest) {
+    const handoffToken = req.cookies.get(GOOGLE_HANDOFF_COOKIE)?.value;
+    if (!handoffToken) {
+      throw new UnauthorizedError("Google sign-in session expired. Please try again.");
+    }
+
+    const payload = verifyGoogleHandoff(handoffToken);
+    const response = ok({
+      user: payload.user,
+      tokens: payload.tokens,
+    });
+    response.cookies.set(GOOGLE_HANDOFF_COOKIE, "", {
+      ...oauthCookieOptions(),
+      maxAge: 0,
+    });
+    return response;
   },
 
   async refresh(req: NextRequest) {

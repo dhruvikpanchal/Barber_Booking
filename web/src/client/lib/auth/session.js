@@ -9,6 +9,7 @@ import {
   getRefreshToken,
   setAuthTokens,
 } from "@/lib/axios";
+import { authUserToStoredUser } from "@/client/lib/auth/profileCache.js";
 
 const ROLE_KEY = "io.auth.role";
 
@@ -85,13 +86,18 @@ export function clearAuthSession() {
   if (typeof window === "undefined") return;
   localStorage.removeItem(ROLE_KEY);
   localStorage.removeItem(USER_KEY);
+  window.dispatchEvent(new CustomEvent("io:auth-updated"));
 }
 
 export function persistAuthSession({ tokens, user, portalRole }) {
   if (tokens) setAuthTokens(tokens);
   if (typeof window === "undefined") return;
   if (portalRole) localStorage.setItem(ROLE_KEY, portalRole);
-  if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+  if (user) {
+    const normalized = authUserToStoredUser(user) ?? user;
+    localStorage.setItem(USER_KEY, JSON.stringify(normalized));
+  }
+  window.dispatchEvent(new CustomEvent("io:auth-updated"));
 }
 
 export function patchStoredUser(updates) {
@@ -99,6 +105,7 @@ export function patchStoredUser(updates) {
   const user = getStoredUser();
   if (!user) return;
   localStorage.setItem(USER_KEY, JSON.stringify({ ...user, ...updates }));
+  window.dispatchEvent(new CustomEvent("io:user-updated"));
 }
 
 export async function refreshAccessToken() {

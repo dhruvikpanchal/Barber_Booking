@@ -59,13 +59,22 @@ export function TextArea({ className = "", rows = 4, ...props }) {
   );
 }
 
-export function SaveButton({ onClick, saving, label = "SAVE CHANGES", icon: Icon }) {
+export function SaveButton({
+  onClick,
+  saving,
+  label = "SAVE CHANGES",
+  icon: Icon,
+  type = "submit",
+  className = "",
+  ...props
+}) {
   return (
     <button
-      type="button"
+      type={type}
       onClick={onClick}
       disabled={saving}
-      className="bg-primary text-on-primary flex items-center gap-2 rounded-md px-5 py-2.5 text-xs font-semibold tracking-[0.12em] transition-all hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30"
+      className={`bg-primary text-on-primary flex items-center gap-2 rounded-md px-5 py-2.5 text-xs font-semibold tracking-[0.12em] transition-all hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 ${className}`}
+      {...props}
     >
       {saving ? (
         <>

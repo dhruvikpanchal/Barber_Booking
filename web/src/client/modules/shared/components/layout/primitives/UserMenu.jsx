@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { ChevronDown, LogOut, Settings, User } from "lucide-react";
 import { UserAvatar } from "@/client/modules/shared/components/ui/UserAvatar.jsx";
 import { authServices } from "@/client/modules/auth/services/authServices";
@@ -63,6 +63,7 @@ export default function UserMenu({
             <Link
               onClick={() => setOpen(false)}
               href={profileHref}
+              prefetch={false}
               className="text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface flex items-center gap-3 px-4 py-2"
             >
               <User className="h-4 w-4" /> Profile
@@ -70,6 +71,7 @@ export default function UserMenu({
             <Link
               onClick={() => setOpen(false)}
               href={settingsHref}
+              prefetch={false}
               className="text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface flex items-center gap-3 px-4 py-2"
             >
               <Settings className="h-4 w-4" /> Settings

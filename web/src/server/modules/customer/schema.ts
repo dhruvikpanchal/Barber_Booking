@@ -26,6 +26,15 @@ const PHONE_REGEX = /^\+?[\d\s\-().]{7,20}$/;
 const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
+/** `Date.getTimezoneOffset()` from the client — aligns wall-clock dates across client/server. */
+const timezoneOffsetField = z.coerce
+  .number()
+  .int()
+  .min(-840)
+  .max(840)
+  .optional()
+  .default(0);
+
 const phoneField = z
   .string()
   .regex(PHONE_REGEX, "Invalid phone number")
@@ -105,6 +114,12 @@ export const createAppointmentSchema = z.object({
   startAt: z.coerce.date().refine((d) => d > new Date(), {
     message: "Appointment must be scheduled in the future",
   }),
+  /** Calendar date the customer selected (`YYYY-MM-DD`) — used for slot/working-hours checks. */
+  date: dateField("Date"),
+  /** Local time slot id (`HH:mm`) — must match `startAt` when combined with `date`. */
+  time: z.string().regex(TIME_REGEX, "Invalid time"),
+  /** Browser `Date.getTimezoneOffset()` for wall-clock date/time interpretation. */
+  timezoneOffsetMinutes: timezoneOffsetField,
   notes: z.string().trim().max(MAX_APPOINTMENT_NOTES_LENGTH).optional().or(z.literal("")),
 });
 
@@ -150,6 +165,7 @@ export const availableSlotsQuerySchema = z.object({
       if (!v) return undefined;
       return Array.isArray(v) ? v : [v];
     }),
+  timezoneOffsetMinutes: timezoneOffsetField,
 });
 
 /** POST /api/v1/customer/booking/confirm — alias of createAppointmentSchema */

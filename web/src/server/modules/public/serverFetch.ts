@@ -15,6 +15,11 @@ const EMPTY_BARBERS_LIST = {
   meta: { total: 0, page: 1, limit: 50, totalPages: 1 },
 };
 
+const EMPTY_SERVICES_LIST = {
+  items: [],
+  meta: { total: 0, page: 1, limit: 50, totalPages: 1 },
+};
+
 async function withDatabaseFallback<T>(
   label: string,
   fn: () => Promise<T>,
@@ -48,6 +53,23 @@ export const getCachedBarbersList = unstable_cache(
   { revalidate: 30 },
 );
 
+export const getCachedServicesList = unstable_cache(
+  () =>
+    withDatabaseFallback(
+      "getCachedServicesList",
+      () => publicService.listServices({ page: 1, limit: 50, popular: undefined }),
+      EMPTY_SERVICES_LIST,
+    ),
+  ["public-services-list"],
+  { revalidate: 30 },
+);
+
+export const getCachedContactInfo = unstable_cache(
+  async () => publicService.getContactInfo(),
+  ["public-contact-info"],
+  { revalidate: 3600 },
+);
+
 export function getCachedBarberBySlug(slug: string) {
   return unstable_cache(
     async () => {
@@ -63,6 +85,25 @@ export function getCachedBarberBySlug(slug: string) {
       }
     },
     ["public-barber", slug],
+    { revalidate: 30 },
+  )();
+}
+
+export function getCachedServiceBySlug(slug: string) {
+  return unstable_cache(
+    async () => {
+      try {
+        return await publicService.getServiceBySlug(slug);
+      } catch (error) {
+        if (error instanceof NotFoundError) return null;
+        if (isDatabaseUnavailable(error)) {
+          console.warn(`[serverFetch] getCachedServiceBySlug(${slug}): database unavailable.`);
+          return null;
+        }
+        throw error;
+      }
+    },
+    ["public-service", slug],
     { revalidate: 30 },
   )();
 }

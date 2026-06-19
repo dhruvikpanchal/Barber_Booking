@@ -8,6 +8,15 @@ const REVIEW_EDIT_HOURS = 24;
 
 export const REVIEW_EDIT_MS = REVIEW_EDIT_HOURS * 60 * 60 * 1000;
 
+/** Completed appointment eligible for a first-time review (matches API — no time limit). */
+export function isReviewableAppointment(appointment, reviewedAppointmentIds = new Set()) {
+  if (!appointment || appointment.status !== "completed") return false;
+  if (appointment.reviewed) return false;
+  if (reviewedAppointmentIds.has(appointment.id)) return false;
+  return true;
+}
+
+/** Edit/delete allowed within 24h of posting (matches API `REVIEW_EDIT_WINDOW_MS`). */
 export function canEditReview(review) {
   const msSince = Date.now() - new Date(review.createdAt).getTime();
   return msSince <= REVIEW_EDIT_MS;
@@ -81,8 +90,7 @@ export function RatingInput({ value, onChange }) {
 }
 
 export function ReviewableCard({ appt, onWrite }) {
-  const timeRemaining = timeLeft(appt.completedAt);
-  if (!timeRemaining) return null; // window closed
+  const completedLabel = appt.completedAt ? formatShortDate(appt.completedAt) : null;
 
   return (
     <div className="border-primary/20 bg-primary/5 flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center">
@@ -102,10 +110,12 @@ export function ReviewableCard({ appt, onWrite }) {
             {appt.services.map((s) => s.name).join(", ")}
           </p>
 
-          <p className="text-primary mt-1 flex items-center gap-1 text-[11px] font-medium">
-            <Clock className="h-2.5 w-2.5 shrink-0" />
-            {timeRemaining}
-          </p>
+          {completedLabel ? (
+            <p className="text-on-surface-variant mt-1 flex items-center gap-1 text-[11px] font-medium">
+              <Clock className="h-2.5 w-2.5 shrink-0" />
+              Completed {completedLabel}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -174,7 +184,8 @@ export function EmptyState({ onBrowse }) {
       </div>
       <p className="text-on-surface font-semibold">No reviews yet</p>
       <p className="text-on-surface-variant mt-1 max-w-xs text-sm">
-        After a completed appointment, you'll have 24 hours to leave a review for your barber.
+        After a completed appointment, you can leave a review for your barber from here or from
+        My Appointments.
       </p>
       <button
         type="button"

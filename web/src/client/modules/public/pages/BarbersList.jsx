@@ -1,23 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, Users } from "lucide-react";
 import { toast } from "sonner";
 import BarberListCard from "@/client/modules/public/components/Barbers/BarberListCard.jsx";
 import { publicHook } from "@/client/modules/public/hooks/publicQuery.jsx";
+import { ssrQueryOptions } from "@/client/modules/public/helpers/publicQueryHelpers.js";
+
+function matchesBarberQuery(barber, query) {
+  const q = query.toLowerCase();
+  return (
+    barber.name.toLowerCase().includes(q) ||
+    barber.role?.toLowerCase().includes(q) ||
+    barber.city?.toLowerCase().includes(q) ||
+    barber.location?.toLowerCase().includes(q) ||
+    (barber.specialties ?? []).some((item) => item.toLowerCase().includes(q)) ||
+    (barber.services ?? []).some((item) => item.toLowerCase().includes(q))
+  );
+}
 
 export default function BarbersList({ initialBarbers }) {
   const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
-
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(query.trim()), query ? 300 : 0);
-    return () => clearTimeout(timer);
-  }, [query]);
 
   const { data: barbers = [], isPending, isError, error } = publicHook.Barbers.useBarbers(
-    { q: debouncedQuery || undefined, limit: 50 },
-    { initialData: debouncedQuery ? undefined : (initialBarbers ?? undefined) },
+    { limit: 50 },
+    ssrQueryOptions(initialBarbers),
   );
 
   useEffect(() => {
@@ -26,7 +33,12 @@ export default function BarbersList({ initialBarbers }) {
     }
   }, [isError, error]);
 
-  const filtered = barbers;
+  const filtered = useMemo(() => {
+    const trimmed = query.trim();
+    if (!trimmed) return barbers;
+    return barbers.filter((barber) => matchesBarberQuery(barber, trimmed));
+  }, [barbers, query]);
+
   const availableCount = filtered.filter((b) => b.available).length;
 
   return (

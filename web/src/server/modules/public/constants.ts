@@ -1,3 +1,5 @@
+import { regionConfig } from "@/server/config/region";
+
 /** Contact form subjects — matches client `data/contact.js` */
 export const CONTACT_SUBJECTS = [
   "General inquiry",
@@ -12,21 +14,10 @@ export const CONTACT_SUBJECTS = [
 
 /** Public support panel — matches client `CONTACT_INFO` (icons as string ids) */
 export const PUBLIC_CONTACT_INFO = {
-  phone: "+1 (555) 018-2049",
-  email: "support@ironandoak.app",
-  address: {
-    street: "114 West Barrow Street",
-    suite: "Suite 3B",
-    city: "Brooklyn",
-    state: "NY",
-    zip: "11201",
-    country: "United States",
-  },
-  hours: [
-    { days: "Monday – Friday", time: "9:00 AM – 6:00 PM EST" },
-    { days: "Saturday", time: "10:00 AM – 4:00 PM EST" },
-    { days: "Sunday", time: "Closed" },
-  ],
+  phone: regionConfig.contact.phone,
+  email: regionConfig.contact.email,
+  address: regionConfig.contact.address,
+  hours: regionConfig.contact.hours,
   social: [
     {
       id: "facebook",

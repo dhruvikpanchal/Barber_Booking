@@ -1,4 +1,5 @@
 import { buildPaginationMeta } from "@/server/modules/shared/helpers/pagination";
+import { regionConfig } from "@/server/config/region";
 import {
   CUSTOMER_APPOINTMENT_NOTIFICATION_CLIENT_TYPES,
   CUSTOMER_NOTIFICATION_CLIENT_TYPES,
@@ -28,7 +29,7 @@ function formatTime12h(time: string): string {
 }
 
 function formatShortDate(date: Date): string {
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString(regionConfig.locale, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -36,9 +37,9 @@ function formatShortDate(date: Date): string {
 }
 
 function formatAppointmentDate(date: Date): string {
-  const day = date.toLocaleDateString("en-US", { weekday: "short" });
-  const dmy = date.toLocaleDateString("en-US", { day: "numeric", month: "short" });
-  const time = date.toLocaleTimeString("en-US", {
+  const day = date.toLocaleDateString(regionConfig.locale, { weekday: "short" });
+  const dmy = date.toLocaleDateString(regionConfig.locale, { day: "numeric", month: "short" });
+  const time = date.toLocaleTimeString(regionConfig.locale, {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
@@ -88,6 +89,7 @@ type CustomerProfileDbRow = {
   photoUrl: string | null;
   address: string | null;
   createdAt: Date;
+  passwordHash?: string | null;
 };
 
 export type CustomerProfileDto = {
@@ -101,6 +103,7 @@ export type CustomerProfileDto = {
   photoUrl: string | null;
   joinedAt: string;
   initials: string;
+  hasPasswordLogin: boolean;
 };
 
 export function toCustomerProfileDto(row: CustomerProfileDbRow): CustomerProfileDto {
@@ -115,6 +118,7 @@ export function toCustomerProfileDto(row: CustomerProfileDbRow): CustomerProfile
     photoUrl: row.photoUrl,
     joinedAt: row.createdAt.toISOString(),
     initials: toInitials(row.fullName),
+    hasPasswordLogin: Boolean(row.passwordHash),
   };
 }
 
@@ -131,7 +135,7 @@ export type DashboardStatsDto = {
 
 export type DashboardActivityDto = {
   id: string;
-  type: "booked" | "confirmed" | "completed" | "cancelled";
+  type: "booked" | "confirmed" | "completed" | "cancelled" | "update";
   at: string;
   appointmentId: string;
   title: string;
@@ -150,21 +154,28 @@ export type CustomerDashboardDto = {
   };
 };
 
+export function isCustomerUpcomingAppointment(
+  appointment: Pick<CustomerAppointmentListItemDto, "status" | "startAt">,
+  now = Date.now(),
+): boolean {
+  const upcomingStatuses = new Set(["pending", "confirmed", "in-service"]);
+  if (!upcomingStatuses.has(appointment.status)) return false;
+  if (appointment.status === "in-service") return true;
+  return new Date(appointment.startAt).getTime() > now;
+}
+
 export function toDashboardStatsDto(
   appointments: CustomerAppointmentListItemDto[],
 ): DashboardStatsDto {
   const now = Date.now();
-  const upcoming = appointments.filter(
-    (a) =>
-      (a.status === "pending" || a.status === "confirmed" || a.status === "in-service") &&
-      new Date(a.startAt).getTime() > now,
-  );
+  const upcoming = appointments.filter((a) => isCustomerUpcomingAppointment(a, now));
 
   return {
     total: appointments.length,
     completed: appointments.filter((a) => a.status === "completed").length,
     upcoming: upcoming.length,
-    cancelled: appointments.filter((a) => a.status === "cancelled").length,
+    cancelled: appointments.filter((a) => a.status === "cancelled" || a.status === "no-show")
+      .length,
   };
 }
 
@@ -201,26 +212,62 @@ export function buildDashboardActivity(
       });
     }
 
-    const completed = appt.timeline.find((s) => s.key === "completed" && s.at);
-    if (completed && appt.status === "completed") {
+    if (appt.status === "completed" && appt.completedAt) {
       events.push({
         id: `${appt.id}-completed`,
         type: "completed",
-        at: completed.at!,
+        at: appt.completedAt,
         appointmentId: appt.id,
         title: "Visit completed",
         description: `${services} ${withBarber}`,
       });
     }
 
-    if (appt.status === "cancelled" && appt.bookedAt) {
+    for (const change of appt.serviceChangeHistory) {
+      events.push({
+        id: `${appt.id}-sc-req-${change.id}`,
+        type: "update",
+        at: change.requestedAt,
+        appointmentId: appt.id,
+        title: "Service change requested",
+        description: change.customerNote || `Update requested for ${appt.barber.name}`,
+      });
+
+      if (change.resolvedAt) {
+        const label =
+          change.outcome === "accepted"
+            ? "Service change accepted"
+            : change.outcome === "rejected"
+              ? "Service change declined"
+              : "Service change updated";
+        events.push({
+          id: `${appt.id}-sc-res-${change.id}`,
+          type: "update",
+          at: change.resolvedAt,
+          appointmentId: appt.id,
+          title: label,
+          description:
+            change.rejectionNote ||
+            `${appt.barber.name} ${change.outcome === "accepted" ? "approved" : "responded to"} your service update`,
+        });
+      }
+    }
+
+    if (
+      (appt.status === "cancelled" || appt.status === "no-show") &&
+      appt.bookedAt
+    ) {
       events.push({
         id: `${appt.id}-cancelled`,
         type: "cancelled",
         at: appt.cancelledAt ?? appt.bookedAt,
         appointmentId: appt.id,
-        title: "Booking cancelled",
-        description: appt.cancelReason ?? `Appointment with ${appt.barber.name} was cancelled`,
+        title: appt.status === "no-show" ? "Missed appointment" : "Booking cancelled",
+        description:
+          appt.cancelReason ??
+          (appt.status === "no-show"
+            ? `You did not attend your appointment with ${appt.barber.name}`
+            : `Appointment with ${appt.barber.name} was cancelled`),
       });
     }
   }
@@ -294,6 +341,7 @@ export type CustomerBarberSummaryDto = {
   name: string;
   role: string;
   image: string | null;
+  isFavorite?: boolean;
 };
 
 export type CustomerShopSummaryDto = {
@@ -476,6 +524,7 @@ export function toCustomerAppointmentListItemDto(
 export function toCustomerAppointmentDetailDto(
   row: CustomerAppointmentDbRow,
   customer: { fullName: string; email: string; phone: string | null },
+  options?: { barberIsFavorite?: boolean },
 ): CustomerAppointmentDetailDto {
   const base = mapAppointmentBase(row);
   const changes = (row.serviceChangeRequests ?? []).map(toServiceChangeDto);
@@ -483,6 +532,10 @@ export function toCustomerAppointmentDetailDto(
 
   return {
     ...base,
+    barber: {
+      ...base.barber,
+      isFavorite: options?.barberIsFavorite ?? false,
+    },
     confirmedAt: row.confirmedAt?.toISOString() ?? null,
     arrivedAt: row.arrivedAt?.toISOString() ?? null,
     completedAt: row.completedAt?.toISOString() ?? null,
@@ -634,10 +687,8 @@ export type AvailableSlotDto = {
 };
 
 export function toAvailableSlotDto(time: string, available: boolean): AvailableSlotDto {
-  const [h, m] = time.split(":").map(Number);
-  const id = `${h}:${m}`;
   return {
-    id,
+    id: time,
     label: formatTime12h(time),
     available,
     time,

@@ -28,13 +28,15 @@ export function mapAdminUserDetailFromApi(raw) {
       description: `${raw.name} registered on Iron & Oak.`,
       at: new Date(raw.joinedAt).toISOString(),
     },
-    {
-      id: `${raw.id}-act-login`,
-      type: "login",
-      title: "Last login",
-      description: "Most recent session.",
-      at: new Date(raw.lastActive).toISOString(),
-    },
+    raw.lastActive
+      ? {
+          id: `${raw.id}-act-login`,
+          type: "login",
+          title: "Last login",
+          description: "Most recent session.",
+          at: new Date(raw.lastActive).toISOString(),
+        }
+      : null,
     ...bookingHistory.slice(0, 5).map((bk, i) => ({
       id: `${raw.id}-act-bk-${i}`,
       type: "booking",
@@ -42,26 +44,18 @@ export function mapAdminUserDetailFromApi(raw) {
       description: `${bk.service} with ${bk.barber}`,
       at: new Date(bk.date).toISOString(),
     })),
-  ].sort((a, b) => new Date(b.at) - new Date(a.at));
-
-  if (raw.status === "disabled") {
-    activityEvents.unshift({
-      id: `${raw.id}-act-off`,
-      type: "status",
-      title: "Account deactivated",
-      description: "Access restricted by admin.",
-      at: new Date(raw.lastActive).toISOString(),
-    });
-  }
+  ]
+    .filter(Boolean)
+    .sort((a, b) => new Date(b.at) - new Date(a.at));
 
   return {
     ...raw,
-    address: raw.city ?? "—",
-    favoriteBarber: raw.favoriteBarber ?? "—",
-    favoriteShop: "—",
+    address: raw.city ?? null,
+    favoriteBarber: raw.favoriteBarber ?? null,
+    favoriteShop: raw.favoriteShop ?? null,
     bookingHistory,
     upcomingBookings,
-    reviewHistory: [],
+    reviewHistory: raw.reviewHistory ?? [],
     activityLevel: raw.activity,
     activityEvents,
     stats: {

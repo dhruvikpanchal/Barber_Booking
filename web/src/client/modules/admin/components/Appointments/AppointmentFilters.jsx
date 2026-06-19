@@ -5,7 +5,7 @@ import {
   APPOINTMENT_STATUSES,
   APPOINTMENT_STATUS_FILTER_ORDER,
 } from "@/client/modules/admin/constants/adminConstants.js";
-import { BARBERS, CITIES } from "@/client/modules/admin/constants/appointmentsConstants.js";
+import { CITIES } from "@/client/modules/admin/constants/appointmentsConstants.js";
 
 const DATE_OPTIONS = [
   { value: "all", label: "All dates" },
@@ -46,6 +46,8 @@ export default function AppointmentFilters({
   query,
   onQueryChange,
   counts,
+  barbers = [],
+  barbersLoading = false,
   disabled = false,
 }) {
   return (
@@ -120,11 +122,11 @@ export default function AppointmentFilters({
           label="Barber"
           icon={Scissors}
           value={barberId}
-          disabled={disabled}
+          disabled={disabled || barbersLoading}
           onChange={(e) => onBarberChange(e.target.value)}
         >
           <option value="all">All barbers</option>
-          {BARBERS.map((b) => (
+          {barbers.map((b) => (
             <option key={b.id} value={b.id}>
               {b.name} · {b.shop}
             </option>

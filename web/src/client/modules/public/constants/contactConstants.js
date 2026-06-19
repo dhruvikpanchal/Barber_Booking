@@ -1,21 +1,18 @@
 import { FaFacebookF, FaInstagram, FaXTwitter } from "react-icons/fa6";
+import { regionConfig } from "@/config/region.js";
+
+/** Icon lookup for API social entries (server sends id/href only, not React components). */
+export const SOCIAL_ICONS = {
+  facebook: FaFacebookF,
+  instagram: FaInstagram,
+  twitter: FaXTwitter,
+};
 
 export const CONTACT_INFO = {
-  phone: "+1 (555) 018-2049",
-  email: "support@ironandoak.app",
-  address: {
-    street: "114 West Barrow Street",
-    suite: "Suite 3B",
-    city: "Brooklyn",
-    state: "NY",
-    zip: "11201",
-    country: "United States",
-  },
-  hours: [
-    { days: "Monday – Friday", time: "9:00 AM – 6:00 PM EST" },
-    { days: "Saturday", time: "10:00 AM – 4:00 PM EST" },
-    { days: "Sunday", time: "Closed" },
-  ],
+  phone: regionConfig.contact.phone,
+  email: regionConfig.contact.email,
+  address: regionConfig.contact.address,
+  hours: regionConfig.contact.hours,
   social: [
     {
       id: "facebook",

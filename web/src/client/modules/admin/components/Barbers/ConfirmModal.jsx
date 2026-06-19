@@ -30,8 +30,8 @@ export default function ConfirmModal({ open, variant, barber, onClose, onConfirm
         <div className="border-status-cancelled/25 bg-status-cancelled/8 flex items-start gap-2.5 rounded-lg border px-4 py-3">
           <AlertTriangle className="text-status-cancelled mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <p className="text-on-surface-variant text-xs">
-            This will permanently erase all data. Please make sure you have exported any necessary
-            records before continuing.
+            This deactivates the barber account. Profile and appointment history remain in the
+            system and can be restored by re-enabling the account.
           </p>
         </div>
       )}

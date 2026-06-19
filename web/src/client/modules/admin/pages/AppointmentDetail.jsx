@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import {
   Activity,
   ArrowLeft,
@@ -11,8 +11,7 @@ import {
   CalendarDays,
   Clock,
   CreditCard,
-  DollarSign,
-  ExternalLink,
+  IndianRupee,
   Loader2,
   Mail,
   MapPin,
@@ -28,6 +27,7 @@ import { mapAdminAppointmentDetail } from "@/client/modules/admin/helpers/adminM
 import StatusBadge from "@/client/modules/shared/components/ui/StatusBadge";
 import { APPOINTMENT_STATUSES } from "@/client/modules/admin/constants/adminConstants.js";
 import { formatWhen } from "@/client/modules/admin/components/Appointments/AppointmentTableRow.jsx";
+import { formatMoney } from "@/client/lib/format/formatMoney.js";
 import ModificationHistorySection from "@/client/modules/admin/components/Appointments/ModificationHistorySection.jsx";
 import {
   fullDateTime,
@@ -44,13 +44,7 @@ import {
  * @param {{ id: string }} props
  */
 export default function AppointmentDetail({ id }) {
-  const {
-    data,
-    isPending,
-    isError,
-    error,
-    refetch,
-  } = adminHook.Appointments.useAppointment(id);
+  const { data, isPending, isError, error, refetch } = adminHook.Appointments.useAppointment(id);
 
   useEffect(() => {
     if (isError) {
@@ -105,7 +99,7 @@ export default function AppointmentDetail({ id }) {
     : null;
   const barberProfileHref = appt.barber.adminBarberId
     ? routes.admin.barbersDetail(appt.barber.adminBarberId)
-    : routes.public.barbersDetail(appt.barber.id);
+    : routes.admin.barbers;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 pb-8">
@@ -147,9 +141,9 @@ export default function AppointmentDetail({ id }) {
           },
           {
             label: "Total amount",
-            value: `$${appt.price}`,
+            value: formatMoney(appt.price),
             sub: `${appt.duration} min`,
-            icon: DollarSign,
+            icon: IndianRupee,
           },
           {
             label: "Payment",
@@ -231,7 +225,6 @@ export default function AppointmentDetail({ id }) {
                   className="border-outline-variant bg-surface-container text-on-surface hover:bg-surface-container-high mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md border py-2.5 text-xs font-semibold transition-colors"
                 >
                   View customer profile
-                  <ExternalLink className="h-3.5 w-3.5" aria-hidden />
                 </Link>
               )}
             </SectionCard>
@@ -239,7 +232,7 @@ export default function AppointmentDetail({ id }) {
             <SectionCard
               title="Barber details"
               description="Assigned professional"
-               className="h-full"
+              className="h-full"
             >
               <DetailRow label="Barber name" value={appt.barber.name} icon={User} />
               <DetailRow label="Shop" value={appt.barber.shop} icon={Building2} />
@@ -256,7 +249,6 @@ export default function AppointmentDetail({ id }) {
                 className="border-outline-variant bg-surface-container text-on-surface hover:bg-surface-container-high mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md border py-2.5 text-xs font-semibold transition-colors"
               >
                 View barber profile
-                <ExternalLink className="h-3.5 w-3.5" aria-hidden />
               </Link>
             </SectionCard>
           </div>
@@ -273,10 +265,10 @@ export default function AppointmentDetail({ id }) {
               label="Price"
               value={
                 appt.originalService
-                  ? `$${appt.price} (was $${appt.originalPrice ?? appt.price})`
-                  : `$${appt.serviceDetails.price}`
+                  ? `${formatMoney(appt.price)} (was ${formatMoney(appt.originalPrice ?? appt.price)})`
+                  : formatMoney(appt.serviceDetails.price)
               }
-              icon={DollarSign}
+              icon={IndianRupee}
             />
             {appt.originalService && (
               <DetailRow label="Original service" value={appt.originalService} icon={Scissors} />

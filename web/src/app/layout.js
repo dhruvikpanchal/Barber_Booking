@@ -1,5 +1,6 @@
 import { Work_Sans, Noto_Serif, Geist_Mono } from "next/font/google";
 import QueryProvider from "@/client/lib/providers/QueryProvider";
+import SocketProvider from "@/client/lib/providers/SocketProvider";
 import SystemStatusBanner from "@/client/modules/shared/components/layout/SystemStatusBanner.jsx";
 import Toast from "@/client/modules/shared/components/layout/toast/Toast.jsx";
 import "./globals.css";
@@ -22,6 +23,7 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
   display: "swap",
+  preload: false,
 });
 
 export const metadata = {
@@ -39,13 +41,16 @@ export default function RootLayout({ children }) {
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`dark ${workSans.variable} ${notoSerif.variable} ${geistMono.variable} h-full scroll-smooth antialiased`}
     >
       <body className="bg-background text-on-surface min-h-full">
         <QueryProvider>
-          <SystemStatusBanner />
-          {children}
-          <Toast />
+          <SocketProvider>
+            <SystemStatusBanner />
+            {children}
+            <Toast />
+          </SocketProvider>
         </QueryProvider>
       </body>
     </html>

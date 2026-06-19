@@ -1,41 +1,25 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { Star, Clock, Scissors, CheckCircle, Search, MapPin } from "lucide-react";
-import customerServices from "@/client/modules/customer/services/customerServices.jsx";
 
-export default function BookingStep1Barber({ booking, onSelect, disabled = false }) {
+export default function BookingStep1Barber({
+  booking,
+  onSelect,
+  disabled = false,
+  barbers = [],
+  loading = false,
+}) {
   const [query, setQuery] = useState("");
   const [serviceFilter, setServiceFilter] = useState("");
-  const [barbers, setBarbers] = useState([]);
-  const [serviceNames, setServiceNames] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    customerServices
-      .listBookingBarbers({ limit: 50 })
-      .then((result) => {
-        if (cancelled) return;
-        const items = result.items ?? [];
-        setBarbers(items);
-        const names = new Set();
-        for (const b of items) {
-          for (const s of b.services ?? []) names.add(s);
-        }
-        setServiceNames([...names].sort());
-      })
-      .catch(() => {
-        if (!cancelled) setBarbers([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const serviceNames = useMemo(() => {
+    const names = new Set();
+    for (const b of barbers) {
+      for (const s of b.services ?? []) names.add(s);
+    }
+    return [...names].sort();
+  }, [barbers]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -179,7 +163,6 @@ export default function BookingStep1Barber({ booking, onSelect, disabled = false
                         <Clock className="text-primary/70 h-3.5 w-3.5" />
                         {barber.experience} yrs exp
                       </span>
-                      <span className="text-primary font-medium">from ${barber.startingPrice}</span>
                     </div>
 
                     <div className="mt-2 flex flex-wrap gap-1.5">

@@ -1,10 +1,10 @@
-function categoryRatingsFromOverall(rating) {
-  const clamp = (n) => Math.min(5, Math.max(1, Math.round(n)));
+export function enrich(review) {
+  const hasReply = Boolean(review.reply);
   return {
-    service: rating,
-    ambiance: clamp(rating - (rating <= 2 ? 0 : 1)),
-    professionalism: rating,
-    value: clamp(rating - (rating >= 4 ? 0 : 1)),
+    ...review,
+    categoryRatings: review.categoryRatings ?? null,
+    hasReply,
+    history: review.history ?? buildHistory({ ...review, hasReply }),
   };
 }
 
@@ -28,15 +28,4 @@ function buildHistory(review) {
     });
   }
   return items;
-}
-
-export function enrich(review) {
-  const categoryRatings = review.categoryRatings ?? categoryRatingsFromOverall(review.rating);
-  const hasReply = Boolean(review.reply);
-  return {
-    ...review,
-    categoryRatings,
-    hasReply,
-    history: review.history ?? buildHistory({ ...review, hasReply }),
-  };
 }

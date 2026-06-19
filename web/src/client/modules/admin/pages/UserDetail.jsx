@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import {
   Activity,
   ArrowLeft,
@@ -10,7 +10,7 @@ import {
   CalendarCheck,
   CheckCircle2,
   Clock,
-  DollarSign,
+  IndianRupee,
   Loader2,
   Mail,
   MapPin,
@@ -30,6 +30,7 @@ import { USER_STATUS_CONFIG } from "@/client/modules/admin/constants/adminConsta
 import { ActivityBadge, UserStatusBadge } from "@/client/modules/shared/components/ui/badges.jsx";
 import { StarRow } from "@/client/modules/shared/components/ui/StarRow.jsx";
 import { formatShortDate, formatRelativeAge } from "@/client/lib/format/formatDateTime.js";
+import { formatMoney } from "@/client/lib/format/formatMoney.js";
 import {
   fullDateTime,
   SectionCard,
@@ -227,8 +228,8 @@ export default function UserDetail({ id }) {
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <StatCard
             label="Lifetime spend"
-            value={`$${stats.totalSpent.toLocaleString()}`}
-            icon={DollarSign}
+            value={formatMoney(stats.totalSpent)}
+            icon={IndianRupee}
           />
           <StatCard
             label="Reviews given"
@@ -299,7 +300,7 @@ export default function UserDetail({ id }) {
                             <PaymentPill status={bk.paymentStatus} />
                           </td>
                           <td className="text-on-surface py-3 text-right font-semibold">
-                            ${bk.price}
+                            {formatMoney(bk.price)}
                           </td>
                         </tr>
                       ))}
@@ -319,7 +320,7 @@ export default function UserDetail({ id }) {
                             {bk.barber} · {formatShortDate(bk.date)}
                           </p>
                         </div>
-                        <p className="text-on-surface shrink-0 font-semibold">${bk.price}</p>
+                        <p className="text-on-surface shrink-0 font-semibold">{formatMoney(bk.price)}</p>
                       </div>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <BookingStatusPill status={bk.status} />
@@ -444,12 +445,16 @@ export default function UserDetail({ id }) {
             <dl className="mt-3 space-y-3 text-sm">
               <div>
                 <dt className="text-on-surface-variant">Favourite barber</dt>
-                <dd className="text-on-surface mt-0.5 font-medium">{user.favoriteBarber}</dd>
+                <dd className="text-on-surface mt-0.5 font-medium">
+                  {user.favoriteBarber ?? "Not set"}
+                </dd>
               </div>
-              <div>
-                <dt className="text-on-surface-variant">Favourite shop</dt>
-                <dd className="text-on-surface mt-0.5 font-medium">{user.favoriteShop}</dd>
-              </div>
+              {user.favoriteShop ? (
+                <div>
+                  <dt className="text-on-surface-variant">Favourite shop</dt>
+                  <dd className="text-on-surface mt-0.5 font-medium">{user.favoriteShop}</dd>
+                </div>
+              ) : null}
               <div className="border-outline-variant/60 border-t pt-3">
                 <dt className="text-on-surface-variant">Last login</dt>
                 <dd className="text-on-surface mt-0.5 font-medium">

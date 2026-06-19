@@ -1,26 +1,28 @@
 "use client";
 
-import { useEffect } from "react";
-import { toast } from "sonner";
 import { Breadcrumb } from "@/client/modules/public/components/Contact/Primitives.jsx";
 import { ContactForm } from "@/client/modules/public/components/Contact/ContactForm.jsx";
 import { ContactInfoPanel } from "@/client/modules/public/components/Contact/ContactInfoPanel.jsx";
 import { publicHook } from "@/client/modules/public/hooks/publicQuery.jsx";
-import { CONTACT_INFO } from "@/client/modules/public/constants/contactConstants.js";
+import { normalizeContactInfo } from "@/client/modules/public/helpers/contactHelpers.js";
+import {
+  PUBLIC_CONTACT_STALE_MS,
+  ssrQueryOptions,
+} from "@/client/modules/public/helpers/publicQueryHelpers.js";
 
-export default function Contact() {
-  const { data: contactInfo, isPending, isError, error } = publicHook.ContactInfo.useContactInfo();
-  const resolvedContactInfo = contactInfo?.info ?? contactInfo ?? CONTACT_INFO;
+export default function Contact({ initialContactInfo }) {
+  const normalizedInitial = initialContactInfo
+    ? normalizeContactInfo(initialContactInfo)
+    : undefined;
 
-  useEffect(() => {
-    if (isError) {
-      toast.error(error?.message || "Could not load contact information.");
-    }
-  }, [isError, error]);
+  const { data, isFetching } = publicHook.ContactInfo.useContactInfo(
+    ssrQueryOptions(normalizedInitial, { staleTime: PUBLIC_CONTACT_STALE_MS }),
+  );
+  const { info: contactInfo } = data ?? normalizeContactInfo(null);
 
   return (
     <div className="mx-auto w-full max-w-6xl min-w-0 px-4 pt-4 pb-24 md:px-16">
-      <Breadcrumb disabled={isPending} />
+      <Breadcrumb />
 
       <header className="mt-5 max-w-2xl">
         <p className="font-label-caps text-primary">Support</p>
@@ -52,12 +54,12 @@ export default function Contact() {
           </header>
 
           <div className="p-5 sm:p-6">
-            <ContactForm disabled={isPending} />
+            <ContactForm />
           </div>
         </section>
 
         <div className="lg:sticky lg:top-28">
-          <ContactInfoPanel contactInfo={resolvedContactInfo} disabled={isPending} />
+          <ContactInfoPanel contactInfo={contactInfo} disabled={isFetching && !normalizedInitial} />
         </div>
       </div>
 

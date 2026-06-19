@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { routes } from "@/client/config/routes/routes";
 
 export default function AboutPage() {

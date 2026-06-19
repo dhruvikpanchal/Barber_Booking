@@ -1,7 +1,8 @@
 "use client";
 
-import { ResponsiveContainer, AreaChart, Area, CartesianGrid, Tooltip } from "recharts";
-import { ChartContainer } from "./ChartContainer.jsx";
+import { AreaChart, Area, CartesianGrid } from "recharts";
+import { ChartContainer, ChartResponsiveContainer } from "./ChartContainer.jsx";
+import ChartTooltip from "./ChartTooltip.jsx";
 
 export default function AreaSeriesPanel({
   data = [],
@@ -16,7 +17,7 @@ export default function AreaSeriesPanel({
 
   const chart = (
     <ChartContainer className="h-40 w-full min-w-0 sm:h-44">
-      <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+      <ChartResponsiveContainer>
         <AreaChart data={chartData}>
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -27,7 +28,7 @@ export default function AreaSeriesPanel({
 
           <CartesianGrid strokeDasharray="3 4" vertical={false} opacity={0.08} />
 
-          <Tooltip />
+          <ChartTooltip />
 
           <Area
             type="monotone"
@@ -44,7 +45,7 @@ export default function AreaSeriesPanel({
             className="text-primary"
           />
         </AreaChart>
-      </ResponsiveContainer>
+      </ChartResponsiveContainer>
     </ChartContainer>
   );
 

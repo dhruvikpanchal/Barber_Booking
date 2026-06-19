@@ -10,9 +10,7 @@ import {
   Trash2,
   CheckCircle,
   XCircle,
-  CalendarCheck,
 } from "lucide-react";
-import { formatLastVisited } from "@/client/modules/customer/helpers/favoritesHelpers.js";
 
 function StarRow({ rating, yourRating }) {
   return (
@@ -84,7 +82,7 @@ export default function SavedBarberCard({ barber, onRemove, onBook, disabled = f
         onClick={handleRemove}
         disabled={disabled || removing}
         title="Remove from favorites"
-        className="border-outline-variant bg-surface-container/80 text-on-surface-variant hover:border-status-cancelled/40 hover:bg-status-cancelled/10 hover:text-status-cancelled absolute top-3 left-3 z-10 flex h-8 w-8 items-center justify-center rounded-full border opacity-0 backdrop-blur-sm transition-all group-hover:opacity-100"
+        className="border-outline-variant bg-surface-container/80 text-on-surface-variant hover:border-status-cancelled/40 hover:bg-status-cancelled/10 hover:text-status-cancelled absolute top-3 left-3 z-10 flex h-8 w-8 items-center justify-center rounded-full border opacity-100 backdrop-blur-sm transition-all lg:opacity-0 lg:group-hover:opacity-100"
       >
         <Trash2 className="h-3.5 w-3.5" />
       </button>
@@ -124,12 +122,6 @@ export default function SavedBarberCard({ barber, onRemove, onBook, disabled = f
             <Clock className="text-primary/60 h-3.5 w-3.5 shrink-0" />
             Next: <span className="text-on-surface font-medium">{barber.nextAvailable}</span>
           </p>
-          <p className="flex items-center gap-2">
-            <CalendarCheck className="text-primary/60 h-3.5 w-3.5 shrink-0" />
-            {barber.totalVisits > 0
-              ? `${barber.totalVisits} visits · Last ${formatLastVisited(barber.lastVisited)}`
-              : "No visits yet"}
-          </p>
         </div>
 
         {/* Specialties */}
@@ -145,15 +137,8 @@ export default function SavedBarberCard({ barber, onRemove, onBook, disabled = f
           ))}
         </div>
 
-        {/* Divider */}
-        <div className="border-outline-variant border-t" />
-
-        {/* Price + CTA */}
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-on-surface-variant text-[10px] tracking-wide uppercase">From</p>
-            <p className="text-primary font-serif text-xl font-bold">${barber.startingPrice}</p>
-          </div>
+        {/* CTA */}
+        <div className="border-outline-variant flex justify-end border-t pt-3">
           <button
             type="button"
             onClick={handleBook}

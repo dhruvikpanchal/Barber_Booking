@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo } from "react";
+import Link from "@/lib/AppLink";
 import { notFound } from "next/navigation";
 import { toast } from "sonner";
 import { publicHook } from "@/client/modules/public/hooks/publicQuery.jsx";
-import { publicServices } from "@/client/modules/public/services/publicServices.jsx";
+import {
+  PUBLIC_DETAIL_STALE_MS,
+  ssrQueryOptions,
+} from "@/client/modules/public/helpers/publicQueryHelpers.js";
 import {
   Clock,
   ChevronRight,
@@ -20,7 +23,6 @@ import {
 import { routes } from "@/client/config/routes/routes";
 import { CATEGORY_ICONS } from "@/client/modules/public/constants/serviceConstants.js";
 import { attachIcon } from "@/client/modules/public/helpers/serviceHelpers.js";
-
 
 // Sub-components
 // ---------------------------------------------------------------------------
@@ -110,7 +112,7 @@ function ServiceHero({ service }) {
                 Starting from
               </span>
               <span className="text-primary font-serif text-2xl font-bold">
-                ${service.startingPrice}
+                ₹{service.startingPrice}
               </span>
             </div>
             <div className="flex flex-col gap-0.5">
@@ -200,7 +202,7 @@ function PricingCard({ service }) {
         Pricing
       </p>
       <div className="mt-3 flex items-baseline gap-2">
-        <span className="text-primary font-serif text-4xl font-bold">${service.startingPrice}</span>
+        <span className="text-primary font-serif text-4xl font-bold">₹{service.startingPrice}</span>
         <span className="text-on-surface-variant text-sm">starting from</span>
       </div>
       <p className="text-on-surface-variant mt-3 text-xs leading-relaxed">
@@ -333,10 +335,16 @@ function RelatedServices({ services }) {
  *     return <ServiceDetail id={params.id} />;
  *   }
  */
-export default function ServiceDetail({ id }) {
-  const { data, isPending, isError, error } = publicHook.Services.useService(id);
+export default function ServiceDetail({ id, initialData }) {
+  const { data, isPending, isError, error } = publicHook.Services.useService(
+    id,
+    ssrQueryOptions(initialData, { staleTime: PUBLIC_DETAIL_STALE_MS }),
+  );
   const service = data ? attachIcon(data) : null;
-  const [related, setRelated] = useState([]);
+  const related = useMemo(
+    () => (data?.relatedServices ?? []).map(attachIcon).filter(Boolean),
+    [data?.relatedServices],
+  );
 
   useEffect(() => {
     if (isError) {
@@ -345,33 +353,12 @@ export default function ServiceDetail({ id }) {
   }, [isError, error]);
 
   useEffect(() => {
-    if (!data?.relatedIds?.length) {
-      setRelated([]);
-      return;
-    }
-
-    let cancelled = false;
-
-    Promise.all(
-      data.relatedIds.map((slug) => publicServices.getService(slug).catch(() => null)),
-    ).then((relatedItems) => {
-      if (!cancelled) {
-        setRelated(relatedItems.map(attachIcon).filter(Boolean));
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [data]);
-
-  useEffect(() => {
     if (!isPending && !isError && !service) {
       notFound();
     }
   }, [isPending, isError, service]);
 
-  if (isPending) {
+  if (isPending && !service) {
     return (
       <div className="text-on-surface-variant mx-auto max-w-6xl px-4 py-24 text-center text-sm md:px-16">
         Loading service…

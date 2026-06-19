@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 
 import { ChevronRight, Home } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";

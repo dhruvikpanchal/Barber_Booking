@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Pencil, Trash2, Clock, ChevronDown, ChevronUp, CornerDownRight } from "lucide-react";
+
+import BarberImage from "@/client/modules/customer/components/shared/BarberImage.jsx";
 import {
   canEditReview,
   formatRelative,
@@ -12,78 +14,82 @@ import {
 export function ReviewCard({ review, onEdit, onDelete }) {
   const editable = canEditReview(review);
   const remaining = editable ? timeLeft(review.createdAt) : null;
+
   const [expanded, setExpanded] = useState(false);
-  const longComment = review.comment?.length > 180;
-  const displayComment =
-    longComment && !expanded ? review.comment.slice(0, 180) + "…" : review.comment;
+
+  const longComment = review.comment?.length > 120;
 
   return (
-    <article className="border-outline-variant bg-surface-container-low overflow-hidden rounded-2xl border transition-all">
-      {/* Card header */}
-      <div className="flex items-start gap-4 p-5">
-        {/* Barber avatar */}
-        <div className="border-outline-variant h-12 w-12 shrink-0 overflow-hidden rounded-xl border">
-          <img
-            src={review.barber.image}
-            alt={review.barber.name}
-            className="h-full w-full object-cover"
-          />
-        </div>
+    <article className="border-outline-variant bg-surface-container-low overflow-hidden rounded-xl border transition-all">
+      {/* Header */}
+      <div className="flex items-start gap-3 p-4">
+        <BarberImage
+          src={review.barber.image}
+          name={review.barber.name}
+          className="h-10 w-10 rounded-lg sm:h-12 sm:w-12"
+        />
 
-        {/* Info */}
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <p className="text-on-surface text-sm leading-tight font-semibold">
-                {review.barber.name}
-              </p>
-              <p className="text-on-surface-variant mt-0.5 text-xs">{review.barber.role}</p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-on-surface truncate text-sm font-semibold">{review.barber.name}</p>
+
+              <p className="text-on-surface-variant text-xs">{review.barber.role}</p>
             </div>
-            {/* Actions */}
-            <div className="flex shrink-0 items-center gap-2">
-              {editable && (
+
+            {editable && (
+              <div className="flex shrink-0 gap-2">
                 <button
                   type="button"
                   onClick={() => onEdit(review)}
-                  className="border-outline-variant bg-surface-container text-on-surface hover:bg-surface-container-high flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors"
+                  className="border-outline-variant bg-surface-container text-on-surface hover:bg-surface-container-high flex items-center gap-1 rounded-lg border p-2 text-xs font-semibold transition-colors sm:px-3 sm:py-1.5"
                 >
-                  <Pencil className="h-3 w-3" />
-                  Edit
+                  <Pencil className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Edit</span>
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={() => onDelete(review)}
-                className="border-status-cancelled/30 bg-status-cancelled/5 text-status-cancelled hover:bg-status-cancelled/10 flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors"
-              >
-                <Trash2 className="h-3 w-3" />
-                Delete
-              </button>
-            </div>
+
+                <button
+                  type="button"
+                  onClick={() => onDelete(review)}
+                  className="border-status-cancelled/30 bg-status-cancelled/5 text-status-cancelled hover:bg-status-cancelled/10 flex items-center gap-1 rounded-lg border p-2 text-xs font-semibold transition-colors sm:px-3 sm:py-1.5"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Delete</span>
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Services chips */}
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {review.services.map((s) => (
-              <span
-                key={s}
-                className="border-outline-variant bg-surface-container text-on-surface-variant inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium"
-              >
-                {s}
-              </span>
-            ))}
-          </div>
+          {/* Services */}
+          {review.services?.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {review.services.slice(0, 3).map((service) => (
+                <span
+                  key={service}
+                  className="border-outline-variant bg-surface-container text-on-surface-variant inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium"
+                >
+                  {service}
+                </span>
+              ))}
+
+              {review.services.length > 3 && (
+                <span className="text-on-surface-variant text-[11px]">
+                  +{review.services.length - 3} more
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Rating + date row */}
-      <div className="flex flex-col gap-2 px-5 pb-3 sm:flex-row sm:items-start sm:justify-between">
+      {/* Rating & Date */}
+      <div className="flex flex-col gap-2 px-4 pb-3 sm:flex-row sm:items-center sm:justify-between">
         <StarDisplay rating={review.rating} />
 
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+        <div className="flex flex-wrap items-center gap-2">
           {remaining && (
-            <span className="border-primary/20 bg-primary/8 text-primary flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium">
-              <Clock className="h-2.5 w-2.5 shrink-0" />
+            <span className="border-primary/20 bg-primary/10 text-primary flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium">
+              <Clock className="h-3 w-3" />
               {remaining}
             </span>
           )}
@@ -94,23 +100,30 @@ export function ReviewCard({ review, onEdit, onDelete }) {
         </div>
       </div>
 
-      {/* Comment body */}
+      {/* Comment */}
       {review.comment && (
-        <div className="px-5 pb-4">
-          <p className="text-on-surface text-sm leading-relaxed">{displayComment}</p>
+        <div className="px-4 pb-4">
+          <p
+            className={`text-on-surface text-sm leading-relaxed ${!expanded ? "line-clamp-3" : ""}`}
+          >
+            {review.comment}
+          </p>
+
           {longComment && (
             <button
               type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="text-primary mt-1.5 flex items-center gap-1 text-xs font-medium transition-opacity hover:opacity-80"
+              onClick={() => setExpanded((prev) => !prev)}
+              className="text-primary mt-1 flex items-center gap-1 text-xs font-medium hover:opacity-80"
             >
               {expanded ? (
                 <>
-                  Show less <ChevronUp className="h-3 w-3" />
+                  Show less
+                  <ChevronUp className="h-3 w-3" />
                 </>
               ) : (
                 <>
-                  Read more <ChevronDown className="h-3 w-3" />
+                  Read more
+                  <ChevronDown className="h-3 w-3" />
                 </>
               )}
             </button>
@@ -118,14 +131,16 @@ export function ReviewCard({ review, onEdit, onDelete }) {
         </div>
       )}
 
-      {/* Barber reply */}
+      {/* Barber Reply */}
       {review.barberReply && (
-        <div className="border-outline-variant bg-surface-container mx-5 mb-5 flex gap-3 rounded-xl border p-4">
+        <div className="border-outline-variant bg-surface-container mx-4 mb-4 flex gap-2 rounded-lg border p-3">
           <CornerDownRight className="text-on-surface-variant mt-0.5 h-4 w-4 shrink-0" />
-          <div>
-            <p className="text-on-surface-variant mb-1 text-xs font-semibold tracking-wide uppercase">
-              Barber's Reply
+
+          <div className="min-w-0">
+            <p className="text-on-surface-variant mb-1 text-[11px] font-semibold tracking-wide uppercase">
+              Barber Reply
             </p>
+
             <p className="text-on-surface text-sm leading-relaxed">{review.barberReply}</p>
           </div>
         </div>

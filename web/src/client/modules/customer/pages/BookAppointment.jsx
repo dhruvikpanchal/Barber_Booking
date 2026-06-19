@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import BookingStep4Summary from "@/client/modules/customer/components/Booking/Bo
 import BookingConfirmed from "@/client/modules/customer/components/Booking/BookingConfirmed.jsx";
 import { customerHook } from "@/client/modules/customer/hooks/customerQuery.jsx";
 import { buildStartAt } from "@/client/modules/shared/helpers/buildStartAt";
+import { getBookingTimezoneOffsetMinutes, normalizeTimeKey } from "@/client/modules/shared/helpers/calendarDate.js";
 import { STEPS } from "@/client/modules/customer/constants/BookAppointmentConstants.js";
 
 const INITIAL_BOOKING = {
@@ -19,6 +20,7 @@ const INITIAL_BOOKING = {
   date: null,
   time: null,
   timeLabel: null,
+  notes: "",
 };
 
 function canAdvance(step, booking) {
@@ -110,19 +112,32 @@ export default function BookAppointment() {
   const [step, setStep] = useState(0);
   const [booking, setBooking] = useState(INITIAL_BOOKING);
   const [confirmed, setConfirmed] = useState(false);
+  const [confirmedAppointment, setConfirmedAppointment] = useState(null);
+  const deepLinkHandled = useRef(false);
 
   const { data: barbersResult, isPending: barbersPending } =
     customerHook.Booking.useListBookingBarbers({ limit: 50 });
   const confirmMutation = customerHook.Booking.useConfirmBooking();
 
-  const busy = barbersPending || confirmMutation.isPending;
+  const confirming = confirmMutation.isPending;
+  const busy = barbersPending || confirming;
 
   useEffect(() => {
     const barberId = searchParams.get("barber");
-    if (!barberId || !barbersResult) return;
+    if (!barberId || !barbersResult || deepLinkHandled.current) return;
+
     const items = barbersResult.items ?? [];
     const barber = items.find((b) => b.id === barberId || b.slug === barberId);
-    if (barber) setBooking({ ...INITIAL_BOOKING, barber });
+    if (!barber) return;
+
+    deepLinkHandled.current = true;
+    setBooking({ ...INITIAL_BOOKING, barber });
+
+    const advanceToServices =
+      searchParams.get("step") === "services" || searchParams.get("from") === "favorites";
+    if (advanceToServices) {
+      setStep(1);
+    }
   }, [searchParams, barbersResult]);
 
   const patchBooking = useCallback((updates) => {
@@ -155,13 +170,6 @@ export default function BookAppointment() {
     [patchBooking],
   );
 
-  const handleEditStep = useCallback(
-    (stepIndex) => {
-      if (!busy) setStep(stepIndex);
-    },
-    [busy],
-  );
-
   const handleNext = () => {
     if (!busy && canAdvance(step, booking)) setStep((s) => s + 1);
   };
@@ -170,29 +178,40 @@ export default function BookAppointment() {
   };
 
   const handleConfirm = async () => {
+    const time = normalizeTimeKey(booking.time);
     if (
-      busy ||
+      confirming ||
       !booking.barber ||
       !booking.date ||
-      !booking.time ||
+      !time ||
       booking.services.length === 0
     ) {
       return;
     }
+
+    const notes = booking.notes?.trim() ?? "";
+    if (notes.length > 500) {
+      toast.error("Notes must be 500 characters or fewer.");
+      return;
+    }
+
     try {
-      await toast.promise(
-        confirmMutation.mutateAsync({
-          barberId: booking.barber.slug ?? booking.barber.id,
-          serviceIds: booking.services.map((s) => s.id),
-          startAt: buildStartAt(booking.date, booking.time),
-          notes: booking.notes ?? "",
-        }),
-        {
-          loading: "Confirming your booking…",
-          success: "Appointment booked successfully!",
-          error: "Could not confirm booking. Please try again.",
-        },
-      );
+      const timezoneOffsetMinutes = getBookingTimezoneOffsetMinutes();
+      const payload = {
+        barberId: booking.barber.slug ?? booking.barber.id,
+        serviceIds: booking.services.map((s) => s.id),
+        startAt: buildStartAt(booking.date, time, timezoneOffsetMinutes),
+        date: booking.date,
+        time,
+        timezoneOffsetMinutes,
+        notes,
+      };
+      const result = await toast.promise(confirmMutation.mutateAsync(payload), {
+        loading: "Confirming your booking…",
+        success: "Appointment booked successfully!",
+        error: (err) => err?.message || "Could not confirm booking. Please try again.",
+      });
+      setConfirmedAppointment(result);
       setConfirmed(true);
     } catch {
       /* toast handles error */
@@ -200,25 +219,31 @@ export default function BookAppointment() {
   };
 
   const handleBookAnother = () => {
+    deepLinkHandled.current = false;
     setBooking(INITIAL_BOOKING);
     setStep(0);
     setConfirmed(false);
+    setConfirmedAppointment(null);
     router.push("/customer/book-appointment");
   };
 
-  if (confirmed) {
+  if (confirmed && confirmedAppointment) {
     return (
-      <div className="mx-auto max-w-2xl pb-28 md:pb-8">
-        <BookingConfirmed booking={booking} onBookAnother={handleBookAnother} />
+      <div className="mx-auto max-w-2xl">
+        <BookingConfirmed
+          booking={booking}
+          appointment={confirmedAppointment}
+          onBookAnother={handleBookAnother}
+        />
       </div>
     );
   }
 
   const currentStepMeta = STEPS[step];
-  const isSummaryStep = step === 4;
+  const isSummaryStep = step === 3;
 
   return (
-    <div className="text-on-surface mx-auto w-full max-w-6xl min-w-0 space-y-6 pb-28 md:space-y-8 md:pb-8">
+    <div className="text-on-surface mx-auto w-full max-w-6xl min-w-0 space-y-6 md:space-y-8">
       <header className="mb-6 space-y-1">
         <p className="font-label-caps text-primary">Customer · Booking</p>
         <h1 className="text-on-surface font-serif text-2xl font-bold tracking-tight md:text-3xl">
@@ -250,7 +275,13 @@ export default function BookAppointment() {
 
         <div className="p-5">
           {step === 0 && (
-            <BookingStep1Barber booking={booking} onSelect={handleBarberSelect} disabled={busy} />
+            <BookingStep1Barber
+              booking={booking}
+              onSelect={handleBarberSelect}
+              disabled={busy}
+              barbers={barbersResult?.items ?? []}
+              loading={barbersPending}
+            />
           )}
           {step === 1 && (
             <BookingStep2Services
@@ -269,9 +300,10 @@ export default function BookAppointment() {
           {step === 3 && (
             <BookingStep4Summary
               booking={booking}
+              onNotesChange={(notes) => patchBooking({ notes })}
               onConfirm={handleConfirm}
-              confirming={confirmMutation.isPending}
-              disabled={busy}
+              confirming={confirming}
+              disabled={busy && !confirming}
             />
           )}
         </div>

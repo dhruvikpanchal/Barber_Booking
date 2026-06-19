@@ -1,9 +1,10 @@
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { Calendar, Clock, MapPin, ChevronRight } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";
 import { formatDateTime } from "@/client/modules/customer/helpers/appointmentsHelpers.js";
 import StatusBadge from "@/client/modules/shared/components/ui/StatusBadge";
 import { CUSTOMER_APPOINTMENT_STATUSES } from "@/client/modules/customer/constants/appointmentStatusesConstants.js";
+import BarberThumb from "./BarberThumb.jsx";
 
 export default function NextAppointmentCard({ appointment }) {
   if (!appointment) {
@@ -42,9 +43,7 @@ export default function NextAppointmentCard({ appointment }) {
       </div>
 
       <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:gap-5 sm:p-5">
-        <div className="border-outline-variant relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border sm:h-20 sm:w-20">
-          <img src={appointment.barber.image} alt="" className="h-full w-full object-cover" />
-        </div>
+        <BarberThumb barber={appointment.barber} className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl" />
 
         <div className="min-w-0 flex-1 space-y-3">
           <div>

@@ -1,5 +1,6 @@
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { AlertTriangle, ChevronRight, Flag } from "lucide-react";
+import { routes } from "@/client/config/routes/routes.js";
 
 const SEVERITY = {
   high: "bg-status-cancelled/15 text-status-cancelled border-status-cancelled/30",
@@ -18,14 +19,23 @@ export default function RecentReports({ items = [] }) {
           </h3>
         </div>
         <Link
-          href="/admin/reports"
+          href={routes.admin.reports}
+          prefetch={false}
           className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
         >
           View all <ChevronRight className="h-3 w-3" aria-hidden />
         </Link>
       </header>
       <ul className="divide-y divide-outline-variant/60">
-        {items.map((r) => (
+        {items.length === 0 ? (
+          <li className="px-4 py-8 text-center sm:px-5">
+            <p className="text-on-surface-variant text-sm">No problem reports yet.</p>
+            <p className="text-on-surface-variant/70 mt-1 text-xs">
+              Customer reports submitted via the contact form appear here.
+            </p>
+          </li>
+        ) : (
+          items.map((r) => (
           <li
             key={r.id}
             className="px-4 py-3 transition-colors hover:bg-surface-container sm:px-5 sm:py-3.5"
@@ -65,7 +75,8 @@ export default function RecentReports({ items = [] }) {
               </div>
             </div>
           </li>
-        ))}
+          ))
+        )}
       </ul>
     </section>
   );

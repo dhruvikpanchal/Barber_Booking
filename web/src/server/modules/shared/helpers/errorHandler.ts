@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ZodError } from "zod";
+import { withDbRetry } from "@/server/db/retry";
+import { isTransientDbError, collectErrorText } from "@/server/db/transientErrors";
 import { captureServerException } from "@/server/modules/shared/monitoring/sentry";
 import { AppError, ValidationError } from "@/server/modules/shared/helpers/AppError";
 
@@ -53,7 +55,7 @@ function isNextControlFlowError(err: unknown): boolean {
 export function withErrorHandler(handler: RouteHandler): RouteHandler {
   return async (req, ctx) => {
     try {
-      return await handler(req, ctx);
+      return await withDbRetry(() => handler(req, ctx));
     } catch (err) {
       if (isNextControlFlowError(err)) throw err;
       logRouteError(req, err);
@@ -73,23 +75,11 @@ function zodIssuesToFields(err: ZodError): Record<string, string[]> {
 }
 
 export function isDatabaseUnavailable(err: unknown): boolean {
-  if (!err || typeof err !== "object") return false;
-  const message = [
-    (err as Error).message,
-    String((err as { cause?: unknown }).cause ?? ""),
-    String((err as { cause?: { cause?: unknown } }).cause?.cause ?? ""),
-  ].join(" ");
-  return (
-    message.includes("ECONNREFUSED") ||
-    message.includes("ECONNRESET") ||
-    message.includes("ENOTFOUND") ||
-    message.includes("Failed query") ||
-    message.includes("pool timeout") ||
-    message.includes("DATABASE_URL is not set") ||
-    message.includes("connect ETIMEDOUT") ||
-    message.includes("Connection terminated") ||
-    message.includes("password authentication failed")
-  );
+  if (!err) return false;
+  const message = collectErrorText(err);
+  if (message.includes("DATABASE_URL is not set")) return true;
+  if (message.includes("password authentication failed")) return true;
+  return isTransientDbError(err);
 }
 
 function isQueryBindingError(err: unknown): boolean {

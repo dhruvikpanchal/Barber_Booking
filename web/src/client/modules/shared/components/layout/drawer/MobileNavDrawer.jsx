@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { X } from "lucide-react";
 import Drawer from "@/client/modules/shared/components/ui/Drawer";
+import NavBadge from "@/client/modules/shared/components/layout/primitives/NavBadge.jsx";
 
 export default function MobileNavDrawer({
   open,
@@ -37,10 +38,18 @@ export default function MobileNavDrawer({
               <li key={it.label}>
                 <Link
                   href={it.href || "#"}
+                  prefetch={false}
                   onClick={onClose}
-                  className="flex h-20 flex-col items-center justify-center gap-2 rounded-lg border border-outline-variant bg-surface-container px-2 text-center text-xs text-on-surface-variant hover:border-primary hover:text-primary"
+                  className="relative flex h-20 flex-col items-center justify-center gap-2 rounded-lg border border-outline-variant bg-surface-container px-2 text-center text-xs text-on-surface-variant hover:border-primary hover:text-primary"
                 >
-                  {Icon ? <Icon className="h-5 w-5" /> : null}
+                  <span className="relative">
+                    {Icon ? <Icon className="h-5 w-5" /> : null}
+                    <NavBadge
+                      count={it.badgeCount ?? 0}
+                      compact
+                      className="right-0 top-0 translate-x-1/2 -translate-y-1/2 ring-surface-container"
+                    />
+                  </span>
                   <span className="leading-tight">{it.label}</span>
                 </Link>
               </li>

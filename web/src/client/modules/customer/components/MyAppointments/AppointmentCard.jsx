@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
-import { MapPin, Clock, Eye, RotateCcw, XCircle, Star, Calendar, ChevronRight } from "lucide-react";
+import Link from "@/lib/AppLink";
+import { MapPin, Clock, Eye, XCircle, Star, Calendar, ChevronRight } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";
 import StatusBadge from "@/client/modules/shared/components/ui/StatusBadge";
 import { CUSTOMER_APPOINTMENT_STATUSES } from "@/client/modules/customer/constants/appointmentStatusesConstants.js";
+import BarberImage from "@/client/modules/customer/components/shared/BarberImage.jsx";
 import {
   formatDateTime,
   formatShopLabel,
@@ -16,7 +17,6 @@ export default function AppointmentCard({
   appt,
   onView,
   onCancel,
-  onRebook,
   onReview,
   disabled = false,
 }) {
@@ -30,13 +30,11 @@ export default function AppointmentCard({
       <div className="flex items-start gap-3.5 p-4">
         {/* Barber photo */}
         <div className="relative shrink-0">
-          <div className="border-outline-variant h-12 w-12 overflow-hidden rounded-xl border">
-            <img
-              src={appt.barber.image}
-              alt={appt.barber.name}
-              className="h-full w-full object-cover"
-            />
-          </div>
+          <BarberImage
+            src={appt.barber.image}
+            name={appt.barber.name}
+            className="h-12 w-12 rounded-xl"
+          />
         </div>
 
         {/* Main info */}
@@ -118,18 +116,6 @@ export default function AppointmentCard({
             <Star className="text-status-pending h-3.5 w-3.5" />
             Reviewed
           </span>
-        )}
-
-        {(appt.status === "completed" || appt.status === "cancelled") && (
-          <button
-            type="button"
-            onClick={() => onRebook(appt)}
-            disabled={disabled}
-            className="border-outline-variant text-on-surface-variant hover:bg-surface-container hover:text-on-surface inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Rebook
-          </button>
         )}
       </div>
     </article>

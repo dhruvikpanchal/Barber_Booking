@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  SERVICES,
   SORT_OPTIONS,
   FILTER_OPTIONS,
   PAGE_SIZE,
@@ -24,22 +23,40 @@ import { ReviewStats } from "@/client/modules/barber/components/Reviews/ReviewSt
 import { ReplyModal } from "@/client/modules/barber/components/Reviews/ReplyModal.jsx";
 import { ReviewCard } from "@/client/modules/barber/components/Reviews/ReviewCard.jsx";
 import { barberHook } from "@/client/modules/barber/hooks/barberQuery.jsx";
-import { mapReview } from "@/client/modules/barber/helpers/barberMappers.js";
+import { useBarberInvalidation } from "@/client/modules/barber/hooks/useBarberInvalidation.js";
+import { buildPaginationRange } from "@/client/modules/shared/helpers/paginationRange.js";
+import { mapReview, mapServiceFromApi } from "@/client/modules/barber/helpers/barberMappers.js";
+
+const ALL_SERVICES = "All Services";
 
 export default function BarberReviews() {
+  const invalidate = useBarberInvalidation();
   const [query, setQuery] = useState("");
   const [filterStar, setFilterStar] = useState("all");
-  const [filterService, setFilterService] = useState("All Services");
+  const [filterService, setFilterService] = useState(ALL_SERVICES);
   const [sortKey, setSortKey] = useState("recent");
   const [page, setPage] = useState(1);
   const [replyTarget, setReplyTarget] = useState(null);
   const [serviceOpen, setServiceOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
 
-  const reviewsQuery = barberHook.Reviews.useListReviews({ page, limit: 100, q: query || undefined });
+  const listParams = useMemo(
+    () => ({
+      page,
+      limit: PAGE_SIZE,
+      sort: sortKey,
+      rating: filterStar,
+      ...(filterService !== ALL_SERVICES ? { service: filterService } : {}),
+      ...(query.trim() ? { q: query.trim() } : {}),
+    }),
+    [page, sortKey, filterStar, filterService, query],
+  );
+
+  const reviewsQuery = barberHook.Reviews.useListReviews(listParams);
+  const servicesQuery = barberHook.Services.useListServices();
   const replyMutation = barberHook.Reviews.useReplyToReview();
 
-  const busy = reviewsQuery.isPending || replyMutation.isPending;
+  const busy = reviewsQuery.isPending || replyMutation.isPending || servicesQuery.isPending;
 
   useEffect(() => {
     if (reviewsQuery.isError) {
@@ -49,8 +66,24 @@ export default function BarberReviews() {
 
   const reviews = useMemo(
     () => (reviewsQuery.data?.reviews ?? []).map(mapReview),
-    [reviewsQuery.data],
+    [reviewsQuery.data?.reviews],
   );
+
+  const ratingBreakdown = reviewsQuery.data?.ratingBreakdown;
+  const replySummary = reviewsQuery.data?.replySummary;
+  const meta = reviewsQuery.data?.meta;
+
+  const serviceOptions = useMemo(() => {
+    const names = (servicesQuery.data?.services ?? [])
+      .map(mapServiceFromApi)
+      .filter((s) => s.active)
+      .map((s) => s.name)
+      .filter(Boolean);
+    return [ALL_SERVICES, ...names];
+  }, [servicesQuery.data?.services]);
+
+  const totalPages = meta?.totalPages ?? 1;
+  const totalResults = meta?.total ?? 0;
 
   async function handleReply(id, text) {
     if (busy) return;
@@ -66,57 +99,29 @@ export default function BarberReviews() {
         success: "Reply posted successfully.",
         error: "Could not post reply.",
       });
-      await reviewsQuery.refetch();
+      await Promise.all([reviewsQuery.refetch(), invalidate.reviews()]);
       setReplyTarget(null);
     } catch {
       /* toast handles error */
     }
   }
 
-  const filtered = useMemo(() => {
-    let list = reviews.filter((r) => !r.reported);
-
-    if (filterStar !== "all") {
-      list = list.filter((r) => r.rating === Number(filterStar));
-    }
-    if (filterService !== "All Services") {
-      list = list.filter((r) => r.service === filterService);
-    }
-    if (query.trim()) {
-      const q = query.trim().toLowerCase();
-      list = list.filter(
-        (r) =>
-          r.customer.name.toLowerCase().includes(q) ||
-          r.text.toLowerCase().includes(q) ||
-          r.service.toLowerCase().includes(q),
-      );
-    }
-
-    return list.slice().sort((a, b) => {
-      if (sortKey === "recent") return new Date(b.date) - new Date(a.date);
-      if (sortKey === "highest") return b.rating - a.rating;
-      if (sortKey === "lowest") return a.rating - b.rating;
-      if (sortKey === "helpful") return b.helpful - a.helpful;
-      return 0;
-    });
-  }, [reviews, filterStar, filterService, query, sortKey]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
   function resetFilters() {
     if (busy) return;
     setFilterStar("all");
-    setFilterService("All Services");
+    setFilterService(ALL_SERVICES);
     setQuery("");
     setSortKey("recent");
     setPage(1);
   }
 
   const isFiltered =
-    filterStar !== "all" || filterService !== "All Services" || query.trim() !== "";
+    filterStar !== "all" || filterService !== ALL_SERVICES || query.trim() !== "";
 
-  const unreplied = reviews.filter((r) => !r.reply && !r.reported).length;
+  const fiveStarRate =
+    ratingBreakdown?.total > 0
+      ? Math.round(((ratingBreakdown["5"] ?? 0) / ratingBreakdown.total) * 100)
+      : null;
 
   if (reviewsQuery.isPending && reviews.length === 0) {
     return (
@@ -145,19 +150,18 @@ export default function BarberReviews() {
             icon: Star,
             label: "Avg Rating",
             value:
-              reviews.length === 0
-                ? "—"
-                : (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1),
+              ratingBreakdown?.total === 0 ? "—" : (ratingBreakdown?.average ?? 0).toFixed(1),
           },
-          { icon: Users, label: "Total Reviews", value: reviews.length },
-          { icon: MessageSquare, label: "Awaiting Reply", value: unreplied },
+          { icon: Users, label: "Total Reviews", value: ratingBreakdown?.total ?? 0 },
+          {
+            icon: MessageSquare,
+            label: "Awaiting Reply",
+            value: replySummary?.unreplied ?? 0,
+          },
           {
             icon: BarChart2,
             label: "5-Star Rate",
-            value:
-              reviews.length === 0
-                ? "—"
-                : `${Math.round((reviews.filter((r) => r.rating === 5).length / reviews.length) * 100)}%`,
+            value: fiveStarRate == null ? "—" : `${fiveStarRate}%`,
           },
         ].map(({ icon: Icon, label, value }) => (
           <div
@@ -177,7 +181,7 @@ export default function BarberReviews() {
 
       <section>
         <h2 className="font-label-caps text-on-surface-variant mb-4">Review Statistics</h2>
-        <ReviewStats reviews={reviews.filter((r) => !r.reported)} />
+        <ReviewStats breakdown={ratingBreakdown} replySummary={replySummary} />
       </section>
 
       <section className="border-outline-variant bg-surface-container-low rounded-xl border">
@@ -190,7 +194,7 @@ export default function BarberReviews() {
               <div>
                 <h2 className="text-on-surface font-serif text-lg font-bold">All Reviews</h2>
                 <p className="text-on-surface-variant text-sm">
-                  {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+                  {totalResults} result{totalResults !== 1 ? "s" : ""}
                   {isFiltered ? " matching filters" : ""}
                 </p>
               </div>
@@ -258,7 +262,7 @@ export default function BarberReviews() {
               </button>
               {serviceOpen && (
                 <div className="border-outline-variant bg-surface-container absolute top-full right-0 z-20 mt-1 w-48 rounded-lg border shadow-xl">
-                  {SERVICES.map((s) => (
+                  {serviceOptions.map((s) => (
                     <button
                       key={s}
                       onClick={() => {
@@ -300,6 +304,7 @@ export default function BarberReviews() {
                       onClick={() => {
                         setSortKey(opt.key);
                         setSortOpen(false);
+                        setPage(1);
                       }}
                       className={`hover:bg-surface-container-high flex w-full items-center px-3 py-2.5 text-left text-xs transition-colors ${
                         sortKey === opt.key
@@ -327,7 +332,7 @@ export default function BarberReviews() {
           </div>
         </div>
 
-        {paged.length === 0 ? (
+        {reviews.length === 0 ? (
           <div className="px-4 py-16 text-center">
             <MessageSquare
               className="text-on-surface-variant mx-auto h-10 w-10 opacity-40"
@@ -340,7 +345,7 @@ export default function BarberReviews() {
           </div>
         ) : (
           <div className="grid gap-4 p-4 sm:grid-cols-2 md:p-6">
-            {paged.map((review) => (
+            {reviews.map((review) => (
               <ReviewCard
                 key={review.id}
                 review={review}
@@ -365,20 +370,29 @@ export default function BarberReviews() {
               >
                 <ChevronLeft className="h-4 w-4" aria-hidden />
               </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-                <button
-                  key={n}
-                  onClick={() => !busy && setPage(n)}
-                  disabled={busy}
-                  className={`flex h-8 w-8 items-center justify-center rounded-md text-xs font-medium transition-colors ${
-                    n === page
-                      ? "bg-primary text-on-primary"
-                      : "border-outline-variant text-on-surface-variant hover:bg-surface-container border"
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
+              {buildPaginationRange(page, totalPages).map((item, index) =>
+                item === "…" ? (
+                  <span
+                    key={`ellipsis-${index}`}
+                    className="text-on-surface-variant flex h-8 w-8 items-center justify-center text-xs"
+                  >
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={item}
+                    onClick={() => !busy && setPage(item)}
+                    disabled={busy}
+                    className={`flex h-8 w-8 items-center justify-center rounded-md text-xs font-medium transition-colors ${
+                      item === page
+                        ? "bg-primary text-on-primary"
+                        : "border-outline-variant text-on-surface-variant hover:bg-surface-container border"
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ),
+              )}
               <button
                 disabled={page === totalPages || busy}
                 onClick={() => setPage((p) => p + 1)}

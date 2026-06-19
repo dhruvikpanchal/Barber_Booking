@@ -7,7 +7,7 @@ import {
   Scissors,
   Clock,
   CalendarDays,
-  DollarSign,
+  IndianRupee,
   StickyNote,
   Check,
   CalendarClock,
@@ -17,6 +17,7 @@ import Drawer from "@/client/modules/shared/components/ui/Drawer";
 import StatusBadge from "@/client/modules/shared/components/ui/StatusBadge";
 import { STATUSES } from "@/client/modules/barber/constants/statusConstants.js";
 import { formatWhen } from "./AppointmentRow";
+import { formatMoney } from "@/client/lib/format/formatMoney.js";
 
 function InfoRow({ Icon, label, value }) {
   if (!value) return null;
@@ -82,7 +83,7 @@ export default function AppointmentDetailDrawer({
           <InfoRow Icon={Scissors} label="Service" value={appt.service} />
           <InfoRow Icon={CalendarDays} label="When" value={`${date} at ${time}`} />
           <InfoRow Icon={Clock} label="Duration" value={`${appt.duration} min`} />
-          <InfoRow Icon={DollarSign} label="Price" value={`$${appt.price}`} />
+          <InfoRow Icon={IndianRupee} label="Price" value={formatMoney(appt.price)} />
           {appt.notes && <InfoRow Icon={StickyNote} label="Notes" value={appt.notes} />}
         </div>
 

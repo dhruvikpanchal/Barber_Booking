@@ -1,8 +1,10 @@
 "use client";
 
+import { regionConfig } from "@/config/region.js";
+
 import { useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { register } from "@/client/assets/ImagePath.js";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import {
@@ -66,7 +68,7 @@ export default function Register() {
 
     const phone = formData.phone.trim();
     if (phone && !PHONE_REGEX.test(phone)) {
-      toast.error("Please enter a valid phone number (e.g. +1 212 555 0100).");
+      toast.error(`Please enter a valid phone number (e.g. ${regionConfig.phoneExample}).`);
       return;
     }
 
@@ -107,8 +109,8 @@ export default function Register() {
             src={register}
             alt="barber"
             fill
-            priority
-            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 33vw, 420px"
+            loading="lazy"
+            sizes="50vw"
             className="object-cover brightness-[0.3] grayscale"
           />
         </div>
@@ -225,7 +227,7 @@ export default function Register() {
               <input
                 name="phone"
                 type="tel"
-                placeholder="+1 (212) 555-0100"
+                placeholder={regionConfig.phonePlaceholder}
                 disabled={registerMutation.isPending}
                 value={formData.phone}
                 onChange={handleChange}

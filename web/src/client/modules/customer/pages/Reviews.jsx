@@ -1,27 +1,32 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Star, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import {
-  REVIEW_EDIT_MS,
   ReviewableCard,
   StatsBar,
   EmptyState,
+  isReviewableAppointment,
 } from "@/client/modules/customer/components/Reviews/Primitives.jsx";
 import { customerHook } from "@/client/modules/customer/hooks/customerQuery.jsx";
 import { ReviewCard } from "@/client/modules/customer/components/Reviews/ReviewCard.jsx";
 import { ReviewFormModal } from "@/client/modules/customer/components/Reviews/ReviewFormModal.jsx";
 import { DeleteModal } from "@/client/modules/customer/components/Reviews/DeleteModal.jsx";
+import { CUSTOMER_NAV_SECTIONS } from "@/client/modules/customer/constants/customerNavSeenConstants.js";
+import { useMarkCustomerNavSeen } from "@/client/modules/customer/hooks/useMarkCustomerNavSeen.js";
+import { routes } from "@/client/config/routes/routes.js";
 
 export default function Reviews() {
+  const router = useRouter();
   const [filterRating, setFilterRating] = useState(0);
   const [sortBy, setSortBy] = useState("newest");
   const [editTarget, setEditTarget] = useState(null);
   const [writeTarget, setWriteTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
-  const reviewsQuery = customerHook.Reviews.useListReviews({ limit: 100, sort: sortBy });
+  const reviewsQuery = customerHook.Reviews.useListReviews({ limit: 100 });
   const pastAppointmentsQuery = customerHook.Appointments.useListAppointments({
     tab: "past",
     limit: 50,
@@ -50,11 +55,7 @@ export default function Reviews() {
     const reviewedIds = new Set(reviews.map((r) => r.appointmentId));
     const pastItems = pastAppointmentsQuery.data?.items ?? [];
     return pastItems
-      .filter((a) => {
-        if (a.status !== "completed" || a.reviewed || reviewedIds.has(a.id)) return false;
-        const completedAt = a.completedAt ?? a.startAt;
-        return Date.now() - new Date(completedAt).getTime() <= REVIEW_EDIT_MS;
-      })
+      .filter((a) => isReviewableAppointment(a, reviewedIds))
       .map((a) => ({
         id: a.id,
         completedAt: a.completedAt ?? a.startAt,
@@ -63,6 +64,12 @@ export default function Reviews() {
         shop: a.shop,
       }));
   }, [reviews, pastAppointmentsQuery.data]);
+
+  useMarkCustomerNavSeen(
+    CUSTOMER_NAV_SECTIONS.reviews,
+    reviewable,
+    (item) => item.completedAt,
+  );
 
   const visible = useMemo(() => {
     let list = filterRating ? reviews.filter((r) => r.rating === filterRating) : reviews;
@@ -123,7 +130,7 @@ export default function Reviews() {
   }
 
   return (
-    <div className="text-on-surface mx-auto w-full max-w-6xl min-w-0 space-y-6 pb-28 md:space-y-8 md:pb-8">
+    <div className="text-on-surface mx-auto w-full max-w-6xl min-w-0 space-y-6 md:space-y-8">
       <header className="mb-6">
         <div className="mb-1 flex items-center gap-2">
           <Star className="text-primary h-4 w-4" />
@@ -162,7 +169,7 @@ export default function Reviews() {
           )}
 
           {reviews.length === 0 ? (
-            <EmptyState onBrowse={() => {}} />
+            <EmptyState onBrowse={() => router.push(routes.customer.bookAppointment)} />
           ) : (
             <>
               <div className="mb-6">

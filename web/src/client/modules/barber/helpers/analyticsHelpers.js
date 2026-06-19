@@ -1,10 +1,7 @@
+import { formatMoney } from "@/client/lib/format/formatMoney.js";
+
 export function formatRevenue(amount) {
-  const value = Number(amount);
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(Number.isFinite(value) ? value : 0);
+  return formatMoney(amount);
 }
 
 export function formatRating(value, digits = 1) {

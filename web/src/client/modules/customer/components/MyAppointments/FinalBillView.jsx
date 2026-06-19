@@ -1,6 +1,6 @@
 "use client";
 
-import { DollarSign, Receipt } from "lucide-react";
+import { IndianRupee, Receipt } from "lucide-react";
 import { formatMoney } from "@/client/lib/format/formatMoney.js";
 
 export default function FinalBillView({
@@ -45,7 +45,7 @@ export default function FinalBillView({
         <div className="grid grid-cols-1 gap-3 min-[400px]:grid-cols-2">
           <div className="border-outline-variant bg-surface-container rounded-lg border p-4">
             <div className="text-on-surface-variant flex items-center gap-2">
-              <DollarSign className="h-4 w-4 shrink-0" aria-hidden />
+              <IndianRupee className="h-4 w-4 shrink-0" aria-hidden />
               <p className="font-label-caps text-[10px]">Estimated total</p>
             </div>
             <p className="text-on-surface mt-2 font-serif text-2xl font-bold">
@@ -60,7 +60,7 @@ export default function FinalBillView({
             }`}
           >
             <div className="text-on-surface-variant flex items-center gap-2">
-              <DollarSign className="h-4 w-4 shrink-0" aria-hidden />
+              <IndianRupee className="h-4 w-4 shrink-0" aria-hidden />
               <p className="font-label-caps text-[10px]">Final total</p>
             </div>
             <p

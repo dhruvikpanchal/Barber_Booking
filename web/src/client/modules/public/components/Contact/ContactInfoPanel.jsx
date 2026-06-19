@@ -1,6 +1,9 @@
 import { ArrowRight, Clock, Mail, MapPin, MessageSquare, Phone } from "lucide-react";
 
-import { CONTACT_INFO } from "@/client/modules/public/constants/contactConstants.js";
+import {
+  CONTACT_INFO,
+  SOCIAL_ICONS,
+} from "@/client/modules/public/constants/contactConstants.js";
 import { InfoRow } from "@/client/modules/public/components/Contact/Primitives.jsx";
 
 export function ContactInfoPanel({ contactInfo = CONTACT_INFO, disabled = false }) {
@@ -125,33 +128,36 @@ export function ContactInfoPanel({ contactInfo = CONTACT_INFO, disabled = false 
         </header>
 
         <ul className="space-y-1.5 p-4">
-          {normalizedSocial.map(({ id, label, handle, href, Icon }) => (
-            <li key={id}>
-              <a
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-disabled={disabled}
-                tabIndex={disabled ? -1 : undefined}
-                className="group border-outline-variant bg-surface-container hover:border-primary/40 hover:bg-primary/8 focus-visible:ring-primary/60 flex items-center gap-3 rounded-lg border px-3.5 py-2.5 transition-colors focus-visible:ring-2 focus-visible:outline-none aria-disabled:pointer-events-none aria-disabled:opacity-50"
-                aria-label={`${label} — ${handle}`}
-              >
-                <span className="border-outline-variant bg-surface-container-high text-on-surface-variant group-hover:border-primary/30 group-hover:text-primary flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors">
-                  <Icon className="h-3.5 w-3.5" aria-hidden />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-on-surface group-hover:text-primary text-xs font-semibold transition-colors">
-                    {label}
-                  </p>
-                  <p className="text-on-surface-variant text-[11px]">{handle}</p>
-                </div>
-                <ArrowRight
-                  className="text-on-surface-variant/40 group-hover:text-primary h-3.5 w-3.5 shrink-0 transition-all group-hover:translate-x-0.5"
-                  aria-hidden
-                />
-              </a>
-            </li>
-          ))}
+          {normalizedSocial.map(({ id, label, handle, href, Icon }) => {
+            const IconComponent = Icon ?? SOCIAL_ICONS[id] ?? MessageSquare;
+            return (
+              <li key={id}>
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-disabled={disabled}
+                  tabIndex={disabled ? -1 : undefined}
+                  className="group border-outline-variant bg-surface-container hover:border-primary/40 hover:bg-primary/8 focus-visible:ring-primary/60 flex items-center gap-3 rounded-lg border px-3.5 py-2.5 transition-colors focus-visible:ring-2 focus-visible:outline-none aria-disabled:pointer-events-none aria-disabled:opacity-50"
+                  aria-label={`${label} — ${handle}`}
+                >
+                  <span className="border-outline-variant bg-surface-container-high text-on-surface-variant group-hover:border-primary/30 group-hover:text-primary flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors">
+                    <IconComponent className="h-3.5 w-3.5" aria-hidden />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-on-surface group-hover:text-primary text-xs font-semibold transition-colors">
+                      {label}
+                    </p>
+                    <p className="text-on-surface-variant text-[11px]">{handle}</p>
+                  </div>
+                  <ArrowRight
+                    className="text-on-surface-variant/40 group-hover:text-primary h-3.5 w-3.5 shrink-0 transition-all group-hover:translate-x-0.5"
+                    aria-hidden
+                  />
+                </a>
+              </li>
+            );
+          })}
         </ul>
       </section>
     </aside>

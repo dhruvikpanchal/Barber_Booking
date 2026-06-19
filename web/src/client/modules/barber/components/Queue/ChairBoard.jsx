@@ -1,6 +1,6 @@
 "use client";
 
-import { Armchair, Scissors, Timer, UserPlus, X, Pause, Play, CheckCircle2 } from "lucide-react";
+import { Armchair, Scissors, Timer, UserPlus, X, CheckCircle2 } from "lucide-react";
 
 function minsSince(t) {
   if (!t) return 0;
@@ -12,7 +12,6 @@ export default function ChairBoard({
   queue,
   onAssignNext,
   onComplete,
-  onPauseToggle,
   onClear,
 }) {
   if (!chairs.length) {
@@ -36,7 +35,6 @@ export default function ChairBoard({
           ? Math.min(100, Math.round((elapsed / customer.duration) * 100))
           : 0;
         const overtime = customer && elapsed > customer.duration;
-        const paused = customer?.status === "paused";
 
         return (
           <div
@@ -67,14 +65,12 @@ export default function ChairBoard({
               </div>
               <span
                 className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                  paused
-                    ? "bg-status-cancelled/15 text-status-cancelled"
-                    : active
-                      ? "bg-primary/15 text-primary"
-                      : "bg-status-confirmed/15 text-status-confirmed"
+                  active
+                    ? "bg-primary/15 text-primary"
+                    : "bg-status-confirmed/15 text-status-confirmed"
                 }`}
               >
-                {paused ? "Paused" : active ? "Busy" : "Free"}
+                {active ? "Busy" : "Free"}
               </span>
             </div>
 
@@ -116,14 +112,6 @@ export default function ChairBoard({
                     className="inline-flex h-8 items-center gap-1 rounded-md bg-status-confirmed px-2.5 text-[11px] font-semibold text-background hover:opacity-90"
                   >
                     <CheckCircle2 className="h-3.5 w-3.5" aria-hidden /> Complete
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onPauseToggle(chair.id)}
-                    className="inline-flex h-8 items-center gap-1 rounded-md border border-outline-variant px-2.5 text-[11px] font-medium text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
-                  >
-                    {paused ? <Play className="h-3.5 w-3.5" aria-hidden /> : <Pause className="h-3.5 w-3.5" aria-hidden />}
-                    {paused ? "Resume" : "Pause"}
                   </button>
                   <button
                     type="button"

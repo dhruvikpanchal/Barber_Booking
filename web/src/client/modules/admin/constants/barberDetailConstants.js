@@ -36,12 +36,12 @@ export const ACCOUNT_STATUS_CONFIG = {
     icon: Clock,
     description: "Profile hidden from customers; login may be restricted.",
   },
-  suspended: {
-    label: "Suspended",
+  disabled: {
+    label: "Disabled",
     badge: "bg-status-cancelled/15 text-status-cancelled border border-status-cancelled/25",
     dot: "bg-status-cancelled",
     icon: Ban,
-    description: "Account suspended by admin — no bookings until restored.",
+    description: "Account disabled by admin — no bookings until restored.",
   },
 };
 

@@ -6,9 +6,6 @@ import { toast } from "sonner";
 import QueueStats from "@/client/modules/barber/components/Queue/QueueStats";
 import ChairBoard from "@/client/modules/barber/components/Queue/ChairBoard";
 import QueueRow from "@/client/modules/barber/components/Queue/QueueRow";
-import AddToQueueModal, {
-  EMPTY_FORM,
-} from "@/client/modules/barber/components/Queue/AddToQueueModal";
 import { STATUS_ORDER } from "@/client/modules/barber/constants/queueConstants.js";
 import {
   QUEUE_TABS,
@@ -16,13 +13,14 @@ import {
 } from "@/client/modules/barber/constants/barberConstants.js";
 import { barberHook, useBarberInvalidation } from "@/client/modules/barber/hooks/barberQuery.jsx";
 import { mapChair, mapQueueEntry } from "@/client/modules/barber/helpers/barberMappers.js";
+import { BARBER_QUEUE_PARAMS } from "@/client/modules/barber/constants/barberQueryConstants.js";
 
 export default function Queue() {
   const [tab, setTab] = useState("active");
   const [sourceFilter, setSourceFilter] = useState("all");
   const invalidate = useBarberInvalidation();
 
-  const queueQuery = barberHook.Queue.useGetQueue({ tab, source: sourceFilter });
+  const queueQuery = barberHook.Queue.useGetQueue(BARBER_QUEUE_PARAMS);
   const statusMutation = barberHook.Queue.useUpdateQueueStatus();
   const assignMutation = barberHook.Queue.useAssignChair();
   const busy = queueQuery.isPending || statusMutation.isPending || assignMutation.isPending;
@@ -81,7 +79,7 @@ export default function Queue() {
     try {
       await statusMutation.mutateAsync({ id, status: status.toUpperCase().replace("-", "_") });
       await refetch();
-      await invalidate.workflow();
+      await invalidate.operations();
     } catch {
       toast.error("Could not update queue status.");
     }
@@ -93,7 +91,7 @@ export default function Queue() {
       await assignMutation.mutateAsync({ id: entryId, chairId });
       await statusMutation.mutateAsync({ id: entryId, status: "IN_SERVICE" });
       await refetch();
-      await invalidate.workflow();
+      await invalidate.operations();
     } catch {
       toast.error("Could not assign chair.");
     }
@@ -186,7 +184,6 @@ export default function Queue() {
           queue={queue}
           onAssignNext={seatNext}
           onComplete={completeByChair}
-          onPauseToggle={() => toast.info("Pause is not available for live queue entries.")}
           onClear={(chairId) => {
             const chair = chairs.find((c) => c.id === chairId);
             if (chair?.customerId) cancelCustomer(chair.customerId);
@@ -270,7 +267,7 @@ export default function Queue() {
                 Nothing here right now
               </p>
               <p className="text-on-surface-variant mt-1 text-sm">
-                Add a customer or wait for online bookings.
+                Online bookings and walk-ins from the Walk-ins page appear here automatically.
               </p>
             </div>
           )}

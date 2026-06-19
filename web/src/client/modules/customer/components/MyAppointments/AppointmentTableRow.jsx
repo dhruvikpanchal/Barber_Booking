@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { Eye, RotateCcw, XCircle, Star } from "lucide-react";
+import Link from "@/lib/AppLink";
+import { Eye, XCircle, Star } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";
 import StatusBadge from "@/client/modules/shared/components/ui/StatusBadge";
 import { CUSTOMER_APPOINTMENT_STATUSES } from "@/client/modules/customer/constants/appointmentStatusesConstants.js";
@@ -18,7 +18,6 @@ export default function AppointmentTableRow({
   appt,
   onView,
   onCancel,
-  onRebook,
   onReview,
   disabled = false,
 }) {
@@ -132,19 +131,6 @@ export default function AppointmentTableRow({
               <Star className="text-status-pending h-3.5 w-3.5" />
               Reviewed
             </span>
-          )}
-
-          {(appt.status === "completed" || appt.status === "cancelled") && (
-            <button
-              type="button"
-              onClick={() => onRebook(appt)}
-              disabled={disabled}
-              title="Rebook"
-              className="border-outline-variant text-on-surface-variant hover:bg-surface-container hover:text-on-surface flex h-8 items-center gap-1 rounded-lg border px-2.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Rebook
-            </button>
           )}
         </div>
       </td>

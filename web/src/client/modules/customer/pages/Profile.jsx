@@ -4,26 +4,30 @@ import { useCallback, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle, Save } from "lucide-react";
 import { toast } from "sonner";
-import { patchStoredUser } from "@/client/lib/auth/session.js";
-import ProfileSummaryCard from "@/client/modules/customer/components/Profile/ProfileSummaryCard.jsx";
+import { getStoredUser } from "@/client/lib/auth/session.js";
+import {
+  cacheBustUrl,
+  extractPhotoUrl,
+  mergeCustomerProfileWithSession,
+  syncProfileAfterMutation,
+  syncProfilePhotoEverywhere,
+} from "@/client/modules/shared/helpers/profilePhotoHelpers.js";
 import ProfileEditorSection from "@/client/modules/customer/components/Profile/ProfileEditorSection.jsx";
-import { cacheBustUrl } from "@/client/modules/customer/helpers/profileHelpers.js";
 import { customerHook } from "@/client/modules/customer/hooks/customerQuery.jsx";
 
-function patchProfileCache(queryClient, updates) {
-  queryClient.setQueryData(["getProfile"], (current) =>
-    current ? { ...current, ...updates } : current,
-  );
-}
+const PORTAL_ROLE = "customer";
 
 function mapProfileFromApi(dto, prev) {
-  if (!dto) return null;
+  const merged = mergeCustomerProfileWithSession(dto);
+  if (!merged) return null;
+
   const keepPreview =
     prev?.photoPreview?.startsWith("blob:") ||
-    (prev?.photoPreview && prev.photoPreview !== dto.photoUrl);
+    (prev?.photoPreview && prev.photoPreview !== merged.photoUrl);
+
   return {
-    ...dto,
-    photoPreview: keepPreview ? prev.photoPreview : (dto.photoUrl ?? ""),
+    ...merged,
+    photoPreview: keepPreview ? prev.photoPreview : (merged.photoUrl ?? ""),
   };
 }
 
@@ -60,28 +64,31 @@ export default function Profile() {
       if (!file || busy) return;
       e.target.value = "";
 
+      const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+      if (!allowedTypes.includes(file.type)) {
+        toast.error("Please upload a JPG, PNG, or WebP image.");
+        return;
+      }
+
       const localPreview = URL.createObjectURL(file);
       const previousPreview = profile?.photoPreview ?? profile?.photoUrl ?? "";
       patch({ photoPreview: localPreview });
 
       try {
-        const updated = await toast.promise(uploadMutation.mutateAsync(file), {
-          loading: "Uploading photo…",
-          success: "Profile photo updated",
-          error: "Photo upload failed",
-        });
-        const nextPhotoUrl = updated?.photoUrl;
-        if (nextPhotoUrl) {
-          const displayUrl = cacheBustUrl(nextPhotoUrl);
-          patch({ photoUrl: nextPhotoUrl, photoPreview: displayUrl });
-          patchProfileCache(queryClient, { photoUrl: nextPhotoUrl });
-          patchStoredUser({ photoUrl: nextPhotoUrl });
-          await queryClient.refetchQueries({ queryKey: ["getProfile"] });
+        const result = await uploadMutation.mutateAsync(file);
+        const nextPhotoUrl = extractPhotoUrl(result);
+        if (!nextPhotoUrl) {
+          throw new Error("Upload succeeded but no photo URL was returned.");
         }
+
+        const displayUrl = syncProfilePhotoEverywhere(queryClient, PORTAL_ROLE, nextPhotoUrl);
+        patch({ photoUrl: nextPhotoUrl, photoPreview: displayUrl });
+        toast.success("Profile photo updated");
         setSaved(true);
         window.setTimeout(() => setSaved(false), 3200);
-      } catch {
+      } catch (err) {
         patch({ photoPreview: previousPreview ? cacheBustUrl(previousPreview) : "" });
+        toast.error(err?.message || "Photo upload failed");
       } finally {
         window.requestAnimationFrame(() => {
           URL.revokeObjectURL(localPreview);
@@ -93,31 +100,43 @@ export default function Profile() {
 
   const handleSave = useCallback(async () => {
     if (!profile || busy) return;
+
+    const stored = getStoredUser();
+    const trimmedName = profile.fullName?.trim() ?? "";
+    if (trimmedName.length < 2) {
+      toast.error("Full name must be at least 2 characters.");
+      return;
+    }
+
+    const email = profile.email?.trim() || stored?.email || "";
+
+    if (!email) {
+      toast.error("Email is missing. Refresh the page and try again.");
+      return;
+    }
+
     try {
-      const updated = await toast.promise(
-        updateMutation.mutateAsync({
-          fullName: profile.fullName?.trim() ?? "",
-          email: profile.email,
-          phone: profile.phone?.trim() ?? "",
-          address: profile.address?.trim() ?? "",
-        }),
-        {
-          loading: "Saving profile…",
-          success: "Profile saved",
-          error: (err) => err?.message ?? "Could not save profile",
-        },
-      );
-      setProfile((prev) => mapProfileFromApi(updated, prev));
+      const updated = await updateMutation.mutateAsync({
+        fullName: trimmedName,
+        email,
+        phone: profile.phone?.trim() ?? "",
+        address: profile.address?.trim() ?? "",
+      });
+
+      const mapped = mapProfileFromApi(updated, profile);
+      setProfile(mapped);
+      syncProfileAfterMutation(queryClient, PORTAL_ROLE, updated);
+      toast.success("Profile saved");
       setSaved(true);
       window.setTimeout(() => setSaved(false), 3200);
-    } catch {
-      /* toast handles error */
+    } catch (err) {
+      toast.error(err?.message || "Could not save profile");
     }
-  }, [profile, busy, updateMutation]);
+  }, [profile, busy, updateMutation, queryClient]);
 
   if (isPending && !profile) {
     return (
-      <div className="mx-auto max-w-6xl space-y-6 pb-28">
+      <div className="mx-auto max-w-6xl space-y-6">
         <div className="bg-surface-container h-32 animate-pulse rounded-xl" />
         <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
       </div>
@@ -141,7 +160,7 @@ export default function Profile() {
   }
 
   return (
-    <div className="text-on-surface mx-auto w-full max-w-6xl min-w-0 space-y-6 pb-28 md:space-y-8 md:pb-8">
+    <div className="text-on-surface mx-auto w-full max-w-6xl min-w-0 space-y-6 md:space-y-8">
       <header className="space-y-2">
         <p className="font-label-caps text-primary">Customer · Profile</p>
         <h1 className="text-on-surface font-serif text-2xl font-bold tracking-tight md:text-3xl">
@@ -153,27 +172,13 @@ export default function Profile() {
         </p>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-8">
-        <div className="order-2 lg:order-1">
-          <ProfileEditorSection
-            profile={profile}
-            photoUrl={displayPhotoUrl}
-            onPatch={patch}
-            onAvatarChange={handleAvatarChange}
-            disabled={busy}
-          />
-        </div>
-
-        <aside className="order-1 lg:sticky lg:top-4 lg:order-2">
-          <ProfileSummaryCard
-            fullName={profile.fullName}
-            email={profile.email}
-            phone={profile.phone}
-            photoUrl={displayPhotoUrl}
-            joinedAt={profile.joinedAt}
-          />
-        </aside>
-      </div>
+      <ProfileEditorSection
+        profile={profile}
+        photoUrl={displayPhotoUrl}
+        onPatch={patch}
+        onAvatarChange={handleAvatarChange}
+        disabled={busy}
+      />
 
       <div className="border-outline-variant bg-surface/95 fixed inset-x-0 bottom-[var(--bottom-nav-height)] z-30 border-t px-4 py-3 backdrop-blur md:static md:bottom-auto md:z-auto md:border-t-0 md:bg-transparent md:px-0 md:py-0 md:pt-4">
         <div className="mx-auto flex max-w-5xl flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">

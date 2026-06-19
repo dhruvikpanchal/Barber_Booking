@@ -1,8 +1,9 @@
 "use client";
 
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
-import { ChartContainer } from "./ChartContainer.jsx";
-import { CHART_TOOLTIP_STYLE } from "./chartStyles.js";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
+import { ChartContainer, ChartResponsiveContainer } from "./ChartContainer.jsx";
+import ChartTooltip from "./ChartTooltip.jsx";
+import { CHART_AXIS_TICK } from "./chartStyles.js";
 
 /**
  * @param {{
@@ -40,15 +41,15 @@ export default function StackedGrowthBarChart({ title, data = [] }) {
       </header>
 
       <ChartContainer className="h-44 w-full min-w-0 sm:h-52">
-        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+        <ChartResponsiveContainer>
           <BarChart data={chartData} barGap={4}>
             <CartesianGrid strokeDasharray="3 4" vertical={false} opacity={0.08} />
 
-            <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={11} />
+            <XAxis dataKey="name" tickLine={false} axisLine={false} tick={CHART_AXIS_TICK} />
 
-            <YAxis tickLine={false} axisLine={false} fontSize={11} />
+            <YAxis tickLine={false} axisLine={false} tick={CHART_AXIS_TICK} />
 
-            <Tooltip cursor={{ opacity: 0.08 }} contentStyle={CHART_TOOLTIP_STYLE} />
+            <ChartTooltip />
 
             <Bar
               dataKey="Returning"
@@ -64,7 +65,7 @@ export default function StackedGrowthBarChart({ title, data = [] }) {
               radius={[6, 6, 0, 0]}
             />
           </BarChart>
-        </ResponsiveContainer>
+        </ChartResponsiveContainer>
       </ChartContainer>
     </section>
   );

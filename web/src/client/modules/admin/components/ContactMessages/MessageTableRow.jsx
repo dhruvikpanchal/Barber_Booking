@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
-import { Eye, Mail, MailOpen, Reply, Trash2 } from "lucide-react";
+import Link from "@/lib/AppLink";
+import { Eye, Mail, MailOpen, Reply } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";
 
-export function MessageTableRow({ message, onView, onToggleRead, onDelete }) {
+export function MessageTableRow({ message, onView, onToggleRead }) {
   const dateFormatted = new Date(message.submittedAt).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
@@ -71,21 +71,13 @@ export function MessageTableRow({ message, onView, onToggleRead, onDelete }) {
               <Reply className="h-3.5 w-3.5" />
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => onDelete(message.id)}
-            title="Delete"
-            className="flex h-8 w-8 items-center justify-center rounded-md border border-outline-variant text-on-surface-variant hover:border-status-cancelled/30 hover:text-status-cancelled transition-all"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
         </div>
       </td>
     </tr>
   );
 }
 
-export function MessageCard({ message, onView, onToggleRead, onDelete }) {
+export function MessageCard({ message, onView, onToggleRead }) {
   const dateFormatted = new Date(message.submittedAt).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
@@ -141,13 +133,6 @@ export function MessageCard({ message, onView, onToggleRead, onDelete }) {
             className="flex h-8 w-8 items-center justify-center rounded-md border border-outline-variant text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
           >
             {message.isRead ? <MailOpen className="h-3.5 w-3.5" /> : <Mail className="h-3.5 w-3.5" />}
-          </button>
-          <button
-            type="button"
-            onClick={() => onDelete(message.id)}
-            className="flex h-8 w-8 items-center justify-center rounded-md border border-outline-variant text-on-surface-variant hover:border-status-cancelled/30 hover:text-status-cancelled"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>

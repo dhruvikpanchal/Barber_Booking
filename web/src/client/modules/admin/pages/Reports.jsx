@@ -2,19 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  Activity,
-  BarChart3,
   Calendar,
-  CalendarCheck,
   Download,
   FileSpreadsheet,
   FileText,
   Loader2,
   RefreshCw,
-  Scissors,
-  UserPlus,
-  Users,
-  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -22,7 +15,8 @@ import {
   REPORT_TYPES,
 } from "@/client/modules/admin/constants/adminConstants.js";
 import { rowsToCsv, downloadFile } from "@/client/modules/admin/components/Reports/MockDataBuilder";
-import { StatusCell, SummaryCard } from "@/client/modules/admin/components/Reports/Primitives.jsx";
+import ReportSummaryGrid from "@/client/modules/admin/components/Reports/ReportSummaryGrid.jsx";
+import { StatusCell } from "@/client/modules/admin/components/Reports/Primitives.jsx";
 import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
 
 export default function Reports() {
@@ -32,6 +26,7 @@ export default function Reports() {
   const [customEnd, setCustomEnd] = useState("2026-05-19");
   const [reportData, setReportData] = useState(null);
   const [exporting, setExporting] = useState(null);
+  const [generateError, setGenerateError] = useState("");
 
   const generateMutation = adminHook.Reports.useGenerateReport();
   const loading = generateMutation.isPending;
@@ -56,6 +51,7 @@ export default function Reports() {
   }, [generateMutation.isError, generateMutation.error]);
 
   async function handleGenerate() {
+    setGenerateError("");
     if (dateRange === "custom" && (!customStart || !customEnd)) {
       toast.error("Select both start and end dates for a custom range.");
       return;
@@ -73,15 +69,22 @@ export default function Reports() {
         ...(dateRange === "custom" ? { start: customStart, end: customEnd } : {}),
       };
 
-      const result = await toast.promise(generateMutation.mutateAsync(payload), {
-        loading: "Generating report…",
-        success: "Report generated successfully.",
-        error: "Could not generate report.",
-      });
+      const result = await toast
+        .promise(generateMutation.mutateAsync(payload), {
+          loading: "Generating report…",
+          success: "Report generated successfully.",
+          error: "Could not generate report.",
+        })
+        .unwrap();
+
+      if (!result?.columns || !Array.isArray(result?.rows)) {
+        throw new Error("Invalid report response from server.");
+      }
 
       setReportData(result);
-    } catch {
-      /* toast handles error */
+    } catch (error) {
+      const message = error?.message || "Could not generate report.";
+      setGenerateError(message);
     }
   }
 
@@ -104,11 +107,9 @@ export default function Reports() {
         `Period: ${rangeLabel}`,
         "",
         rowsToCsv(columns, rows),
-        "",
-        "— Demo PDF export (plain text). Use a PDF library in production.",
       ].join("\n");
       downloadFile(text, `iron-oak-${slug}.txt`, "text/plain;charset=utf-8;");
-      toast.info("PDF export simulated as downloadable summary file.");
+      toast.success("Text summary downloaded.");
     }
 
     setExporting(null);
@@ -165,7 +166,7 @@ export default function Reports() {
             ) : (
               <Download className="h-4 w-4" aria-hidden />
             )}
-            Export PDF
+            Export summary (TXT)
           </button>
         </div>
       </header>
@@ -184,6 +185,7 @@ export default function Reports() {
                   onClick={() => {
                     setReportType(type.key);
                     setReportData(null);
+                    setGenerateError("");
                   }}
                   className={`w-full rounded-xl border p-4 text-left transition-colors ${
                     active
@@ -240,6 +242,7 @@ export default function Reports() {
                   onClick={() => {
                     setDateRange(range.key);
                     setReportData(null);
+                    setGenerateError("");
                   }}
                   className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
                     dateRange === range.key
@@ -282,73 +285,31 @@ export default function Reports() {
             )}
           </section>
 
+          {generateError && (
+            <div className="border-status-cancelled/30 bg-status-cancelled/10 text-status-cancelled rounded-xl border px-4 py-3 text-sm">
+              {generateError}
+            </div>
+          )}
+
           {loading && (
-            <div className="border-outline-variant flex flex-col items-center justify-center rounded-xl border border-dashed py-20">
+            <div className="border-outline-variant flex flex-col items-center justify-center rounded-xl border border-dashed py-12">
               <Loader2 className="text-primary h-8 w-8 animate-spin" aria-hidden />
               <p className="text-on-surface-variant mt-3 text-sm">Generating report…</p>
             </div>
           )}
 
           {!loading && generated && summary && (
-            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <SummaryCard
-                label="Total appointments"
-                value={summary.totalAppointments.toLocaleString()}
-                sub={`${summary.completionRate}% completed`}
-                icon={CalendarCheck}
-                accent="bg-primary/15 text-primary"
-              />
-              <SummaryCard
-                label="Completed"
-                value={summary.completed.toLocaleString()}
-                icon={CalendarCheck}
-                accent="bg-status-confirmed/15 text-status-confirmed"
-              />
-              <SummaryCard
-                label="Cancelled"
-                value={summary.cancelled.toLocaleString()}
-                icon={XCircle}
-                accent="bg-status-cancelled/15 text-status-cancelled"
-              />
-              <SummaryCard
-                label="New customers"
-                value={summary.newCustomers.toLocaleString()}
-                sub={`${summary.newBarbers} new barbers`}
-                icon={Users}
-                accent="bg-primary/15 text-primary"
-              />
-              <SummaryCard
-                label="Active barbers"
-                value={summary.activeBarbers}
-                icon={Scissors}
-                accent="bg-status-confirmed/15 text-status-confirmed"
-              />
-              <SummaryCard
-                label="Top service"
-                value={summary.topService}
-                sub="Most booked"
-                icon={BarChart3}
-                accent="bg-primary/15 text-primary"
-              />
-              <SummaryCard
-                label="Platform sessions"
-                value={summary.platformSessions.toLocaleString()}
-                icon={Activity}
-                accent="bg-surface-container text-on-surface-variant"
-              />
-              <SummaryCard
-                label="Registrations"
-                value={(summary.newCustomers + summary.newBarbers).toLocaleString()}
-                sub="Customers + barbers"
-                icon={UserPlus}
-                accent="bg-primary/15 text-primary"
-              />
-            </section>
+            <ReportSummaryGrid reportType={reportType} summary={summary} />
           )}
 
-          {!loading && (
-            <section className="border-outline-variant bg-surface-container-low rounded-xl border">
-              <header className="border-outline-variant flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4 md:px-6">
+          <section className="border-outline-variant bg-surface-container-low relative rounded-xl border">
+            {loading && (
+              <div className="bg-surface-container-low/80 absolute inset-0 z-10 flex items-center justify-center rounded-xl backdrop-blur-[1px]">
+                <Loader2 className="text-primary h-7 w-7 animate-spin" aria-hidden />
+              </div>
+            )}
+
+            <header className="border-outline-variant flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4 md:px-6">
                 <div>
                   <h2 className="text-on-surface font-serif text-lg font-bold">Report preview</h2>
                   <p className="text-on-surface-variant text-sm">
@@ -423,7 +384,7 @@ export default function Reports() {
                                   ].some((s) => String(val).toLowerCase().includes(s)));
                               return (
                                 <td key={col.key} className="text-on-surface px-5 py-3.5">
-                                  {isStatus ? <StatusCell value={val} /> : val}
+                                  {isStatus ? <StatusCell value={val} /> : (val ?? "—")}
                                 </td>
                               );
                             })}
@@ -447,12 +408,13 @@ export default function Reports() {
                             <span className="text-on-surface-variant text-xs">{col.label}</span>
                             <span className="text-on-surface text-right text-sm font-medium">
                               {col.key === "status" ||
-                              String(row[col.key])
-                                .toLowerCase()
-                                .match(/active|cancel|complet|pending|approv/) ? (
+                              (typeof row[col.key] === "string" &&
+                                String(row[col.key])
+                                  .toLowerCase()
+                                  .match(/active|cancel|complet|pending|approv/)) ? (
                                 <StatusCell value={row[col.key]} />
                               ) : (
-                                row[col.key]
+                                (row[col.key] ?? "—")
                               )}
                             </span>
                           </div>
@@ -462,8 +424,7 @@ export default function Reports() {
                   </ul>
                 </>
               )}
-            </section>
-          )}
+          </section>
         </div>
       </div>
     </div>

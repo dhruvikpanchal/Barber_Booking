@@ -1,5 +1,7 @@
+import { regionConfig } from "@/config/region.js";
+
 /** Fixed locale so SSR (Node) and the browser format the same text. */
-export const DISPLAY_LOCALE = "en-US";
+export const DISPLAY_LOCALE = regionConfig.locale;
 
 export function formatTimeLabel(iso) {
   if (!iso) return "—";

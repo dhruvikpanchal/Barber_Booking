@@ -1,5 +1,5 @@
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { Star } from "lucide-react";
 import { routes } from "@/config/routes/routes";
 
@@ -45,7 +45,6 @@ export default function LandingBarberCard({ barber }) {
               {barber.reviewCount != null ? ` · ${barber.reviewCount} reviews` : ""}
             </span>
           </div>
-          <div className="font-label-caps text-primary">From ${barber.startingPrice}</div>
         </div>
       </div>
     </Link>

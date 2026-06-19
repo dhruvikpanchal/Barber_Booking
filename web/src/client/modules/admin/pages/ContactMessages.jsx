@@ -10,12 +10,14 @@ import {
   MessageTableRow,
 } from "@/client/modules/admin/components/ContactMessages/MessageTableRow.jsx";
 import { adminHook } from "@/client/modules/admin/hooks/adminQuery.jsx";
+import { useAdminInvalidation } from "@/client/modules/admin/hooks/useAdminInvalidation.js";
 import { mapContactMessageListItem } from "@/client/modules/admin/helpers/adminMappers.js";
 import { CONTACT_MESSAGE_TABS } from "@/client/modules/admin/constants/adminConstants.js";
 import { routes } from "@/client/config/routes/routes.js";
 
 export default function ContactMessages() {
   const router = useRouter();
+  const invalidate = useAdminInvalidation();
 
   const [tab, setTab] = useState("all");
   const [query, setQuery] = useState("");
@@ -30,23 +32,16 @@ export default function ContactMessages() {
     [tab, query],
   );
 
-  const statsQuery = adminHook.ContactMessages.useContactMessageStats();
   const listQuery = adminHook.ContactMessages.useListContactMessages(listParams);
   const updateMutation = adminHook.ContactMessages.useUpdateContactMessage();
 
-  const busy = statsQuery.isPending || listQuery.isPending || updateMutation.isPending;
+  const busy = listQuery.isPending || updateMutation.isPending;
 
   useEffect(() => {
     if (listQuery.isError) {
       toast.error(listQuery.error?.message || "Could not load contact messages.");
     }
   }, [listQuery.isError, listQuery.error]);
-
-  useEffect(() => {
-    if (statsQuery.isError) {
-      toast.error(statsQuery.error?.message || "Could not load message stats.");
-    }
-  }, [statsQuery.isError, statsQuery.error]);
 
   const messages = useMemo(
     () => (listQuery.data?.items ?? []).map(mapContactMessageListItem),
@@ -55,11 +50,11 @@ export default function ContactMessages() {
 
   const stats = useMemo(
     () => ({
-      total: statsQuery.data?.total ?? messages.length,
-      unread: statsQuery.data?.unread ?? 0,
-      unreplied: statsQuery.data?.unreplied ?? 0,
+      total: listQuery.data?.meta?.stats?.total ?? messages.length,
+      unread: listQuery.data?.meta?.stats?.unread ?? 0,
+      unreplied: listQuery.data?.meta?.stats?.unreplied ?? 0,
     }),
-    [statsQuery.data, messages.length],
+    [listQuery.data?.meta?.stats, messages.length],
   );
 
   const filtered = useMemo(
@@ -68,7 +63,7 @@ export default function ContactMessages() {
   );
 
   async function refetch() {
-    await Promise.all([listQuery.refetch(), statsQuery.refetch()]);
+    await listQuery.refetch();
   }
 
   async function toggleRead(id) {
@@ -85,14 +80,10 @@ export default function ContactMessages() {
           error: "Could not update message.",
         },
       );
-      await refetch();
+      await Promise.all([refetch(), invalidate.contactMessages()]);
     } catch {
       /* toast handles error */
     }
-  }
-
-  function deleteMessage() {
-    toast.info("Message deletion is not available via API.");
   }
 
   function handleView(message) {
@@ -103,7 +94,6 @@ export default function ContactMessages() {
   const handlers = {
     onView: handleView,
     onToggleRead: toggleRead,
-    onDelete: deleteMessage,
   };
 
   if (listQuery.isPending && messages.length === 0) {

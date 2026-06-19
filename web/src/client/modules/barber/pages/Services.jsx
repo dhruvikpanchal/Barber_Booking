@@ -47,9 +47,11 @@ export default function BarberServices() {
   const createMutation = barberHook.Services.useCreateService();
   const updateMutation = barberHook.Services.useUpdateService();
   const deleteMutation = barberHook.Services.useDeleteService();
+  const toggleMutation = barberHook.Services.useToggleService();
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [togglingId, setTogglingId] = useState(null);
   const [form, setForm] = useState(EMPTY_SERVICE_FORM);
   const [errors, setErrors] = useState({});
   const [serviceToDelete, setServiceToDelete] = useState(null);
@@ -57,7 +59,11 @@ export default function BarberServices() {
   const [filter, setFilter] = useState("all");
 
   const busy =
-    isPending || createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
+    isPending ||
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending ||
+    toggleMutation.isPending;
 
   useEffect(() => {
     if (isError) {
@@ -177,6 +183,23 @@ export default function BarberServices() {
       if (!busy) setServiceToDelete(service);
     },
     [busy],
+  );
+
+  const toggleActive = useCallback(
+    async (service) => {
+      if (busy || togglingId) return;
+      setTogglingId(service.id);
+      try {
+        await toggleMutation.mutateAsync({ id: service.id, active: !service.active });
+        await queryClient.invalidateQueries({ queryKey: ["barberListServices"] });
+        toast.success(service.active ? "Service hidden from customers" : "Service is now visible");
+      } catch {
+        toast.error("Could not update service visibility.");
+      } finally {
+        setTogglingId(null);
+      }
+    },
+    [busy, togglingId, toggleMutation, queryClient],
   );
 
   const confirmDelete = useCallback(async () => {
@@ -316,7 +339,8 @@ export default function BarberServices() {
                 service={service}
                 onEdit={openEdit}
                 onDeleteRequest={requestDelete}
-                disabled={busy}
+                onToggleActive={toggleActive}
+                toggling={togglingId === service.id}
               />
             ))
           ) : (

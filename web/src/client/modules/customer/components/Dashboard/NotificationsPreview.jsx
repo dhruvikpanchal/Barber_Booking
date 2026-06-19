@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { Bell, ChevronRight } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";
 import { getNotificationDeepLink } from "@/config/routes/notificationRoutes";
@@ -36,8 +36,13 @@ export default function NotificationsPreview({ notifications, unreadCount }) {
         </Link>
       </div>
 
-      <ul className="divide-outline-variant divide-y">
-        {notifications.map((notif) => {
+      {notifications.length === 0 ? (
+        <p className="text-on-surface-variant px-4 py-6 text-sm sm:px-5">
+          No notifications yet. Booking updates will appear here.
+        </p>
+      ) : (
+        <ul className="divide-outline-variant divide-y">
+          {notifications.map((notif) => {
           const meta = TYPE_META[notif.type];
           const Icon = meta?.icon;
           const href = getNotificationDeepLink(notif);
@@ -79,7 +84,8 @@ export default function NotificationsPreview({ notifications, unreadCount }) {
             </li>
           );
         })}
-      </ul>
+        </ul>
+      )}
     </section>
   );
 }

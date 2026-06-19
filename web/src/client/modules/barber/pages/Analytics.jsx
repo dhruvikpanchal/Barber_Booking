@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { shouldRetryQuery } from "@/client/lib/query/retryPolicy.js";
 import { useHydrated } from "@/client/modules/shared/hooks/useHydrated.js";
-import { BarChart3, CalendarCheck, CheckCircle2, DollarSign, Star, Users } from "lucide-react";
+import { BarChart3, CalendarCheck, CheckCircle2, IndianRupee, Star, Users } from "lucide-react";
 import { toast } from "sonner";
-import { formatRevenue, formatRating, normalizeAnalytics } from "@/client/modules/barber/helpers/analyticsHelpers.js";
+import { barberHook } from "@/client/modules/barber/hooks/barberQuery.jsx";
+import {
+  formatRevenue,
+  formatRating,
+  normalizeAnalytics,
+} from "@/client/modules/barber/helpers/analyticsHelpers.js";
 import StatTile from "@/client/modules/shared/components/ui/StatTile";
 import AnalyticsPeriodFilter, {
   defaultCustomRange,
@@ -17,7 +20,6 @@ import StackedGrowthBarChart from "@/client/modules/shared/components/charts/Sta
 import CustomerStatsPanel from "@/client/modules/barber/components/Analytics/CustomerStatsPanel.jsx";
 import MonthlyPerformanceSummary from "@/client/modules/barber/components/Analytics/MonthlyPerformanceSummary.jsx";
 import GrowthInsights from "@/client/modules/barber/components/Analytics/GrowthInsights.jsx";
-import { barberServices } from "@/client/modules/barber/services/barberServices.jsx";
 
 export default function Analytics() {
   const hydrated = useHydrated();
@@ -39,12 +41,10 @@ export default function Analytics() {
     period !== "custom" ||
     Boolean(customRange.start && customRange.end && customRange.start <= customRange.end);
 
-  const { data, isPending, isError, error, refetch } = useQuery({
-    queryKey: ["barberGetAnalytics", queryParams],
-    queryFn: () => barberServices.getAnalytics(queryParams),
-    enabled: canFetch,
-    retry: shouldRetryQuery,
-  });
+  const { data, isPending, isError, error, refetch } = barberHook.Analytics.useGetAnalytics(
+    canFetch ? queryParams : "",
+    { enabled: canFetch },
+  );
 
   const analytics = useMemo(() => normalizeAnalytics(data), [data]);
 
@@ -127,7 +127,7 @@ export default function Analytics() {
           label="Total revenue"
           value={formatRevenue(analytics.stats.totalRevenue)}
           hint="Gross service revenue"
-          Icon={DollarSign}
+          Icon={IndianRupee}
           accent="text-status-confirmed bg-status-confirmed/15"
           delta={analytics.deltas.totalRevenue}
         />
@@ -172,7 +172,6 @@ export default function Analytics() {
           data={analytics.revenueTrend}
           delta={analytics.deltas.totalRevenue}
           gradientId="barberRevenueTrend"
-          valuePrefix="$"
         />
         <MetricTrendCard
           title="Appointment trend"

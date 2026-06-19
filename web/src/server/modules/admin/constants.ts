@@ -216,6 +216,15 @@ export const ADMIN_USER_ROLES = ["CUSTOMER", "BARBER", "ADMIN"] as const;
 
 export const CONTACT_REPLY_STATUSES = ["UNREPLIED", "REPLIED"] as const;
 
+export const CONTACT_WORKFLOW_STATUSES = [
+  "NEW",
+  "IN_PROGRESS",
+  "REPLIED",
+  "CLOSED",
+] as const;
+
+export type ContactWorkflowStatus = (typeof CONTACT_WORKFLOW_STATUSES)[number];
+
 export type ContactReplyStatus = (typeof CONTACT_REPLY_STATUSES)[number];
 
 export const CONTACT_MESSAGE_TABS = [
@@ -286,7 +295,7 @@ export const ADMIN_NOTIFICATION_TYPE_TO_VARIANT: Partial<
 // client: data/profileData.js, constants/admin.js SETTINGS_TABS, ADMIN_ALERTS
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const ADMIN_SETTINGS_SECTIONS = ["maintenance", "password"] as const;
+export const ADMIN_SETTINGS_SECTIONS = ["password"] as const;
 
 export type AdminSettingsSection = (typeof ADMIN_SETTINGS_SECTIONS)[number];
 
@@ -303,3 +312,18 @@ export type AdminAlertPreferenceKey = (typeof ADMIN_ALERT_PREFERENCE_KEYS)[numbe
 export const ADMIN_DIGEST_PREFERENCE_KEYS = ["daily_digest", "weekly_report"] as const;
 
 export type AdminDigestPreferenceKey = (typeof ADMIN_DIGEST_PREFERENCE_KEYS)[number];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NAV BADGES  ·  /admin/nav-badges
+// Per-admin last-seen watermarks for sidebar actionable-item badges.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const ADMIN_NAV_SECTION_KEYS = [
+  "barber_requests",
+  "contact_messages",
+  "users",
+  "appointments",
+  "barbers",
+] as const;
+
+export type AdminNavSection = (typeof ADMIN_NAV_SECTION_KEYS)[number];

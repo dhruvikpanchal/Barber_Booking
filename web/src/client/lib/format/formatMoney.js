@@ -1,11 +1,12 @@
-/** Fixed locale so SSR and the browser format the same text. */
-const MONEY_LOCALE = "en-US";
+import { regionConfig } from "@/config/region.js";
 
-export function formatMoney(value) {
+/** Fixed locale so SSR and the browser format the same text. */
+export function formatMoney(value, options = {}) {
   if (value == null) return "—";
-  return new Intl.NumberFormat(MONEY_LOCALE, {
+  return new Intl.NumberFormat(regionConfig.locale, {
     style: "currency",
-    currency: "USD",
+    currency: regionConfig.currency,
     maximumFractionDigits: 0,
+    ...options,
   }).format(value);
 }

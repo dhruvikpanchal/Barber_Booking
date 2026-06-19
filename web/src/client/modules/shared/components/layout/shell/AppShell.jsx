@@ -3,8 +3,11 @@
 import { useLayoutEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { SidebarProvider } from "@/components/layout/sidebar/SidebarShell";
-import DashboardTopbar from "@/components/layout/navbar/DashboardTopbar";
-import MobileHeader from "@/components/layout/navbar/MobileHeader";
+import DashboardHeader from "@/components/layout/navbar/DashboardHeader";
+import ProfileHydrator from "@/client/modules/shared/components/auth/ProfileHydrator.jsx";
+import AdminNavSeenHydrator from "@/client/modules/shared/components/auth/AdminNavSeenHydrator.jsx";
+import BarberNavSeenHydrator from "@/client/modules/shared/components/auth/BarberNavSeenHydrator.jsx";
+import NotificationUnreadHydrator from "@/client/modules/shared/components/auth/NotificationUnreadHydrator.jsx";
 
 /**
  * Generic dashboard shell shared by Customer, Barber, Admin.
@@ -31,20 +34,18 @@ export default function AppShell({
 
   return (
     <SidebarProvider storageKey={`io.sidebar.${role}`}>
+      <ProfileHydrator role={role} />
+      <AdminNavSeenHydrator role={role} />
+      <BarberNavSeenHydrator role={role} />
+      <NotificationUnreadHydrator role={role} />
       <div className="app-dashboard-root flex h-dvh w-full overflow-hidden bg-background text-on-surface">
         {sidebar}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <div
-            className="relative z-50 hidden shrink-0 bg-surface md:block"
+            className="relative z-50 shrink-0 bg-surface"
             style={{ minHeight: "var(--header-height)" }}
           >
-            <DashboardTopbar role={role} actions={topbarActions} />
-          </div>
-          <div
-            className="relative z-50 shrink-0 bg-surface md:hidden"
-            style={{ minHeight: "var(--header-height)" }}
-          >
-            <MobileHeader role={role} />
+            <DashboardHeader role={role} actions={topbarActions} />
           </div>
           <main
             ref={mainRef}

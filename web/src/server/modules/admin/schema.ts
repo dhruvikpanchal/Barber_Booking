@@ -7,6 +7,7 @@ import {
   ADMIN_ALERT_PREFERENCE_KEYS,
   ADMIN_DIGEST_PREFERENCE_KEYS,
   ADMIN_MAX_LIST_LIMIT,
+  ADMIN_NAV_SECTION_KEYS,
   ADMIN_NOTIFICATION_TABS,
   ADMIN_REPORT_DATE_RANGES,
   ADMIN_REPORT_EXPORT_FORMATS,
@@ -226,8 +227,11 @@ export const replyContactMessageSchema = z.object({
     .max(MAX_ADMIN_REPLY_LENGTH, `Reply must be ${MAX_ADMIN_REPLY_LENGTH} characters or fewer`),
 });
 
+const contactWorkflowStatusKeys = ["new", "in_progress", "replied", "closed"] as const;
+
 export const updateContactMessageSchema = z.object({
   isRead: z.boolean().optional(),
+  workflowStatus: z.enum(contactWorkflowStatusKeys).optional(),
   internalNote: z
     .string()
     .trim()
@@ -264,11 +268,6 @@ export const updateAdminProfileSchema = z.object({
 
 // SETTINGS  ·  GET/PATCH /api/v1/admin/settings
 
-export const updateMaintenanceSettingsSchema = z.object({
-  enabled: z.boolean(),
-  message: z.string().trim().max(500).optional().or(z.literal("")),
-});
-
 export const updateAdminPasswordSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
   newPassword: z.string().min(8, "New password must be at least 8 characters"),
@@ -277,6 +276,12 @@ export const updateAdminPasswordSchema = z.object({
 export const updateAdminAlertPreferencesSchema = z.object({
   alerts: z.record(z.enum(ADMIN_ALERT_PREFERENCE_KEYS), z.boolean()).optional(),
   digests: z.record(z.enum(ADMIN_DIGEST_PREFERENCE_KEYS), z.boolean()).optional(),
+});
+
+// NAV BADGES  ·  GET /api/v1/admin/nav-badges, POST /api/v1/admin/nav-badges/seen
+
+export const markAdminNavSectionSeenSchema = z.object({
+  section: z.enum(ADMIN_NAV_SECTION_KEYS),
 });
 
 // INFERRED TYPES
@@ -300,6 +305,6 @@ export type UpdateContactMessageInput = z.infer<typeof updateContactMessageSchem
 export type AdminNotificationsQuery = z.infer<typeof adminNotificationsQuerySchema>;
 export type MarkAdminNotificationReadInput = z.infer<typeof markAdminNotificationReadSchema>;
 export type UpdateAdminProfileInput = z.infer<typeof updateAdminProfileSchema>;
-export type UpdateMaintenanceSettingsInput = z.infer<typeof updateMaintenanceSettingsSchema>;
 export type UpdateAdminPasswordInput = z.infer<typeof updateAdminPasswordSchema>;
 export type UpdateAdminAlertPreferencesInput = z.infer<typeof updateAdminAlertPreferencesSchema>;
+export type MarkAdminNavSectionSeenInput = z.infer<typeof markAdminNavSectionSeenSchema>;

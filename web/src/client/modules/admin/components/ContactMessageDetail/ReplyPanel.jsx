@@ -21,7 +21,12 @@ export function ReplyPanel({ message, onSend, disabled, sending = false }) {
     const text = body.trim();
     if (!text || sending || disabled) return;
 
-    await onSend(text);
+    try {
+      await onSend(text);
+    } catch {
+      return;
+    }
+
     setBody("");
     setSent(true);
     window.setTimeout(() => setSent(false), 2000);

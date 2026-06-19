@@ -1,4 +1,3 @@
-import { buildAdminBarberDetail } from "@/client/modules/admin/helpers/barberDetailHelpers.js";
 import { buildBarberRequestDetail } from "@/client/modules/admin/helpers/barberRequestsHelpers.js";
 import { buildContactMessageRecord } from "@/client/modules/admin/helpers/contactMessagesHelpers.js";
 import { mapAdminUserDetailFromApi } from "@/client/modules/admin/helpers/userDetailHelpers.js";
@@ -141,11 +140,30 @@ export function mapAdminBarberListItem(raw) {
 
 export function mapAdminBarberDetail(raw) {
   const listShape = mapAdminBarberListItem(raw);
-  return buildAdminBarberDetail({
+  const accountStatus = raw.status === "disabled" ? "disabled" : raw.status;
+
+  return {
     ...listShape,
-    experience: raw.experience ?? "Senior",
+    accountStatus,
+    bio: raw.bio ?? null,
     specialties: raw.specialties ?? [],
-  });
+    servicesCount: raw.servicesCount ?? 0,
+    stats: {
+      totalAppointments: raw.appointmentsTotal ?? 0,
+      thisMonth: raw.appointmentsThisMonth ?? 0,
+    },
+    activity: raw.joinedAt
+      ? [
+          {
+            id: `${raw.id}-joined`,
+            type: "account",
+            title: "Account created",
+            description: `${listShape.name} joined the platform.`,
+            at: new Date(raw.joinedAt).toISOString(),
+          },
+        ]
+      : [],
+  };
 }
 
 export function mapBarberRequestDetail(raw) {
@@ -173,7 +191,7 @@ export function mapContactMessageDetail(raw) {
 }
 
 export function toBarberStatusApi(status) {
-  if (status === "suspended") return "DISABLED";
+  if (status === "suspended" || status === "disabled") return "DISABLED";
   return status.toUpperCase();
 }
 
@@ -209,7 +227,6 @@ export function mapAdminDashboard(raw) {
   if (!raw) return null;
 
   const stats = raw.stats ?? {};
-  const queue = raw.queueOverview ?? {};
 
   return {
     stats: {
@@ -227,21 +244,23 @@ export function mapAdminDashboard(raw) {
       ...item,
       time: item.time ? formatTimeAgo(item.time) : item.time,
     })),
-    recentReports: raw.recentReports ?? [],
-    queueOverview: [
-      {
-        city: "Platform-wide",
-        waiting: queue.waiting ?? 0,
-        inService: queue.inService ?? 0,
-        freeChairs: Math.max(0, (queue.chairsTotal ?? 0) - (queue.chairsBusy ?? 0)),
-      },
-    ],
     cityGrowth: (raw.cityGrowth ?? []).map((c) => ({
       city: c.city,
-      users: c.barbers ?? c.users ?? 0,
+      barbers: c.barbers ?? c.users ?? 0,
       delta: c.growthPct ?? c.delta ?? 0,
       hot: (c.growthPct ?? c.delta ?? 0) > 10,
     })),
+    queueOverview: {
+      waiting: raw.queueOverview?.waiting ?? 0,
+      inService: raw.queueOverview?.inService ?? 0,
+      chairsBusy: raw.queueOverview?.chairsBusy ?? 0,
+      chairsTotal: raw.queueOverview?.chairsTotal ?? 0,
+    },
+    recentReports: (raw.recentReports ?? []).map((r) => ({
+      ...r,
+      time: r.time ? formatTimeAgo(r.time) : r.time,
+    })),
+    unreadMessages: stats.unreadMessages ?? 0,
   };
 }
 
@@ -258,16 +277,14 @@ export function mapAdminProfile(api) {
     photoUrl: api.photoUrl ?? "",
     isActive: api.isActive,
     lastActiveAt: api.lastActiveAt,
-    createdAt: api.createdAt,
-    role: "Administrator",
+    createdAt: api.createdAt ?? api.joinedAt ?? null,
+    role: api.role === "Admin" ? "Administrator" : (api.role ?? "Administrator"),
   };
 }
 
 export function mapAdminProfileToApi(profile) {
   return {
-    fullName: profile.fullName,
-    phone: profile.phone || null,
-    city: profile.city || null,
-    photoUrl: profile.photo || null,
+    fullName: profile.fullName?.trim() ?? "",
+    phone: profile.phone?.trim() ?? "",
   };
 }

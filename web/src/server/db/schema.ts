@@ -15,6 +15,7 @@ import {
   barberStatusEnum,
   cancelledByEnum,
   contactReplyStatusEnum,
+  contactWorkflowStatusEnum,
   notificationTypeEnum,
   queueSourceEnum,
   roleEnum,
@@ -477,6 +478,7 @@ export const contactMessages = pgTable("contact_messages", {
   message: text("message").notNull(),
   isRead: boolean("is_read").notNull().default(false),
   replyStatus: contactReplyStatusEnum("reply_status").notNull().default("UNREPLIED"),
+  workflowStatus: contactWorkflowStatusEnum("workflow_status").notNull().default("NEW"),
   replyText: text("reply_text"),
   repliedAt: timestamp("replied_at", { withTimezone: true, mode: "date" }),
   internalNote: text("internal_note"),
@@ -722,6 +724,48 @@ export const contactMessagesRelations = relations(contactMessages, ({ one }) => 
   user: one(users, { fields: [contactMessages.userId], references: [users.id] }),
 }));
 
+// ─── ADMIN NAV SEEN ─────────────────────────────────────────────────────────
+
+export const adminNavSeen = pgTable(
+  "admin_nav_seen",
+  {
+    id: text("id").primaryKey().$defaultFn(createId),
+    adminUserId: text("admin_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    section: text("section").notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: "date" }).notNull(),
+    ...timestamps,
+  },
+  (table) => [unique("admin_nav_seen_admin_user_id_section_unique").on(table.adminUserId, table.section)],
+);
+
+export const adminNavSeenRelations = relations(adminNavSeen, ({ one }) => ({
+  admin: one(users, { fields: [adminNavSeen.adminUserId], references: [users.id] }),
+}));
+
+// ─── BARBER NAV SEEN ────────────────────────────────────────────────────────
+
+export const barberNavSeen = pgTable(
+  "barber_nav_seen",
+  {
+    id: text("id").primaryKey().$defaultFn(createId),
+    barberUserId: text("barber_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    section: text("section").notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: "date" }).notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique("barber_nav_seen_barber_user_id_section_unique").on(table.barberUserId, table.section),
+  ],
+);
+
+export const barberNavSeenRelations = relations(barberNavSeen, ({ one }) => ({
+  barber: one(users, { fields: [barberNavSeen.barberUserId], references: [users.id] }),
+}));
+
 // ─── SCHEMA EXPORT ──────────────────────────────────────────────────────────
 
 export const schema = {
@@ -752,6 +796,8 @@ export const schema = {
   requestDocuments,
   notifications,
   contactMessages,
+  adminNavSeen,
+  barberNavSeen,
 };
 
 export type User = typeof users.$inferSelect;

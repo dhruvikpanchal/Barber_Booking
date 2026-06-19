@@ -43,11 +43,10 @@ export default function DangerSection({ onToast, onDelete, deleting: externalDel
             <Check className="w-5 h-5 text-red-400" />
           </div>
           <p className="text-sm text-on-surface font-semibold">
-            Account deletion scheduled
+            Account deleted
           </p>
           <p className="text-xs text-on-surface-variant mt-2 max-w-xs mx-auto">
-            Your account will be permanently deleted in 30 days. You can cancel
-            by logging in and visiting settings.
+            Your account has been permanently deleted and you have been signed out.
           </p>
         </div>
       ) : (
@@ -89,8 +88,8 @@ export default function DangerSection({ onToast, onDelete, deleting: externalDel
                     <ul className="text-[11px] text-on-surface-variant space-y-1 list-disc list-inside">
                       <li>All your upcoming bookings will be cancelled</li>
                       <li>Your reviews and ratings will be removed</li>
-                      <li>You will lose access to all loyalty points</li>
-                      <li>This account cannot be recovered after 30 days</li>
+                      <li>You will be signed out immediately</li>
+                      <li>This account cannot be recovered</li>
                     </ul>
                   </div>
                 </div>

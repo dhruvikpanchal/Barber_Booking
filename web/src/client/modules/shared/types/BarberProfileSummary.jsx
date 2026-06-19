@@ -1,14 +1,6 @@
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import Image from "next/image";
-import {
-  Star,
-  Clock,
-  MapPin,
-  CalendarPlus,
-  Images,
-  MessageSquare,
-  User,
-} from "lucide-react";
+import { Star, Clock, MapPin, CalendarPlus, Images, MessageSquare, User } from "lucide-react";
 
 /**
  * Shared barber profile card — matches public listing/detail hierarchy.
@@ -64,8 +56,8 @@ export default function BarberProfileSummary({
     <div
       className={
         isCompact
-          ? "relative aspect-square w-full min-h-[88px] bg-surface-container"
-          : "relative aspect-square bg-surface-container md:aspect-auto md:min-h-[320px]"
+          ? "bg-surface-container relative aspect-square min-h-[88px] w-full"
+          : "bg-surface-container relative aspect-square md:aspect-auto md:min-h-[320px]"
       }
     >
       {barber.image ? (
@@ -74,26 +66,15 @@ export default function BarberProfileSummary({
           alt=""
           fill
           className="object-cover"
-          sizes={
-            isCompact
-              ? "120px"
-              : "(max-width: 768px) 100vw, 280px"
-          }
-          unoptimized={
-            typeof barber.image === "string" && barber.image.startsWith("blob:")
-          }
+          sizes={isCompact ? "120px" : "(max-width: 768px) 100vw, 280px"}
+          unoptimized={typeof barber.image === "string" && barber.image.startsWith("blob:")}
         />
       ) : (
-        <div className="flex h-full min-h-[inherit] items-center justify-center text-on-surface-variant">
-          <User
-            className={isCompact ? "h-8 w-8 opacity-40" : "h-16 w-16 opacity-40"}
-            aria-hidden
-          />
+        <div className="text-on-surface-variant flex h-full min-h-[inherit] items-center justify-center">
+          <User className={isCompact ? "h-8 w-8 opacity-40" : "h-16 w-16 opacity-40"} aria-hidden />
         </div>
       )}
-      <span
-        className={`absolute ${isCompact ? "right-2 top-2" : "left-4 top-4"}`}
-      >
+      <span className={`absolute ${isCompact ? "top-2 right-2" : "top-4 left-4"}`}>
         {availabilityBadge}
       </span>
     </div>
@@ -104,19 +85,17 @@ export default function BarberProfileSummary({
       className={`flex flex-wrap items-center gap-x-3 gap-y-1 ${isCompact ? "text-xs" : "text-sm"}`}
     >
       {rating > 0 ? (
-        <span className="inline-flex items-center gap-1 font-semibold text-on-surface">
+        <span className="text-on-surface inline-flex items-center gap-1 font-semibold">
           <Star
             className={`fill-primary text-primary ${isCompact ? "h-3.5 w-3.5" : "h-5 w-5"}`}
             aria-hidden
           />
           {rating.toFixed(1)}
-          <span className="font-normal text-on-surface-variant">
-            ({reviewCount} reviews)
-          </span>
+          <span className="text-on-surface-variant font-normal">({reviewCount} reviews)</span>
         </span>
       ) : null}
       {barber.experienceText ? (
-        <span className="inline-flex items-center gap-1 text-on-surface-variant">
+        <span className="text-on-surface-variant inline-flex items-center gap-1">
           <Clock
             className={`text-primary/70 ${isCompact ? "h-3.5 w-3.5" : "h-4 w-4"}`}
             aria-hidden
@@ -124,42 +103,34 @@ export default function BarberProfileSummary({
           {barber.experienceText}
         </span>
       ) : null}
-      {startingPrice != null ? (
-        <span className="font-semibold text-primary">
-          From ${startingPrice}
-        </span>
+      {startingPrice > 0 ? (
+        <span className="text-primary font-semibold">From ₹{startingPrice}</span>
       ) : null}
     </div>
   );
 
   const contentBlock = (
-    <div
-      className={`flex min-w-0 flex-col ${isCompact ? "p-3" : "p-5 sm:p-6 md:p-8"}`}
-    >
+    <div className={`flex min-w-0 flex-col ${isCompact ? "p-3" : "p-5 sm:p-6 md:p-8"}`}>
       {barber.role ? (
-        <p
-          className={`font-label-caps text-primary ${isCompact ? "text-[10px]" : ""}`}
-        >
+        <p className={`font-label-caps text-primary ${isCompact ? "text-[10px]" : ""}`}>
           {barber.role}
         </p>
       ) : null}
       <h2
-        className={`font-serif font-bold tracking-tight text-on-surface ${
-          isCompact
-            ? "mt-0.5 text-base leading-snug"
-            : "mt-1 text-3xl md:text-4xl"
+        className={`text-on-surface font-serif font-bold tracking-tight ${
+          isCompact ? "mt-0.5 text-base leading-snug" : "mt-1 text-3xl md:text-4xl"
         }`}
       >
         {barber.name}
       </h2>
 
       <p
-        className={`mt-1.5 flex items-start gap-1.5 text-on-surface-variant ${
+        className={`text-on-surface-variant mt-1.5 flex items-start gap-1.5 ${
           isCompact ? "text-xs" : "text-sm"
         }`}
       >
         <MapPin
-          className={`shrink-0 text-primary ${isCompact ? "mt-0.5 h-3.5 w-3.5" : "mt-0.5 h-4 w-4"}`}
+          className={`text-primary shrink-0 ${isCompact ? "mt-0.5 h-3.5 w-3.5" : "mt-0.5 h-4 w-4"}`}
           aria-hidden
         />
         <span className="min-w-0 break-words">
@@ -180,27 +151,27 @@ export default function BarberProfileSummary({
           {barber.available ? (
             <Link
               href={bookHref}
-              className="inline-flex h-11 items-center gap-2 rounded-md bg-primary px-5 text-sm font-bold text-on-primary transition-colors hover:bg-primary/90"
+              className="bg-primary text-on-primary hover:bg-primary/90 inline-flex h-11 items-center gap-2 rounded-md px-5 text-sm font-bold transition-colors"
             >
               <CalendarPlus className="h-4 w-4" aria-hidden />
               Book appointment
             </Link>
           ) : (
-            <span className="inline-flex h-11 cursor-not-allowed items-center gap-2 rounded-md border border-outline-variant bg-surface-container px-5 text-sm font-semibold text-on-surface-variant opacity-60">
+            <span className="border-outline-variant bg-surface-container text-on-surface-variant inline-flex h-11 cursor-not-allowed items-center gap-2 rounded-md border px-5 text-sm font-semibold opacity-60">
               <CalendarPlus className="h-4 w-4" aria-hidden />
               Currently unavailable
             </span>
           )}
           <a
             href="#gallery"
-            className="inline-flex h-11 items-center gap-2 rounded-md border border-outline-variant bg-surface-container px-4 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+            className="border-outline-variant bg-surface-container text-on-surface hover:bg-surface-container-high inline-flex h-11 items-center gap-2 rounded-md border px-4 text-sm font-semibold transition-colors"
           >
             <Images className="h-4 w-4" aria-hidden />
             View gallery
           </a>
           <a
             href="#reviews"
-            className="inline-flex h-11 items-center gap-2 rounded-md border border-outline-variant bg-surface-container px-4 text-sm font-semibold text-on-surface transition-colors hover:bg-surface-container-high"
+            className="border-outline-variant bg-surface-container text-on-surface hover:bg-surface-container-high inline-flex h-11 items-center gap-2 rounded-md border px-4 text-sm font-semibold transition-colors"
           >
             <MessageSquare className="h-4 w-4" aria-hidden />
             Read reviews
@@ -211,7 +182,7 @@ export default function BarberProfileSummary({
   );
 
   return (
-    <section className="overflow-hidden rounded-xl border border-outline-variant bg-surface-container-low">
+    <section className="border-outline-variant bg-surface-container-low overflow-hidden rounded-xl border">
       <div
         className={
           isCompact
@@ -224,23 +195,19 @@ export default function BarberProfileSummary({
       </div>
 
       {(barber.bio || services.length > 0) && (
-        <div
-          className={`border-t border-outline-variant ${isCompact ? "p-3" : "p-5 sm:p-6"}`}
-        >
+        <div className={`border-outline-variant border-t ${isCompact ? "p-3" : "p-5 sm:p-6"}`}>
           {barber.bio ? (
             <>
               <h3
-                className={`font-serif font-bold text-on-surface ${
+                className={`text-on-surface font-serif font-bold ${
                   isCompact ? "text-sm" : "text-lg"
                 }`}
               >
                 About
               </h3>
               <p
-                className={`mt-1.5 leading-relaxed text-on-surface-variant ${
-                  isCompact
-                    ? "line-clamp-3 text-xs"
-                    : "text-sm"
+                className={`text-on-surface-variant mt-1.5 leading-relaxed ${
+                  isCompact ? "line-clamp-3 text-xs" : "text-sm"
                 }`}
               >
                 {barber.bio}
@@ -250,7 +217,7 @@ export default function BarberProfileSummary({
           {services.length > 0 ? (
             <div className={barber.bio ? "mt-3" : ""}>
               {!isCompact && (
-                <p className="font-label-caps mb-2 text-[10px] text-on-surface-variant">
+                <p className="font-label-caps text-on-surface-variant mb-2 text-[10px]">
                   Specialties
                 </p>
               )}
@@ -258,7 +225,7 @@ export default function BarberProfileSummary({
                 {services.map((s) => (
                   <span
                     key={s}
-                    className="rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary"
+                    className="border-primary/25 bg-primary/10 text-primary rounded-full border px-2.5 py-0.5 text-[11px] font-medium"
                   >
                     {s}
                   </span>

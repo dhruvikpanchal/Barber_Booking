@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import Link from "next/link";
+import { useState, useEffect } from "react";
+import Link from "@/lib/AppLink";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -27,6 +27,7 @@ import DetailSection from "@/client/modules/customer/components/MyAppointments/D
 import CancelModal from "@/client/modules/customer/components/MyAppointments/CancelModal.jsx";
 import ReviewModal from "@/client/modules/customer/components/MyAppointments/ReviewModal.jsx";
 import ChangeRequestPendingBadge from "@/client/modules/customer/components/MyAppointments/ChangeRequestPendingBadge.jsx";
+import BarberImage from "@/client/modules/customer/components/shared/BarberImage.jsx";
 import RequestServiceChangeModal from "@/client/modules/customer/components/MyAppointments/RequestServiceChangeModal.jsx";
 import {
   formatDateTime,
@@ -38,6 +39,8 @@ import {
 } from "@/client/modules/customer/helpers/appointmentsHelpers.js";
 import { customerHook } from "@/client/modules/customer/hooks/customerQuery.jsx";
 import { routes } from "@/client/config/routes/routes.js";
+import { CUSTOMER_NAV_SECTIONS } from "@/client/modules/customer/constants/customerNavSeenConstants.js";
+import { useMarkCustomerNavSeen } from "@/client/modules/customer/hooks/useMarkCustomerNavSeen.js";
 
 function InfoLine({ icon: Icon, label, value }) {
   return (
@@ -65,15 +68,21 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
   } = customerHook.Appointments.useGetAppointment(id);
   const appt = apptFromQuery ?? initialAppt ?? null;
 
-  const { data: favorites = [], refetch: refetchFavorites } =
-    customerHook.Favorites.useListFavorites();
-  const favoriteIds = useMemo(
-    () => new Set((Array.isArray(favorites) ? favorites : []).map((b) => b.id)),
-    [favorites],
+  useMarkCustomerNavSeen(
+    CUSTOMER_NAV_SECTIONS.appointments,
+    appt ? [appt] : [],
+    (item) => item.bookedAt,
   );
 
   const barberSlug = appt?.barber?.slug ?? appt?.barber?.id ?? "";
-  const { data: serviceCatalogRaw = [] } = customerHook.Booking.useListBookingServices(barberSlug);
+  const [changeModalOpen, setChangeModalOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  const { data: serviceCatalogRaw = [] } = customerHook.Booking.useListBookingServices(barberSlug, {
+    enabled: changeModalOpen && Boolean(barberSlug),
+  });
   const serviceCatalog = Array.isArray(serviceCatalogRaw) ? serviceCatalogRaw : [];
 
   const cancelMutation = customerHook.Appointments.useCancelAppointment();
@@ -82,9 +91,11 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
   const addFavoriteMutation = customerHook.Favorites.useAddFavorite();
   const removeFavoriteMutation = customerHook.Favorites.useRemoveFavorite();
 
-  const [changeModalOpen, setChangeModalOpen] = useState(false);
-  const [cancelOpen, setCancelOpen] = useState(false);
-  const [reviewOpen, setReviewOpen] = useState(false);
+  useEffect(() => {
+    if (appt?.barber?.isFavorite != null) {
+      setIsFavorite(Boolean(appt.barber.isFavorite));
+    }
+  }, [appt?.barber?.isFavorite, appt?.id]);
 
   const busy =
     isPending ||
@@ -102,7 +113,7 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
 
   if (isPending && !appt) {
     return (
-      <div className="mx-auto max-w-6xl space-y-4 pb-28">
+      <div className="mx-auto max-w-6xl space-y-4">
         <div className="bg-surface-container h-8 w-48 animate-pulse rounded" />
         <div className="bg-surface-container h-40 animate-pulse rounded-xl" />
         <div className="bg-surface-container h-64 animate-pulse rounded-xl" />
@@ -136,7 +147,6 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
     phone: "—",
   };
   const barberId = displayAppt.barber?.slug ?? displayAppt.barber?.id;
-  const isFavorite = favoriteIds.has(barberId);
   const changeEligibility = canRequestServiceChange(displayAppt, displayAppt.pendingChangeRequest);
   const progressSteps = buildProgressTracker(displayAppt);
   const isUpcoming = displayAppt.status === "pending" || displayAppt.status === "confirmed";
@@ -150,14 +160,20 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
           success: `${displayAppt.barber.name} removed from favorites.`,
           error: "Could not update favorites.",
         });
+        setIsFavorite(false);
       } else {
         await toast.promise(addFavoriteMutation.mutateAsync(barberId), {
           loading: "Updating favorites…",
           success: `${displayAppt.barber.name} added to favorites.`,
           error: "Could not update favorites.",
         });
+        setIsFavorite(true);
       }
-      await refetchFavorites();
+      queryClient.setQueryData(["getAppointment", id], (current) =>
+        current?.barber
+          ? { ...current, barber: { ...current.barber, isFavorite: !isFavorite } }
+          : current,
+      );
       await queryClient.invalidateQueries({ queryKey: ["listFavorites"] });
     } catch {
       /* toast handles error */
@@ -186,10 +202,10 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
     }
   }
 
-  async function handleCancelConfirm() {
+  async function handleCancelConfirm(reason = "") {
     if (busy) return;
     try {
-      await toast.promise(cancelMutation.mutateAsync({ id: displayAppt.id, reason: "" }), {
+      await toast.promise(cancelMutation.mutateAsync({ id: displayAppt.id, reason }), {
         loading: "Cancelling booking…",
         success: "Booking cancelled successfully.",
         error: "Could not cancel booking.",
@@ -217,7 +233,7 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl min-w-0 pb-28 md:pb-10">
+    <div className="mx-auto w-full max-w-6xl min-w-0">
       <Link
         href={routes.customer.myAppointments}
         aria-disabled={busy}
@@ -266,13 +282,11 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
               <div>
                 <p className="font-label-caps text-primary mb-2 text-[10px]">Barber</p>
                 <div className="mb-3 flex items-center gap-3">
-                  <div className="border-primary/25 h-12 w-12 shrink-0 overflow-hidden rounded-lg border">
-                    <img
-                      src={displayAppt.barber.image}
-                      alt={displayAppt.barber.name}
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
+                  <BarberImage
+                    src={displayAppt.barber.image}
+                    name={displayAppt.barber.name}
+                    className="border-primary/25 h-12 w-12 rounded-lg"
+                  />
                   <div className="min-w-0">
                     <p className="text-on-surface font-semibold">{displayAppt.barber.name}</p>
                     <p className="text-on-surface-variant text-xs">{displayAppt.barber.role}</p>
@@ -371,13 +385,11 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
               <p className="font-label-caps text-on-surface-variant text-[10px]">Your barber</p>
             </div>
             <div className="flex items-center gap-4 p-4 sm:p-5">
-              <div className="border-primary/30 h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 sm:h-20 sm:w-20">
-                <img
-                  src={displayAppt.barber.image}
-                  alt={displayAppt.barber.name}
-                  className="h-full w-full object-cover"
-                />
-              </div>
+              <BarberImage
+                src={displayAppt.barber.image}
+                name={displayAppt.barber.name}
+                className="border-primary/30 h-16 w-16 rounded-xl border-2 sm:h-20 sm:w-20"
+              />
               <div className="min-w-0 flex-1">
                 <p className="text-on-surface font-serif text-lg font-bold">
                   {displayAppt.barber.name}
@@ -437,7 +449,12 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
               {(displayAppt.status === "completed" || displayAppt.status === "cancelled") && (
                 <button
                   type="button"
-                  onClick={() => !busy && router.push(routes.customer.bookAppointment)}
+                  onClick={() =>
+                    !busy &&
+                    router.push(
+                      `${routes.customer.bookAppointment}?barber=${encodeURIComponent(barberId)}&step=services&from=favorites`,
+                    )
+                  }
                   disabled={busy}
                   className="border-outline-variant text-on-surface hover:bg-surface-container-high flex h-11 w-full items-center justify-center rounded-xl border text-sm font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50"
                 >

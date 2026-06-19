@@ -38,26 +38,34 @@ export default function AppointmentNotificationCard({ notif, onRead, onDelete })
           </div>
         </div>
 
-        <div className="border-outline-variant bg-surface-container-lowest mt-3 ml-11 space-y-2 rounded-md border p-3">
-          <div className="flex items-center gap-2">
-            <BarberAvatar initials={notif.barber.initials} size="sm" />
-            <div>
-              <p className="text-on-surface text-sm font-semibold">{notif.barber.name}</p>
-              <p className="text-on-surface-variant text-xs">{notif.service}</p>
-            </div>
-          </div>
-          <div className="text-on-surface-variant flex flex-wrap gap-3 pt-1 text-xs">
-            <span className="flex items-center gap-1.5">
-              <Clock className="text-primary/60 h-3.5 w-3.5" />
-              {notif.date}
-            </span>
-            {notif.reason && (
-              <span className="text-on-surface-variant/80 italic">
-                {notif.cancelledBy === "barber" ? "Barber" : "You"}: {notif.reason}
-              </span>
+        {(notif.barber || notif.service || notif.date) && (
+          <div className="border-outline-variant bg-surface-container-lowest mt-3 ml-11 space-y-2 rounded-md border p-3">
+            {notif.barber && (
+              <div className="flex items-center gap-2">
+                <BarberAvatar initials={notif.barber.initials} size="sm" />
+                <div>
+                  <p className="text-on-surface text-sm font-semibold">{notif.barber.name}</p>
+                  {notif.service ? (
+                    <p className="text-on-surface-variant text-xs">{notif.service}</p>
+                  ) : null}
+                </div>
+              </div>
+            )}
+            {notif.date && (
+              <div className="text-on-surface-variant flex flex-wrap gap-3 pt-1 text-xs">
+                <span className="flex items-center gap-1.5">
+                  <Clock className="text-primary/60 h-3.5 w-3.5" />
+                  {notif.date}
+                </span>
+                {notif.reason && (
+                  <span className="text-on-surface-variant/80 italic">
+                    {notif.cancelledBy === "barber" ? "Barber" : "You"}: {notif.reason}
+                  </span>
+                )}
+              </div>
             )}
           </div>
-        </div>
+        )}
 
         <div className="mt-3 ml-11 flex flex-wrap items-center justify-between gap-2">
           <ViewLink href={href} />

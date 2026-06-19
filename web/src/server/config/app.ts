@@ -1,6 +1,9 @@
 /** Application-wide settings (not secrets). */
+import { regionConfig } from "@/server/config/region";
+
 export const appConfig = {
   name: "Iron & Oak",
+  region: regionConfig,
   apiPrefix: "/api/v1",
   defaultPagination: {
     page: 1,

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { ChevronRight, Download, Eye, FileText, Home } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";
 
@@ -132,20 +132,29 @@ export function DocumentList({ documents, emptyLabel }) {
             </div>
           </div>
           <div className="flex shrink-0 gap-2 sm:ml-auto">
-            <button
-              type="button"
-              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-outline-variant bg-surface-container-low px-3 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface sm:flex-initial"
-            >
-              <Eye className="h-3.5 w-3.5" aria-hidden />
-              Preview
-            </button>
-            <button
-              type="button"
-              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-outline-variant bg-surface-container-low px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 sm:flex-initial"
-            >
-              <Download className="h-3.5 w-3.5" aria-hidden />
-              Download
-            </button>
+            {doc.fileUrl ? (
+              <>
+                <a
+                  href={doc.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-outline-variant bg-surface-container-low px-3 py-2 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface sm:flex-initial"
+                >
+                  <Eye className="h-3.5 w-3.5" aria-hidden />
+                  Preview
+                </a>
+                <a
+                  href={doc.fileUrl}
+                  download={doc.fileName}
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-md border border-outline-variant bg-surface-container-low px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/10 sm:flex-initial"
+                >
+                  <Download className="h-3.5 w-3.5" aria-hidden />
+                  Download
+                </a>
+              </>
+            ) : (
+              <span className="text-on-surface-variant text-xs">File unavailable</span>
+            )}
           </div>
         </li>
       ))}

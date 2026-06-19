@@ -1,9 +1,10 @@
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import { CalendarClock, ChevronRight } from "lucide-react";
 import { routes } from "@/config/routes/routes.js";
 import { formatDateTime } from "@/client/modules/customer/helpers/appointmentsHelpers.js";
 import StatusBadge from "@/client/modules/shared/components/ui/StatusBadge";
 import { CUSTOMER_APPOINTMENT_STATUSES } from "@/client/modules/customer/constants/appointmentStatusesConstants.js";
+import BarberThumb from "./BarberThumb.jsx";
 
 export default function UpcomingBookingsWidget({ appointments }) {
   return (
@@ -53,9 +54,7 @@ export default function UpcomingBookingsWidget({ appointments }) {
                   href={routes.customer.appointmentsDetail(appt.id)}
                   className="group hover:bg-surface-container flex items-center gap-3 px-4 py-3.5 transition-colors sm:px-5"
                 >
-                  <div className="border-outline-variant h-10 w-10 shrink-0 overflow-hidden rounded-lg border">
-                    <img src={appt.barber.image} alt="" className="h-full w-full object-cover" />
-                  </div>
+                  <BarberThumb barber={appt.barber} />
                   <div className="min-w-0 flex-1">
                     <p className="text-on-surface truncate text-sm font-semibold">
                       {appt.barber.name}
@@ -73,7 +72,7 @@ export default function UpcomingBookingsWidget({ appointments }) {
                       size="sm"
                     />
                     <ChevronRight
-                      className="text-on-surface-variant h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100"
+                      className="text-on-surface-variant h-4 w-4 opacity-60 lg:opacity-0 lg:transition-opacity lg:group-hover:opacity-100"
                       aria-hidden
                     />
                   </div>

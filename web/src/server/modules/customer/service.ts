@@ -1,4 +1,5 @@
 import { appConfig } from "@/server/config";
+import { sendBookingConfirmation } from "@/server/infra/mail/mailtrap";
 import { uploadImage } from "@/server/infra/storage/cloudinary";
 import {
   BOOKING_MIN_LEAD_MINUTES,
@@ -9,6 +10,7 @@ import {
 import {
   buildDashboardActivity,
   buildPaginationMeta,
+  isCustomerUpcomingAppointment,
   matchesCustomerNotificationFilter,
   toAvailableSlotDto,
   toBookingBarberDto,
@@ -50,8 +52,20 @@ import {
   NotFoundError,
   UnprocessableError,
 } from "@/server/modules/shared/helpers/AppError";
+import {
+  dayOfWeekFromDateKey,
+  startAtMatchesWallClock,
+  wallClockDayBounds,
+  wallClockToInstant,
+} from "@/server/modules/shared/helpers/calendarDate";
 import { NOTIFICATION_TYPE } from "@/server/modules/shared/constants/notificationTypes";
 import { ROLES } from "@/server/modules/shared/constants/roles";
+import {
+  realtimeToBarber,
+  realtimeToRole,
+  realtimeToUser,
+  realtimeSyncUser,
+} from "@/server/modules/shared/realtime/emit";
 
 function fireAndForget(promise: Promise<unknown>): void {
   promise.catch((err) => console.error("[customer] async side-effect failed", err));
@@ -83,13 +97,12 @@ function notificationTypesForFilter(filter: string): string[] | undefined {
         NOTIFICATION_TYPE.BOOKING_CONFIRMED,
         NOTIFICATION_TYPE.BOOKING_CANCELLED,
         NOTIFICATION_TYPE.BOOKING_REMINDER,
+        NOTIFICATION_TYPE.BOOKING_MODIFICATION_REQUEST,
       ];
     case "service_change":
       return [NOTIFICATION_TYPE.SERVICE_CHANGE_ACCEPTED, NOTIFICATION_TYPE.SERVICE_CHANGE_REJECTED];
     case "review_request":
       return [NOTIFICATION_TYPE.REVIEW_REQUEST];
-    case "promotion":
-      return [NOTIFICATION_TYPE.PROMOTION];
     default:
       return undefined;
   }
@@ -118,20 +131,35 @@ async function notifyBarber(
   if (!barber) return;
 
   fireAndForget(
-    customerRepository.createNotification({
-      userId: barber.userId,
-      type: payload.type,
-      title: payload.title,
-      message: payload.message,
-      ...(payload.appointmentId ? { appointment: { connect: { id: payload.appointmentId } } } : {}),
-      metadata: (payload.metadata ?? undefined) as unknown,
-    }),
+    customerRepository
+      .createNotification({
+        userId: barber.userId,
+        type: payload.type,
+        title: payload.title,
+        message: payload.message,
+        appointmentId: payload.appointmentId ?? null,
+        metadata: (payload.metadata ?? undefined) as unknown,
+      })
+      .then(() => {
+        realtimeToUser(barber.userId, ["notifications", "appointments"], {
+          entityId: payload.appointmentId,
+          toast: { title: payload.title, message: payload.message },
+        });
+        realtimeToBarber(barberId, [
+          "notifications",
+          "appointments",
+          "queue",
+          "dashboard",
+        ], payload.appointmentId);
+      }),
   );
 }
 
 export const customerService = {
   async getProfile(userId: string) {
-    const user = await getCustomerContext(userId);
+    await getCustomerContext(userId);
+    const user = await customerRepository.findUserProfileById(userId);
+    if (!user) throw new NotFoundError("User");
     return toCustomerProfileDto(user);
   },
 
@@ -151,7 +179,8 @@ export const customerService = {
       address: input.address || null,
     });
 
-    return toCustomerProfileDto(updated);
+    const profileRow = await customerRepository.findUserProfileById(userId);
+    return toCustomerProfileDto(profileRow ?? updated);
   },
 
   async uploadProfilePhoto(userId: string, file: { buffer: Buffer; mimeType: string }) {
@@ -177,11 +206,7 @@ export const customerService = {
 
     const now = Date.now();
     const upcoming = listDtos
-      .filter(
-        (a) =>
-          (a.status === "pending" || a.status === "confirmed" || a.status === "in-service") &&
-          new Date(a.startAt).getTime() > now,
-      )
+      .filter((a) => isCustomerUpcomingAppointment(a, now))
       .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
 
     const nextAppointment = upcoming[0] ?? null;
@@ -221,11 +246,16 @@ export const customerService = {
     const user = await getCustomerContext(userId);
     const row = await customerRepository.findAppointmentById(userId, appointmentId);
     if (!row) throw new NotFoundError("Appointment");
-    return toCustomerAppointmentDetailDto(row, {
-      fullName: user.fullName,
-      email: user.email,
-      phone: user.phone,
-    });
+    const favorite = await customerRepository.findFavorite(userId, row.barber.id);
+    return toCustomerAppointmentDetailDto(
+      row,
+      {
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+      },
+      { barberIsFavorite: Boolean(favorite) },
+    );
   },
 
   async createAppointment(userId: string, input: CreateAppointmentInput) {
@@ -269,7 +299,19 @@ export const customerService = {
       );
     }
 
-    await this.assertSlotAvailable(barber.id, input.startAt, totalDuration);
+    const tzOffset = input.timezoneOffsetMinutes ?? 0;
+    if (!startAtMatchesWallClock(input.startAt, input.date, input.time, tzOffset)) {
+      throw new UnprocessableError("startAt does not match the selected date and time");
+    }
+
+    await this.assertSlotAvailable(
+      barber.id,
+      input.startAt,
+      totalDuration,
+      input.date,
+      input.time,
+      tzOffset,
+    );
 
     const customer = await customerRepository.findUserById(userId);
     const row = await customerRepository.createAppointment({
@@ -296,7 +338,23 @@ export const customerService = {
       }),
     );
 
+    if (customer?.email) {
+      fireAndForget(
+        sendBookingConfirmation({
+          to: customer.email,
+          customerName: customer.fullName ?? "Customer",
+          barberName: barber.user.fullName,
+          serviceNames: snapshots.map((s) => s.name),
+          startAt: input.startAt,
+        }),
+      );
+    }
+
     fireAndForget(syncOnlineAppointmentQueueEntry(barber.id, row.id));
+
+    realtimeToUser(userId, ["appointments", "dashboard"], row.id);
+    realtimeToBarber(barber.id, ["queue", "appointments", "dashboard"], row.id);
+    realtimeToRole(ROLES.ADMIN, ["appointments", "nav_badges", "dashboard"], row.id);
 
     return toCreateAppointmentResultDto(row);
   },
@@ -331,6 +389,9 @@ export const customerService = {
     );
 
     fireAndForget(syncOnlineAppointmentQueueEntry(row.barber.id, row.id));
+
+    realtimeToUser(userId, ["appointments", "dashboard"], row.id);
+    realtimeToBarber(row.barber.id, ["queue", "appointments", "dashboard"], row.id);
 
     return toCustomerAppointmentListItemDto(row);
   },
@@ -392,6 +453,8 @@ export const customerService = {
       }),
     );
 
+    realtimeToUser(userId, ["appointments", "notifications"], appointmentId);
+
     return {
       id: request?.id ?? "",
       status: request?.status?.toLowerCase() ?? "",
@@ -441,16 +504,15 @@ export const customerService = {
       totalDuration = services.reduce((s, x) => s + x.service.duration, 0);
     }
 
-    const dayDate = new Date(`${query.date}T00:00:00`);
-    const dayIndex = dayDate.getDay();
+    const tzOffset = query.timezoneOffsetMinutes ?? 0;
+    const dayIndex = dayOfWeekFromDateKey(query.date);
     const hours = await customerRepository.getWorkingHoursForDay(barber.id, dayIndex);
 
     if (!hours || hours.isClosed || !hours.openTime || !hours.closeTime) {
       return [];
     }
 
-    const dayStart = new Date(`${query.date}T00:00:00`);
-    const dayEnd = new Date(`${query.date}T23:59:59`);
+    const { start: dayStart, end: dayEnd } = wallClockDayBounds(query.date, tzOffset);
     const busy = await customerRepository.findAppointmentsForSlotCheck(barber.id, dayStart, dayEnd);
 
     const openMin = parseTimeToMinutes(hours.openTime);
@@ -460,7 +522,7 @@ export const customerService = {
 
     for (let cursor = openMin; cursor + totalDuration <= closeMin; cursor += interval) {
       const time = minutesToTime(cursor);
-      const slotStart = new Date(`${query.date}T${time}:00`);
+      const slotStart = wallClockToInstant(query.date, time, tzOffset);
       const slotStartMs = slotStart.getTime();
       const slotEndMs = appointmentEndMs(slotStart, totalDuration);
 
@@ -482,12 +544,15 @@ export const customerService = {
     return slots;
   },
 
-  async assertSlotAvailable(barberId: string, startAt: Date, durationMinutes: number) {
-    const dateStr = startAt.toISOString().slice(0, 10);
-    const timeStr = `${String(startAt.getHours()).padStart(2, "0")}:${String(startAt.getMinutes()).padStart(2, "0")}`;
-
-    const dayStart = new Date(`${dateStr}T00:00:00`);
-    const dayEnd = new Date(`${dateStr}T23:59:59`);
+  async assertSlotAvailable(
+    barberId: string,
+    startAt: Date,
+    durationMinutes: number,
+    dateStr: string,
+    timeStr: string,
+    timezoneOffsetMinutes = 0,
+  ) {
+    const { start: dayStart, end: dayEnd } = wallClockDayBounds(dateStr, timezoneOffsetMinutes);
     const busy = await customerRepository.findAppointmentsForSlotCheck(barberId, dayStart, dayEnd);
 
     const slotStartMs = startAt.getTime();
@@ -504,7 +569,7 @@ export const customerService = {
       throw new ConflictError("This time slot is no longer available");
     }
 
-    const dayIndex = startAt.getDay();
+    const dayIndex = dayOfWeekFromDateKey(dateStr);
     const hours = await customerRepository.getWorkingHoursForDay(barberId, dayIndex);
     if (!hours || hours.isClosed || !hours.openTime || !hours.closeTime) {
       throw new UnprocessableError("Barber is not available on this date");
@@ -547,6 +612,7 @@ export const customerService = {
     if (existing) throw new ConflictError("Barber is already in your favorites");
 
     const fav = await customerRepository.addFavorite(userId, barber.id);
+    realtimeSyncUser(userId, ["favorites"]);
     return toFavoriteToggleResultDto(barber.id, fav.savedAt);
   },
 
@@ -559,6 +625,7 @@ export const customerService = {
     if (!existing) throw new NotFoundError("Favorite");
 
     await customerRepository.removeFavorite(userId, barber.id);
+    realtimeSyncUser(userId, ["favorites"]);
   },
 
   async listReviews(userId: string, query: CustomerReviewsQuery) {
@@ -596,6 +663,35 @@ export const customerService = {
     if (!review) throw new NotFoundError("Review");
 
     fireAndForget(customerRepository.recalculateBarberRating(appointment.barber.id));
+
+    const customer = await customerRepository.findUserById(userId);
+    const customerName = customer?.fullName ?? "A customer";
+    const serviceName = appointment.services?.[0]?.name ?? null;
+    const nameParts = customerName.trim().split(/\s+/).filter(Boolean);
+    const avatar =
+      nameParts.length === 0
+        ? "?"
+        : nameParts.length === 1
+          ? nameParts[0]!.charAt(0).toUpperCase()
+          : (nameParts[0]!.charAt(0) + nameParts[nameParts.length - 1]!.charAt(0)).toUpperCase();
+
+    notifyBarber(appointment.barber.id, {
+      type: NOTIFICATION_TYPE.NEW_CUSTOMER_REVIEW,
+      title: "New customer review",
+      message: `${customerName} left a ${input.rating}-star review.`,
+      appointmentId,
+      metadata: {
+        client: customerName,
+        avatar,
+        rating: input.rating,
+        review: input.comment ?? null,
+        service: serviceName,
+        reviewId: review.id,
+      },
+    });
+
+    realtimeToUser(userId, ["reviews", "appointments"], review.id);
+    realtimeToBarber(appointment.barber.id, ["reviews"]);
 
     return toCustomerReviewDto(review);
   },
@@ -678,12 +774,14 @@ export const customerService = {
 
     const updated = await customerRepository.markNotificationRead(userId, notificationId);
     if (!updated) throw new NotFoundError("Notification");
+    realtimeSyncUser(userId, ["notifications"]);
     return { id: updated.id, isRead: updated.isRead };
   },
 
   async markAllNotificationsRead(userId: string) {
     await getCustomerContext(userId);
     await customerRepository.markAllNotificationsRead(userId);
+    realtimeSyncUser(userId, ["notifications"]);
     return { message: "All notifications marked as read" };
   },
 
@@ -693,5 +791,6 @@ export const customerService = {
     if (!row) throw new NotFoundError("Notification");
     const deleted = await customerRepository.deleteNotification(userId, notificationId);
     if (!deleted) throw new NotFoundError("Notification");
+    realtimeSyncUser(userId, ["notifications"]);
   },
 };

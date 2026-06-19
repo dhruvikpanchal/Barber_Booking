@@ -1,4 +1,4 @@
-import { CalendarCheck, CalendarClock, CalendarX, RefreshCw, Star, Tag, CalendarRange } from "lucide-react";
+import { CalendarCheck, CalendarClock, CalendarX, RefreshCw, Star, CalendarRange } from "lucide-react";
 
 export const APPOINTMENT_TYPES = [
   "booking_confirmed",
@@ -62,15 +62,6 @@ export const TYPE_META = {
     dot: "bg-yellow-400",
     filterLabel: "Reviews",
   },
-  promotion: {
-    icon: Tag,
-    label: "Offer",
-    color: "text-primary",
-    bg: "bg-primary/10",
-    border: "border-primary/20",
-    dot: "bg-primary",
-    filterLabel: "Offers",
-  },
 };
 
 export const FILTERS = [
@@ -82,5 +73,4 @@ export const FILTERS = [
   },
   { id: "service_change", label: "Updates" },
   { id: "review_request", label: "Reviews" },
-  { id: "promotion", label: "Offers" },
 ];

@@ -25,6 +25,9 @@ const envSchema = z.object({
   /** Google OAuth client ID (required for POST /auth/google) */
   GOOGLE_CLIENT_ID: z.string().optional(),
 
+  /** Google OAuth client secret (required for redirect-based Google sign-in) */
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+
   /** Public Google client ID for browser sign-in (falls back to GOOGLE_CLIENT_ID) */
   NEXT_PUBLIC_GOOGLE_CLIENT_ID: z.string().optional(),
 });

@@ -1,28 +1,30 @@
 "use client";
 
 import { useCallback, useEffect, useMemo } from "react";
-import Link from "next/link";
+import Link from "@/lib/AppLink";
 import {
   ArrowLeft,
   CalendarDays,
   Check,
   Clock,
-  DollarSign,
+  IndianRupee,
   Mail,
   Phone,
   Scissors,
   StickyNote,
+  Users,
   X,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { routes } from "@/client/config/routes/routes.js";
 import {
-  getServiceChangeAppointmentId,
   normalizeBarberAppointment,
+  getPendingServiceChangeRequest,
 } from "@/client/modules/barber/helpers/appointmentHelpers.js";
 import { mapAppointmentListItem } from "@/client/modules/barber/helpers/barberMappers.js";
 import { formatDateLabel, formatTimeLabel } from "@/client/lib/format/formatDateTime.js";
+import { formatMoney } from "@/client/lib/format/formatMoney.js";
 import StatusBadge from "@/client/modules/shared/components/ui/StatusBadge";
 import { STATUSES } from "@/client/modules/barber/constants/statusConstants.js";
 import ServiceChangeRequestsSection from "@/client/modules/barber/components/Appointments/ServiceChangeRequestsSection.jsx";
@@ -100,7 +102,7 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
           error: "Could not update appointment.",
         });
         await refetch();
-        await invalidate.workflow();
+        await invalidate.operations();
       } catch {
         /* toast handles error */
       }
@@ -131,8 +133,8 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
     );
   }
 
-  const serviceChangeId = getServiceChangeAppointmentId(appt);
-  const hasPendingChange = Boolean(appt.pendingChangeRequest);
+  const serviceChangeId = appt.id;
+  const hasPendingChange = Boolean(getPendingServiceChangeRequest(appt.serviceChangeRequests));
   const date = formatDateLabel(appt.startAt, {
     weekday: "long",
     month: "long",
@@ -147,6 +149,10 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
     appt.status === "confirmed" ||
     appt.status === "in-service" ||
     appt.status === "rescheduled";
+  const showQueueNav =
+    appt.status === "confirmed" || appt.status === "in-service" || appt.status === "rescheduled";
+  const priceLabel =
+    appt.status === "completed" && appt.finalPrice != null ? "Final total" : "Estimated total";
 
   return (
     <div className="text-on-surface mx-auto w-full max-w-6xl min-w-0 space-y-6 pb-28 md:space-y-8 md:pb-8">
@@ -223,7 +229,11 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
                 <InfoRow Icon={CalendarDays} label="Date" value={date} />
                 <InfoRow Icon={Clock} label="Time" value={time} />
                 <InfoRow Icon={Clock} label="Duration" value={`${appt.duration} minutes`} />
-                <InfoRow Icon={DollarSign} label="Estimated total" value={`$${appt.price}`} />
+                <InfoRow
+                  Icon={IndianRupee}
+                  label={priceLabel}
+                  value={formatMoney(appt.price)}
+                />
               </div>
               <div className="px-4 py-1 sm:px-5">
                 <p className="font-label-caps text-on-surface-variant py-3">Services</p>
@@ -235,7 +245,7 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
                         {s.name}
                         <span className="text-on-surface-variant">
                           {" "}
-                          · {s.duration}m · ${s.price}
+                          · {s.duration}m · {formatMoney(s.price)}
                         </span>
                       </span>
                     </li>
@@ -264,6 +274,7 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
 
           <ServiceChangeRequestsSection
             appointmentId={serviceChangeId}
+            requests={appt.serviceChangeRequests}
             showHistory
             compact={false}
           />
@@ -298,14 +309,20 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
                   </button>
                 </>
               )}
+              {showQueueNav && (
+                <Link
+                  href={routes.barber.queue}
+                  className="bg-primary text-on-primary inline-flex h-11 w-full items-center justify-center gap-2 rounded-md text-sm font-bold hover:opacity-90"
+                >
+                  <Users className="h-4 w-4" aria-hidden />
+                  Open queue for this visit
+                </Link>
+              )}
               {appt.status === "confirmed" && (
                 <>
-                  <p className="text-on-surface-variant rounded-lg border border-outline-variant bg-surface-container px-3 py-3 text-sm">
-                    This booking is confirmed. Seat the customer and complete the service from the{" "}
-                    <Link href={routes.barber.queue} className="text-primary font-semibold hover:underline">
-                      Queue
-                    </Link>{" "}
-                    page.
+                  <p className="text-on-surface-variant border-outline-variant bg-surface-container rounded-lg border px-3 py-3 text-sm">
+                    This booking is confirmed. Seat the customer and complete the service from the
+                    queue.
                   </p>
                   <button
                     type="button"
@@ -318,13 +335,15 @@ export default function AppointmentDetail({ appt: initialAppt, appointmentId }) 
                   </button>
                 </>
               )}
+              {appt.status === "rescheduled" && (
+                <p className="text-on-surface-variant border-outline-variant bg-surface-container rounded-lg border px-3 py-3 text-sm">
+                  This visit was rescheduled. Manage seating and completion from the queue when the
+                  customer arrives.
+                </p>
+              )}
               {appt.status === "in-service" && (
-                <p className="text-on-surface-variant rounded-lg border border-outline-variant bg-surface-container px-3 py-3 text-sm">
-                  Service in progress. Complete this visit from the{" "}
-                  <Link href={routes.barber.queue} className="text-primary font-semibold hover:underline">
-                    Queue
-                  </Link>{" "}
-                  page.
+                <p className="text-on-surface-variant border-outline-variant bg-surface-container rounded-lg border px-3 py-3 text-sm">
+                  Service in progress. Complete this visit from the queue board.
                 </p>
               )}
               {!canAct && (

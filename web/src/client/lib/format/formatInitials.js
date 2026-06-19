@@ -1,4 +1,5 @@
 export function customerInitials(name) {
+  if (!name || typeof name !== "string") return "?";
   return name
     .split(" ")
     .map((p) => p[0])

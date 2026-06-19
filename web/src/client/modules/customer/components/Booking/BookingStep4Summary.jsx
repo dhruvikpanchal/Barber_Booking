@@ -1,9 +1,11 @@
 "use client";
 
-import { User, Scissors, Calendar, Clock, MapPin, ChevronRight, AlertCircle } from "lucide-react";
+import { User, Scissors, Calendar, Clock, MapPin, ChevronRight, AlertCircle, StickyNote } from "lucide-react";
 
-import { formatLongDate } from "@/client/lib/format/formatDateTime.js";
+import { formatLongLocalDate } from "@/client/modules/shared/helpers/formatLocalDate.jsx";
 import { formatMoney } from "@/client/lib/format/formatMoney.js";
+
+const MAX_NOTES_LENGTH = 500;
 
 function SummaryRow({ icon: Icon, label, value }) {
   return (
@@ -21,12 +23,14 @@ function SummaryRow({ icon: Icon, label, value }) {
 
 export default function BookingStep4Summary({
   booking,
+  onNotesChange,
   onConfirm,
   confirming,
   disabled = false,
 }) {
   const total = booking.services.reduce((s, sv) => s + sv.price, 0);
   const totalDuration = booking.services.reduce((s, sv) => s + sv.duration, 0);
+  const notesLength = booking.notes?.length ?? 0;
 
   return (
     <div className="space-y-5">
@@ -106,7 +110,7 @@ export default function BookingStep4Summary({
             value={
               <div>
                 <p className="text-on-surface text-sm font-semibold">
-                  {formatLongDate(booking.date)}
+                  {formatLongLocalDate(booking.date)}
                 </p>
                 <p className="text-on-surface-variant text-xs">{booking.timeLabel ?? "—"}</p>
               </div>
@@ -139,10 +143,29 @@ export default function BookingStep4Summary({
       <div className="border-outline-variant bg-surface-container flex gap-3 rounded-xl border px-4 py-3">
         <AlertCircle className="text-on-surface-variant mt-0.5 h-4 w-4 shrink-0" />
         <p className="text-on-surface-variant text-xs leading-relaxed">
-          Free cancellation up to 24 hours before your appointment. Final price is confirmed after
-          your visit — no online payment required.
+          Final price is confirmed after your visit — no online payment required. You can cancel
+          upcoming appointments anytime from My Appointments.
         </p>
       </div>
+
+      <label className="block">
+        <span className="font-label-caps text-on-surface-variant mb-1.5 flex items-center gap-1.5 text-[10px]">
+          <StickyNote className="h-3.5 w-3.5" />
+          Notes for your barber (optional)
+        </span>
+        <textarea
+          value={booking.notes ?? ""}
+          onChange={(e) => onNotesChange?.(e.target.value)}
+          disabled={disabled || confirming}
+          maxLength={MAX_NOTES_LENGTH}
+          rows={3}
+          placeholder="Allergies, style preferences, or anything your barber should know…"
+          className="border-outline-variant bg-surface-container text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary w-full resize-none rounded-xl border px-3.5 py-2.5 text-sm focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+        />
+        <p className="text-on-surface-variant mt-1 text-right text-[11px]">
+          {notesLength}/{MAX_NOTES_LENGTH}
+        </p>
+      </label>
 
       <button
         type="button"
